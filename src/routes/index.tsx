@@ -16,14 +16,12 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <div className="max-w-md text-center space-y-8">
+    <div className="flex min-h-screen items-center justify-center bg-background py-section">
+      <div className="max-w-3xl text-center space-y-8 px-6">
         <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">T-0 Sandbox Bridge</h1>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-caption font-medium uppercase tracking-wider text-primary">Sandbox</p>
+          <h1 className="text-display-lg font-semibold tracking-tight">T-0 Sandbox Bridge</h1>
+          <p className="text-tagline text-muted-foreground">
             Provider sandbox for quote, settlement, payment, payout flows.
           </p>
         </div>
@@ -38,20 +36,16 @@ function Index() {
             </CardHeader>
           </Card>
 
-          <Link to="/sandbox" className="contents">
-            <Button size="lg" className="w-full">
-              Open Sandbox
-            </Button>
-          </Link>
+          <Button asChild size="lg" className="w-full">
+            <Link to="/sandbox">Open Sandbox</Link>
+          </Button>
 
-          <Link to="/docs" className="contents">
-            <Button variant="outline" size="lg" className="w-full">
-              Read Docs
-            </Button>
-          </Link>
+          <Button asChild variant="outline" size="lg" className="w-full">
+            <Link to="/docs">Read Docs</Link>
+          </Button>
         </div>
 
-        <p className="text-sm text-muted-foreground">
+        <p className="text-caption text-muted-foreground">
           Built with TanStack Start + Nitro
         </p>
       </div>
