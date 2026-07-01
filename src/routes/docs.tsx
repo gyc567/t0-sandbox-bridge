@@ -1,8 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import ReactMarkdown from "react-markdown";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Link } from "@tanstack/react-router";
 
 // In production, this would be loaded from a file or API
 const docsContent = `
@@ -64,21 +63,21 @@ export const Route = createFileRoute("/docs")({
 function DocsPage() {
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
+      <header className="border-b border-border">
         <div className="container py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold">T-0 Sandbox Bridge</h1>
-          <Link to="/sandbox" className="contents">
-            <Button variant="outline">Open Sandbox</Button>
-          </Link>
+          <h1 className="text-tagline font-semibold">T-0 Sandbox Bridge</h1>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/sandbox">Open Sandbox</Link>
+          </Button>
         </div>
       </header>
 
-      <main className="container py-8 max-w-4xl">
+      <main className="container py-section max-w-3xl">
         <Card>
           <CardHeader>
             <CardTitle>Integration Guide</CardTitle>
           </CardHeader>
-          <CardContent className="prose prose-sm max-w-none">
+          <CardContent className="prose max-w-none">
             <ReactMarkdown>{docsContent}</ReactMarkdown>
           </CardContent>
         </Card>
