@@ -14,10 +14,6 @@ export default defineConfig({
   },
   // Vercel deployment configuration
   nitro: {
-    preset: "node",
-    output: {
-      dir: ".output",
-      publicDir: ".output/public",
-    },
+    preset: "vercel",
   },
 });
