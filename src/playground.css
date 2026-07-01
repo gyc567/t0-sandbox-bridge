@@ -1,0 +1,135 @@
+/*
+ * Playground dark scope.
+ *
+ * Scoped override of Apple light tokens for the /playground route only.
+ * All existing Tailwind utilities (bg-background, text-foreground,
+ * border-border, etc.) continue to work — they just resolve to dark
+ * values inside elements with the .playground class.
+ *
+ * No changes to the global :root tokens.
+ */
+
+.playground {
+  color-scheme: dark;
+
+  --background: #0a0e1a;
+  --foreground: #f5f5f7;
+  --card: rgba(10, 14, 26, 0.7);
+  --card-foreground: #f5f5f7;
+  --popover: rgba(10, 14, 26, 0.92);
+  --popover-foreground: #f5f5f7;
+  --primary: #00d4ff;
+  --primary-foreground: #0a0e1a;
+  --secondary: rgba(255, 255, 255, 0.04);
+  --secondary-foreground: #f5f5f7;
+  --muted: rgba(255, 255, 255, 0.04);
+  --muted-foreground: #a1a1a6;
+  --accent: rgba(0, 212, 255, 0.08);
+  --accent-foreground: #00d4ff;
+  --destructive: #ff453a;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #00d4ff;
+
+  --usdt: #d4a017;
+  --usdt-soft: rgba(212, 160, 23, 0.4);
+  --success: #34c759;
+  --danger: #ff453a;
+
+  --text-display-mega: 4.5rem;
+  --text-display-mega--line-height: 1;
+  --text-display-mega--letter-spacing: -0.03em;
+
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.playground .text-display-mega {
+  font-size: var(--text-display-mega);
+  line-height: var(--text-display-mega--line-height);
+  letter-spacing: var(--text-display-mega--letter-spacing);
+  font-weight: 600;
+}
+
+.playground .font-mono {
+  font-family: var(--font-mono);
+}
+
+.playground .tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.playground .bg-elevated {
+  background-color: rgba(10, 14, 26, 0.7);
+}
+
+.playground .bg-glass {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.playground .bg-glass-hover:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.playground .border-hairline {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.playground .border-hairline-strong {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.playground .text-muted-canvas {
+  color: #6e6e73;
+}
+
+.playground .text-secondary-canvas {
+  color: #a1a1a6;
+}
+
+.playground .text-accent-cyan {
+  color: #00d4ff;
+}
+
+.playground .border-accent-cyan {
+  border-color: #00d4ff;
+}
+
+.playground .ring-accent-cyan {
+  box-shadow: 0 0 0 1px #00d4ff;
+}
+
+/* Live status dot — soft pulsing glow */
+.playground .status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background-color: var(--primary);
+  box-shadow: 0 0 8px 2px rgba(0, 212, 255, 0.4);
+  animation: playground-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes playground-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px 2px rgba(0, 212, 255, 0.4);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 12px 4px rgba(0, 212, 255, 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playground .status-dot {
+    animation: none;
+    opacity: 1;
+    box-shadow: 0 0 8px 2px rgba(0, 212, 255, 0.4);
+  }
+}
