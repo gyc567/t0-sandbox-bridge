@@ -9,7 +9,9 @@ import {
   publishQuoteFn,
   snapshotFn,
 } from "@/lib/t0/t0.functions";
-import type { Currency, VolumeBand } from "@/lib/t0/types";
+import type { Currency, Payment, Payout, Quote, NetworkEvent, VolumeBand } from "@/lib/t0/types";
+
+type Snapshot = { quotes: Quote[]; payments: Payment[]; payouts: Payout[]; events: NetworkEvent[] };
 
 export const Route = createFileRoute("/sandbox")({
   head: () => ({ meta: [{ title: "T-0 Sandbox Console" }] }),
