@@ -27,6 +27,13 @@ export interface IncomingPaymentInput {
   beneficiaryRef: string;
 }
 
+export interface Snapshot {
+  quotes: Quote[];
+  payments: Payment[];
+  payouts: Payout[];
+  events: NetworkEvent[];
+}
+
 export class PayoutProviderService {
   private quotes = new Map<string, Quote>();
   private payments = new Map<string, Payment>();
@@ -88,6 +95,13 @@ export class PayoutProviderService {
 
   // ── 11-16. Payout lifecycle ───────────────────────────────────
   async processPayout(paymentId: string, opts: { fail?: boolean } = {}): Promise<Payout> {
+    // Idempotency: return existing payout if already processed
+    for (const po of this.payouts.values()) {
+      if (po.paymentId === paymentId) {
+        return po;
+      }
+    }
+
     const payment = this.payments.get(paymentId);
     if (!payment) throw new Error("unknown payment");
     if (payment.status !== "accepted") throw new Error("payment not in accepted state");

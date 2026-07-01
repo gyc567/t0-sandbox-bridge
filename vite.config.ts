@@ -12,4 +12,12 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Vercel deployment configuration
+  nitro: {
+    preset: "node",
+    output: {
+      dir: ".output",
+      publicDir: ".output/public",
+    },
+  },
 });

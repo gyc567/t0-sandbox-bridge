@@ -78,6 +78,35 @@ describe("PayoutProviderService", () => {
     const q = await svc.publishQuote({ currency: "USD", band: 1000, rate: 1 });
     const p = await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "X" });
     await svc.processPayout(p.id);
-    await expect(svc.processPayout(p.id)).rejects.toThrow(/not in accepted/);
+    // Idempotency: repeated payout returns existing payout, not error
+    const po2 = await svc.processPayout(p.id);
+    expect(po2.id).toBe(svc.snapshot().payouts[0].id);
+  });
+
+  it("processPayout is idempotent - returns same payout on repeat call", async () => {
+    const q = await svc.publishQuote({ currency: "USD", band: 1000, rate: 1 });
+    const p = await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "X" });
+
+    const po1 = await svc.processPayout(p.id);
+    const po2 = await svc.processPayout(p.id);
+    const po3 = await svc.processPayout(p.id);
+
+    expect(po1.id).toBe(po2.id);
+    expect(po2.id).toBe(po3.id);
+    expect(svc.snapshot().payouts).toHaveLength(1);
+  });
+
+  it("processPayout idempotency works with fail option", async () => {
+    const q = await svc.publishQuote({ currency: "USD", band: 1000, rate: 1 });
+    const p = await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "X" });
+
+    const po1 = await svc.processPayout(p.id, { fail: true });
+    expect(po1.status).toBe("failed");
+
+    // Subsequent calls should return the same failed payout
+    const po2 = await svc.processPayout(p.id);
+    expect(po2.id).toBe(po1.id);
+    expect(po2.status).toBe("failed");
+    expect(svc.snapshot().payouts).toHaveLength(1);
   });
 });
