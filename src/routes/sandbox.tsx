@@ -23,7 +23,7 @@ const BANDS: VolumeBand[] = [1_000, 5_000, 10_000, 25_000, 250_000, 1_000_000];
 const CURRENCIES: Currency[] = ["USD", "EUR", "GBP", "CNH", "MXN", "BRL", "NGN", "INR"];
 
 function SandboxPage() {
-  const data = Route.useLoaderData();
+  const data = Route.useLoaderData() as Snapshot;
   const router = useRouter();
   const refresh = () => router.invalidate();
 
