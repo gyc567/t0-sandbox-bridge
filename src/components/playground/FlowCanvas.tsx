@@ -7,6 +7,7 @@ import {
   type PacketColor,
 } from "@/data/flows";
 import { GlowDot } from "@/components/playground/GlowDot";
+import { RateLockBadge } from "@/components/playground/RateLockBadge";
 
 interface FlowCanvasProps {
   activeChannel: Channel;
@@ -27,6 +28,28 @@ const NODE_CENTERS: Record<NodeId, { x: number; y: number }> = {
 };
 
 /**
+ * For Payment Intent, the "OFI" node is reinterpreted as the Beneficiary
+ * and "POP" as the Pay-In Provider. The wiring stays the same; only labels
+ * change.
+ */
+function nodeLabels(flowType: Channel["flowType"]) {
+  if (flowType === "payment-intent") {
+    return {
+      ofi: "Beneficiary",
+      ofiSubtitle: "Intent originator",
+      pop: "Pay-In Provider",
+      popSubtitle: "Fiat collector",
+    };
+  }
+  return {
+    ofi: "OFI",
+    ofiSubtitle: "Originator",
+    pop: "POP",
+    popSubtitle: "Payout Provider",
+  };
+}
+
+/**
  * Some steps traverse the bottom USDT transfer channel instead of
  * the main line. Detect them by id and reroute the packet y.
  */
@@ -41,13 +64,15 @@ function channelSteps(stepId: string): boolean {
 /**
  * Static three-node topology + scroll-driven packet rendering.
  *
- * Phase 3 wires a master `progress` prop (0-1) in. As it crosses each
- * step's t threshold, the packet flies from `source` to `target`.
- * Settled packets leave a small arrival ring; target nodes get a soft
- * cyan glow once any packet has reached them.
+ * Phase 5 adds:
+ *   - Flow-aware node labels (Payment Intent shows Beneficiary / Pay-In Provider)
+ *   - RateLockBadge in Network Core during Payment Intent "rate-bound" step
+ *   - Manual AML: the AML/Last Look packets now route through Network Core
+ *     as defined by their source/target in flows.ts.
  */
 export function FlowCanvas({ activeChannel, progress }: FlowCanvasProps) {
   const flow = getFlow(activeChannel.flowType);
+  const labels = nodeLabels(activeChannel.flowType);
 
   // Compute lit nodes from progress (set semantics — node stays lit once lit).
   const litNodes = new Set<NodeId>();
@@ -56,6 +81,13 @@ export function FlowCanvas({ activeChannel, progress }: FlowCanvasProps) {
       litNodes.add(step.target);
     }
   }
+
+  // Rate-lock freeze-frame for Payment Intent.
+  const rateBoundStep = flow.steps.find((s) => s.id === "rate-bound");
+  const rateLockActive =
+    !!rateBoundStep &&
+    progress >= rateBoundStep.t - 0.02 &&
+    progress < rateBoundStep.t + 0.08;
 
   // Packet colors per step.packetColor
   const colorMap: Record<PacketColor, { dot: string; glow: string }> = {
@@ -154,8 +186,8 @@ export function FlowCanvas({ activeChannel, progress }: FlowCanvasProps) {
 
       {/* ─── OFI node ─── */}
       <NodeCard
-        title="OFI"
-        subtitle="Originator"
+        title={labels.ofi}
+        subtitle={labels.ofiSubtitle}
         accentColor="neutral"
         hexId="0x7a3f"
         className="absolute left-[2%] top-[15%] h-[70%] w-[18%]"
@@ -195,12 +227,15 @@ export function FlowCanvas({ activeChannel, progress }: FlowCanvasProps) {
           accent="cyan"
           compact
         />
+
+        {/* Rate-lock freeze-frame for Payment Intent */}
+        <RateLockBadge active={rateLockActive} />
       </NodeCard>
 
       {/* ─── POP node ─── */}
       <NodeCard
-        title="POP"
-        subtitle="Payout Provider"
+        title={labels.pop}
+        subtitle={labels.popSubtitle}
         accentColor="neutral"
         hexId="0x9b1c"
         className="absolute left-[80%] top-[15%] h-[70%] w-[18%]"
@@ -212,7 +247,7 @@ export function FlowCanvas({ activeChannel, progress }: FlowCanvasProps) {
         <ModuleSlot label="Finalize" hexId="0xP004" />
       </NodeCard>
 
-      {/* ─── Local keyframes (also keep the heartbeat logic from Phase 2) ─── */}
+      {/* ─── Local keyframes ─── */}
       <style>{`
         .heartbeat {
           animation: playground-heartbeat 3.6s ease-in-out infinite;
@@ -308,8 +343,8 @@ function NodeCard({
           {hexId && (
             <span
               className={cn(
-                "font-mono tabular text-muted-canvas",
-                lit ? "text-accent-cyan" : "heartbeat",
+                "font-mono tabular",
+                lit ? "text-accent-cyan" : "text-muted-canvas heartbeat",
               )}
               style={{ fontSize: "9px", letterSpacing: "0.04em" }}
             >
@@ -328,7 +363,7 @@ function NodeCard({
       </header>
       <div
         className={cn(
-          "flex flex-1 flex-col gap-1.5",
+          "relative flex flex-1 flex-col gap-1.5",
           large ? "px-4 py-3" : "px-3 py-2",
         )}
       >
