@@ -1,32 +1,77 @@
 import { cn } from "@/lib/utils";
 import type { Channel } from "@/data/channels";
+import {
+  getFlow,
+  type FlowStep,
+  type NodeId,
+  type PacketColor,
+} from "@/data/flows";
+import { GlowDot } from "@/components/playground/GlowDot";
 
 interface FlowCanvasProps {
   activeChannel: Channel;
+  /** Master scroll progress [0, 1]. Drives all packet animations. */
+  progress: number;
 }
 
 /**
- * Static three-node topology rendering.
- *
- * Layout:
- *   OFI (left)  ─┬─►  Network Core (center, large)  ◄─┬─  POP (right)
- *                 └──── USDT transfer channel ────────┘  (dashed ochre)
- *
- * Each node has internal sub-modules with hex IDs that idle-flicker (heartbeat)
- * to suggest live state. The USDT channel at the bottom pulses with a soft
- * ochre animated dash offset.
- *
- * Phase 2: pure topology, no packet motion. Phase 3 wires packet trails to
- * the scroll-driven animation engine.
+ * Node centers in SVG viewBox (0 0 1000 600) coordinates.
+ * `preserveAspectRatio="none"` on the parent SVG means these scale
+ * linearly with the container, so they line up with the absolute-
+ * positioned node cards below.
  */
-export function FlowCanvas({ activeChannel }: FlowCanvasProps) {
+const NODE_CENTERS: Record<NodeId, { x: number; y: number }> = {
+  ofi: { x: 110, y: 300 },
+  network: { x: 425, y: 300 },
+  pop: { x: 890, y: 300 },
+};
+
+/**
+ * Some steps traverse the bottom USDT transfer channel instead of
+ * the main line. Detect them by id and reroute the packet y.
+ */
+function channelSteps(stepId: string): boolean {
+  return (
+    stepId === "usdt-settle" ||
+    stepId === "end-user-pays" ||
+    stepId === "settlement"
+  );
+}
+
+/**
+ * Static three-node topology + scroll-driven packet rendering.
+ *
+ * Phase 3 wires a master `progress` prop (0-1) in. As it crosses each
+ * step's t threshold, the packet flies from `source` to `target`.
+ * Settled packets leave a small arrival ring; target nodes get a soft
+ * cyan glow once any packet has reached them.
+ */
+export function FlowCanvas({ activeChannel, progress }: FlowCanvasProps) {
+  const flow = getFlow(activeChannel.flowType);
+
+  // Compute lit nodes from progress (set semantics — node stays lit once lit).
+  const litNodes = new Set<NodeId>();
+  for (const step of flow.steps) {
+    if (progress >= step.t) {
+      litNodes.add(step.target);
+    }
+  }
+
+  // Packet colors per step.packetColor
+  const colorMap: Record<PacketColor, { dot: string; glow: string }> = {
+    cyan: { dot: "#00d4ff", glow: "rgba(0, 212, 255, 0.5)" },
+    ochre: { dot: "#d4a017", glow: "rgba(212, 160, 23, 0.5)" },
+    sage: { dot: "#7ec488", glow: "rgba(126, 196, 136, 0.5)" },
+    slate: { dot: "#7e95b0", glow: "rgba(126, 149, 176, 0.5)" },
+  };
+
   return (
     <div
       className="relative mx-auto w-full max-w-7xl"
       style={{ height: "min(640px, 70vh)", minHeight: "520px" }}
       aria-label="T-0 protocol topology"
     >
-      {/* ─── Connection layer (SVG, behind nodes) ─── */}
+      {/* ─── SVG layer: connections + packets ─── */}
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
         viewBox="0 0 1000 600"
@@ -34,6 +79,15 @@ export function FlowCanvas({ activeChannel }: FlowCanvasProps) {
         aria-hidden
       >
         <defs>
+          <filter
+            id="packet-blur"
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+          >
+            <feGaussianBlur stdDeviation="3" />
+          </filter>
           <linearGradient id="usdt-channel-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="rgba(212, 160, 23, 0)" />
             <stop offset="50%" stopColor="rgba(212, 160, 23, 0.7)" />
@@ -44,12 +98,11 @@ export function FlowCanvas({ activeChannel }: FlowCanvasProps) {
         {/* OFI ↔ Network Core — two horizontal lines (top section) */}
         <line x1="190" y1="180" x2="350" y2="180" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
         <line x1="190" y1="230" x2="350" y2="230" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
-
         {/* Network Core ↔ POP — two horizontal lines */}
         <line x1="650" y1="180" x2="810" y2="180" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
         <line x1="650" y1="230" x2="810" y2="230" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
 
-        {/* USDT channel — bottom, ochre dashed */}
+        {/* USDT channel — bottom, ochre dashed (shimmer via CSS) */}
         <line
           x1="100"
           y1="500"
@@ -72,18 +125,41 @@ export function FlowCanvas({ activeChannel }: FlowCanvasProps) {
           USDT transfer channel · Tron / Ethereum / BSC
         </text>
 
-        {/* Tiny arrow markers (chevrons) on connection lines */}
+        {/* Chevron markers */}
         <polygon points="345,180 353,180 349,184" fill="rgba(255,255,255,0.3)" />
         <polygon points="655,180 647,180 651,184" fill="rgba(255,255,255,0.3)" />
+
+        {/* Packets (driven by scroll progress) */}
+        {flow.steps.map((step) => {
+          const source = NODE_CENTERS[step.source];
+          const target = NODE_CENTERS[step.target];
+          const colors = colorMap[step.packetColor];
+          const alongChannel = channelSteps(step.id);
+          return (
+            <GlowDot
+              key={step.id}
+              sourceX={source.x}
+              sourceY={alongChannel ? 500 : source.y}
+              targetX={target.x}
+              targetY={alongChannel ? 500 : target.y}
+              progress={progress}
+              stepT={step.t}
+              color={colors.dot}
+              glowColor={colors.glow}
+              trail={!alongChannel}
+            />
+          );
+        })}
       </svg>
 
-      {/* ─── OFI Node (left third) ─── */}
+      {/* ─── OFI node ─── */}
       <NodeCard
         title="OFI"
         subtitle="Originator"
         accentColor="neutral"
         hexId="0x7a3f"
         className="absolute left-[2%] top-[15%] h-[70%] w-[18%]"
+        lit={litNodes.has("ofi")}
       >
         <ModuleSlot label="Quote book" hexId="0xa1b2" />
         <ModuleSlot label="Payment init" hexId="0xb3c4" />
@@ -91,7 +167,7 @@ export function FlowCanvas({ activeChannel }: FlowCanvasProps) {
         <ModuleSlot label="Fiat rail" hexId="0xd7e8" muted />
       </NodeCard>
 
-      {/* ─── Network Core (center, larger) ─── */}
+      {/* ─── Network Core ─── */}
       <NodeCard
         title="T-0 Network Core"
         subtitle={`flow · ${activeChannel.flowType}`}
@@ -99,6 +175,7 @@ export function FlowCanvas({ activeChannel }: FlowCanvasProps) {
         hexId="M4IN.0"
         large
         className="absolute left-[22.5%] top-[5%] h-[88%] w-[40%]"
+        lit={litNodes.has("network")}
       >
         <div className="grid grid-cols-2 gap-1.5">
           <ModuleSlot label="Quote Aggregator" hexId="0xN001" compact />
@@ -120,13 +197,14 @@ export function FlowCanvas({ activeChannel }: FlowCanvasProps) {
         />
       </NodeCard>
 
-      {/* ─── POP Node (right third) ─── */}
+      {/* ─── POP node ─── */}
       <NodeCard
         title="POP"
         subtitle="Payout Provider"
         accentColor="neutral"
         hexId="0x9b1c"
         className="absolute left-[80%] top-[15%] h-[70%] w-[18%]"
+        lit={litNodes.has("pop")}
       >
         <ModuleSlot label="Quote Publish" hexId="0xP001" />
         <ModuleSlot label="ECDSA sign" hexId="0xP002" />
@@ -134,7 +212,7 @@ export function FlowCanvas({ activeChannel }: FlowCanvasProps) {
         <ModuleSlot label="Finalize" hexId="0xP004" />
       </NodeCard>
 
-      {/* ─── Local keyframes for the heartbeat + USDT channel shimmer ─── */}
+      {/* ─── Local keyframes (also keep the heartbeat logic from Phase 2) ─── */}
       <style>{`
         .heartbeat {
           animation: playground-heartbeat 3.6s ease-in-out infinite;
@@ -178,26 +256,45 @@ interface NodeCardProps {
   large?: boolean;
   accentColor?: "neutral" | "cyan";
   className?: string;
+  lit?: boolean;
   children: React.ReactNode;
 }
 
-function NodeCard({ title, subtitle, hexId, large, accentColor = "neutral", className, children }: NodeCardProps) {
+function NodeCard({
+  title,
+  subtitle,
+  hexId,
+  large,
+  accentColor = "neutral",
+  className,
+  lit,
+  children,
+}: NodeCardProps) {
   return (
     <div
       className={cn(
-        "flex flex-col rounded-xl border border-hairline backdrop-blur",
-        "bg-glass",
+        "flex flex-col rounded-xl border backdrop-blur bg-glass transition-colors duration-700",
         large && "rounded-2xl",
-        accentColor === "cyan" && "border-[rgba(0,212,255,0.18)]",
+        !lit && accentColor === "cyan" && "border-[rgba(0,212,255,0.18)]",
+        !lit && accentColor === "neutral" && "border-hairline",
+        lit && "border-[rgba(0,212,255,0.5)]",
         className,
       )}
       style={{
-        boxShadow: large
-          ? "0 0 24px 0 rgba(0, 212, 255, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.04)"
-          : "inset 0 1px 0 0 rgba(255, 255, 255, 0.03)",
+        boxShadow: lit
+          ? "0 0 26px 0 rgba(0, 212, 255, 0.32), inset 0 1px 0 0 rgba(255, 255, 255, 0.06)"
+          : large
+            ? "0 0 24px 0 rgba(0, 212, 255, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.04)"
+            : "inset 0 1px 0 0 rgba(255, 255, 255, 0.03)",
+        transition: "box-shadow 700ms cubic-bezier(0.16, 1, 0.3, 1), border-color 700ms ease-out",
       }}
     >
-      <header className={cn("border-b border-hairline", large ? "px-4 py-3" : "px-3 py-2")}>
+      <header
+        className={cn(
+          "border-b border-hairline",
+          large ? "px-4 py-3" : "px-3 py-2",
+        )}
+      >
         <div className="flex items-center justify-between">
           <h3
             className={cn(
@@ -210,7 +307,10 @@ function NodeCard({ title, subtitle, hexId, large, accentColor = "neutral", clas
           </h3>
           {hexId && (
             <span
-              className="font-mono tabular text-muted-canvas heartbeat"
+              className={cn(
+                "font-mono tabular text-muted-canvas",
+                lit ? "text-accent-cyan" : "heartbeat",
+              )}
               style={{ fontSize: "9px", letterSpacing: "0.04em" }}
             >
               {hexId}
@@ -226,7 +326,12 @@ function NodeCard({ title, subtitle, hexId, large, accentColor = "neutral", clas
           </p>
         )}
       </header>
-      <div className={cn("flex flex-1 flex-col gap-1.5", large ? "px-4 py-3" : "px-3 py-2")}>
+      <div
+        className={cn(
+          "flex flex-1 flex-col gap-1.5",
+          large ? "px-4 py-3" : "px-3 py-2",
+        )}
+      >
         {children}
       </div>
     </div>
