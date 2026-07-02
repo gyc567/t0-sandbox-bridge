@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { AmbientGrid } from "@/components/playground/AmbientGrid";
+import { ArtifactDrawer } from "@/components/playground/ArtifactDrawer";
 import { ChannelBar } from "@/components/playground/ChannelBar";
 import { ChannelContextStrip } from "@/components/playground/ChannelContextStrip";
 import { FlowCanvas } from "@/components/playground/FlowCanvas";
@@ -10,7 +11,7 @@ import { LiveClock } from "@/components/playground/LiveClock";
 import { LiveTicker } from "@/components/playground/LiveTicker";
 import { TimelineScrubber } from "@/components/playground/TimelineScrubber";
 import { CHANNELS, type ChannelId, getChannel } from "@/data/channels";
-import { getFlow } from "@/data/flows";
+import { getFlow, type ArtifactType } from "@/data/flows";
 import { useScrollProgress } from "@/lib/playground/animation";
 import { Button } from "@/components/ui/button";
 
@@ -41,15 +42,16 @@ const TICKER_HEIGHT = 56;
 /**
  * T-0 Command Center
  *
- * Phase 4 layout: hero overlay + channel context strip.
+ * Phase 6 layout: artifact drawer.
  *   [TopBar 60px sticky]
  *   [LiveTicker 56px sticky]
  *   [320vh scroll trigger]
  *     [sticky canvas pane]
  *       [HeroOverlay: 0-12%]
- *       [FlowCanvas: packets]
- *       [ChannelContextStrip: anchored bottom]
- *       [TimelineScrubber: bottom]
+ *       [FlowCanvas: clickable packets + nodes]
+ *       [ChannelContextStrip]
+ *       [TimelineScrubber: clickable markers]
+ *       [ArtifactDrawer: when a step is selected]
  *   [Footer section]
  */
 function PlaygroundPage() {
@@ -57,12 +59,32 @@ function PlaygroundPage() {
   const activeChannel = getChannel(activeId);
   const flow = getFlow(activeChannel.flowType);
 
+  const [selectedArtifact, setSelectedArtifact] = useState<{
+    type: ArtifactType;
+    stepId: string;
+  } | null>(null);
+
   const triggerRef = useRef<HTMLElement>(null);
   const progress = useScrollProgress(triggerRef);
 
   function handleReset() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  function handleStepClick(stepId: string) {
+    const step = flow.steps.find((s) => s.id === stepId);
+    if (step) {
+      setSelectedArtifact({ type: step.artifactType, stepId });
+    }
+  }
+
+  function handleCloseArtifact() {
+    setSelectedArtifact(null);
+  }
+
+  const selectedStep = selectedArtifact
+    ? flow.steps.find((s) => s.id === selectedArtifact.stepId)
+    : null;
 
   return (
     <div className="playground">
@@ -124,6 +146,7 @@ function PlaygroundPage() {
                   <FlowCanvas
                     activeChannel={activeChannel}
                     progress={progress}
+                    onStepClick={handleStepClick}
                   />
                 </div>
 
@@ -138,10 +161,24 @@ function PlaygroundPage() {
                 flow={flow}
                 progress={progress}
                 onReset={handleReset}
+                onMarkerClick={handleStepClick}
               />
             </div>
           </div>
         </section>
+
+        {/* Artifact drawer */}
+        {selectedArtifact && (
+          <ArtifactDrawer
+            type={selectedArtifact.type}
+            timestamp={
+              selectedStep
+                ? `t-${((1 - selectedStep.t) * 100).toFixed(1)}% in cycle`
+                : undefined
+            }
+            onClose={handleCloseArtifact}
+          />
+        )}
 
         {/* Footer */}
         <section className="border-t border-hairline px-6 py-12">
@@ -189,7 +226,7 @@ function PlaygroundPage() {
             className="mx-auto mt-8 max-w-7xl text-center font-mono text-muted-canvas"
             style={{ fontSize: "10px", letterSpacing: "0.12em" }}
           >
-            PHASE 4 · HERO OVERLAY + CONTEXT STRIP · VARIANTS + DRAWER NEXT
+            PHASE 6 · ARTIFACT DRAWER · SANDBOX WIRING + BENTO FOOTER NEXT
           </p>
         </section>
       </main>

@@ -8,6 +8,8 @@ interface TimelineScrubberProps {
   progress: number;
   /** Reset handler — scrolls window to top. */
   onReset: () => void;
+  /** Called when a step marker is clicked. */
+  onMarkerClick?: (stepId: string) => void;
 }
 
 /** Parse a "12:18" timestamp label into total seconds. */
@@ -30,7 +32,7 @@ function fmtTime(seconds: number): string {
  * Active step markers grow + glow; current step gets a hover label
  * (shortLabel) below it. The cyan fill bar tracks scroll progress.
  */
-export function TimelineScrubber({ flow, progress, onReset }: TimelineScrubberProps) {
+export function TimelineScrubber({ flow, progress, onReset, onMarkerClick }: TimelineScrubberProps) {
   const totalSec = parseTimeLabel(flow.totalLabel);
   const currentSec = progress * totalSec;
 
@@ -84,14 +86,17 @@ export function TimelineScrubber({ flow, progress, onReset }: TimelineScrubberPr
               const isActive = progress >= step.t;
               const isCurrent = i === currentIdx;
               return (
-                <div
+                <button
                   key={step.id}
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
+                  type="button"
+                  className="absolute -translate-x-1/2 -translate-y-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-full"
                   style={{ left: `${step.t * 100}%`, top: "50%" }}
                   title={step.label}
+                  onClick={() => onMarkerClick?.(step.id)}
+                  aria-label={`Open artifact for ${step.label}`}
                 >
-                  <div
-                    className="rounded-full transition-all duration-300"
+                  <span
+                    className="block rounded-full transition-all duration-300"
                     style={{
                       width: isCurrent ? 10 : 6,
                       height: isCurrent ? 10 : 6,
@@ -102,14 +107,14 @@ export function TimelineScrubber({ flow, progress, onReset }: TimelineScrubberPr
                     }}
                   />
                   {isCurrent && (
-                    <div
+                    <span
                       className="absolute left-1/2 top-3.5 -translate-x-1/2 whitespace-nowrap font-mono uppercase text-accent-cyan"
                       style={{ fontSize: "9px", letterSpacing: "0.16em" }}
                     >
                       {step.shortLabel}
-                    </div>
+                    </span>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>

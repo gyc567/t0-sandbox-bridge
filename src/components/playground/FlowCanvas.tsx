@@ -13,6 +13,8 @@ interface FlowCanvasProps {
   activeChannel: Channel;
   /** Master scroll progress [0, 1]. Drives all packet animations. */
   progress: number;
+  /** Called when a step/node is clicked to open its artifact. */
+  onStepClick?: (stepId: string) => void;
 }
 
 /**
@@ -70,7 +72,7 @@ function channelSteps(stepId: string): boolean {
  *   - Manual AML: the AML/Last Look packets now route through Network Core
  *     as defined by their source/target in flows.ts.
  */
-export function FlowCanvas({ activeChannel, progress }: FlowCanvasProps) {
+export function FlowCanvas({ activeChannel, progress, onStepClick }: FlowCanvasProps) {
   const flow = getFlow(activeChannel.flowType);
   const labels = nodeLabels(activeChannel.flowType);
 
@@ -168,18 +170,25 @@ export function FlowCanvas({ activeChannel, progress }: FlowCanvasProps) {
           const colors = colorMap[step.packetColor];
           const alongChannel = channelSteps(step.id);
           return (
-            <GlowDot
+            <g
               key={step.id}
-              sourceX={source.x}
-              sourceY={alongChannel ? 500 : source.y}
-              targetX={target.x}
-              targetY={alongChannel ? 500 : target.y}
-              progress={progress}
-              stepT={step.t}
-              color={colors.dot}
-              glowColor={colors.glow}
-              trail={!alongChannel}
-            />
+              className="cursor-pointer"
+              onClick={() => onStepClick?.(step.id)}
+              role="button"
+              aria-label={`Open artifact for ${step.label}`}
+            >
+              <GlowDot
+                sourceX={source.x}
+                sourceY={alongChannel ? 500 : source.y}
+                targetX={target.x}
+                targetY={alongChannel ? 500 : target.y}
+                progress={progress}
+                stepT={step.t}
+                color={colors.dot}
+                glowColor={colors.glow}
+                trail={!alongChannel}
+              />
+            </g>
           );
         })}
       </svg>
@@ -292,6 +301,7 @@ interface NodeCardProps {
   accentColor?: "neutral" | "cyan";
   className?: string;
   lit?: boolean;
+  onClick?: () => void;
   children: React.ReactNode;
 }
 
@@ -303,6 +313,7 @@ function NodeCard({
   accentColor = "neutral",
   className,
   lit,
+  onClick,
   children,
 }: NodeCardProps) {
   return (
@@ -313,8 +324,12 @@ function NodeCard({
         !lit && accentColor === "cyan" && "border-[rgba(0,212,255,0.18)]",
         !lit && accentColor === "neutral" && "border-hairline",
         lit && "border-[rgba(0,212,255,0.5)]",
+        onClick && "cursor-pointer hover:bg-[rgba(255,255,255,0.06)]",
         className,
       )}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      aria-label={onClick ? `Inspect ${title}` : undefined}
       style={{
         boxShadow: lit
           ? "0 0 26px 0 rgba(0, 212, 255, 0.32), inset 0 1px 0 0 rgba(255, 255, 255, 0.06)"

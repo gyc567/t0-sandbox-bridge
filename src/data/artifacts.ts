@@ -273,3 +273,58 @@ export const ARTIFACT_TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
 export function getArtifactTemplate(type: ArtifactType): ArtifactTemplate {
   return ARTIFACT_TEMPLATES[type];
 }
+
+/**
+ * Build a mock curl command for the sandbox endpoint matching an artifact.
+ *
+ * No real secrets are included. Headers and body are synthetic examples
+ * that mirror the shape a provider would send.
+ */
+export function buildCurlCommand(type: ArtifactType): string {
+  const t = getArtifactTemplate(type);
+  const payload = t.build();
+  const url = "https://api-sandbox.t-0.network/v1/";
+  const headers = [
+    '-H "Content-Type: application/json"',
+    '-H "X-Signature: [REDACTED]"',
+    '-H "X-Public-Key: [REDACTED]"',
+    '-H "X-Signature-Timestamp: ' + Date.now() + '"',
+  ].join(" \\\n  ");
+
+  let path: string;
+  switch (type) {
+    case "update-quote":
+      path = "quote";
+      break;
+    case "get-quote":
+      path = "quote:get";
+      break;
+    case "usdt-settle":
+      path = "settlement";
+      break;
+    case "update-limit":
+      path = "limit";
+      break;
+    case "create-payment":
+      path = "payment";
+      break;
+    case "payout-rpc":
+      path = "payout";
+      break;
+    case "ecdsa-sign":
+      path = "auth/sign";
+      break;
+    case "finalize-payout":
+      path = "payout:finalize";
+      break;
+    case "ledger-entry":
+      path = "ledger";
+      break;
+    default:
+      path = "noop";
+  }
+
+  return `curl -X POST ${url}${path} \\
+  ${headers} \\
+  -d '${JSON.stringify(payload, null, 2)}'`;
+}
