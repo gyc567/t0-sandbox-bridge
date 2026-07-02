@@ -18,7 +18,7 @@ export function RateLockBadge({ active }: RateLockBadgeProps) {
   return (
     <div
       className={cn(
-        "absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2",
+        "rate-lock-pulse absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2",
         "flex flex-col items-center gap-2 rounded-lg border border-accent-cyan px-4 py-3 backdrop-blur",
       )}
       style={{
@@ -49,6 +49,9 @@ export function RateLockBadge({ active }: RateLockBadgeProps) {
         @keyframes rate-lock-pulse {
           0%, 100% { box-shadow: 0 0 28px 4px rgba(0, 212, 255, 0.35); }
           50%      { box-shadow: 0 0 40px 8px rgba(0, 212, 255, 0.55); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .rate-lock-pulse { animation: none !important; }
         }
       `}</style>
     </div>

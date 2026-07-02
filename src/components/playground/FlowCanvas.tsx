@@ -174,7 +174,7 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
           return (
             <g
               key={step.id}
-              className="cursor-pointer"
+              className="packet-group cursor-pointer"
               onClick={() => onStepClick?.(step.id)}
               role="button"
               aria-label={`Open artifact for ${step.label}`}
@@ -290,6 +290,7 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
             animation: none !important;
           }
           .heartbeat, .heartbeat-2, .heartbeat-3 { opacity: 0.55 !important; }
+          .packet-group { display: none !important; }
         }
       `}</style>
     </div>

@@ -14,7 +14,7 @@ import { useEffect, useState, type RefObject } from "react";
  * Implemented with requestAnimationFrame for buttery updates under
  * 60fps; teardown cancels the rAF so no leaks.
  */
-export function useScrollProgress(triggerRef: RefObject<HTMLElement>): number {
+export function useScrollProgress(triggerRef: RefObject<HTMLElement | null>): number {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
