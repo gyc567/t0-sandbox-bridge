@@ -3,7 +3,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { AmbientGrid } from "@/components/playground/AmbientGrid";
 import { ChannelBar } from "@/components/playground/ChannelBar";
+import { ChannelContextStrip } from "@/components/playground/ChannelContextStrip";
 import { FlowCanvas } from "@/components/playground/FlowCanvas";
+import { HeroOverlay } from "@/components/playground/HeroOverlay";
 import { LiveClock } from "@/components/playground/LiveClock";
 import { LiveTicker } from "@/components/playground/LiveTicker";
 import { TimelineScrubber } from "@/components/playground/TimelineScrubber";
@@ -35,31 +37,26 @@ export const Route = createFileRoute("/playground")({
 
 const TOP_BAR_HEIGHT = 60;
 const TICKER_HEIGHT = 56;
-const SCRUBBER_HEIGHT = 80;
 
 /**
  * T-0 Command Center
  *
- * Phase 3 layout: scroll-driven experience.
- *   [TopBar 60px sticky]                              — LOGO · LIVE · Channels · Clock
- *   [LiveTicker 56px sticky]                          — 4 KPI segments
- *   ─────── scroll-driven section starts ───────
- *   [320vh tall container, child is sticky for 100vh]  — FlowCanvas (scroll-driven packets)
- *   ─────── scroll-driven section ends ───────
- *   [Footer section, appears after scroll completes]    — Bento support (Phase 7)
- *
- * While the user scrolls through the container, the FlowCanvas stays
- * pinned and `progress` (0 → 1) drives packet animations on the canvas.
- * TimelineScrubber renders the same progress as a horizontal track with
- * step markers.
+ * Phase 4 layout: hero overlay + channel context strip.
+ *   [TopBar 60px sticky]
+ *   [LiveTicker 56px sticky]
+ *   [320vh scroll trigger]
+ *     [sticky canvas pane]
+ *       [HeroOverlay: 0-12%]
+ *       [FlowCanvas: packets]
+ *       [ChannelContextStrip: anchored bottom]
+ *       [TimelineScrubber: bottom]
+ *   [Footer section]
  */
 function PlaygroundPage() {
   const [activeId, setActiveId] = useState<ChannelId>(CHANNELS[0].id);
   const activeChannel = getChannel(activeId);
   const flow = getFlow(activeChannel.flowType);
 
-  // Trigger element is the section the user actually scrolls through.
-  // Anything past its bottom returns progress = 1 (all packets settled).
   const triggerRef = useRef<HTMLElement>(null);
   const progress = useScrollProgress(triggerRef);
 
@@ -105,8 +102,6 @@ function PlaygroundPage() {
       <LiveTicker fee={activeChannel.fee} />
 
       <main>
-        {/* Scroll experience — 320vh tall. Inner sticky pane holds the
-            canvas + scrubber for the duration of the scroll. */}
         <section
           ref={triggerRef}
           style={{ height: "320vh" }}
@@ -119,8 +114,11 @@ function PlaygroundPage() {
               height: `calc(100vh - ${TOP_BAR_HEIGHT + TICKER_HEIGHT}px)`,
             }}
           >
-            <div className="flex h-full flex-col">
-              {/* Canvas area (scroll-driven content) */}
+            <div className="relative flex h-full flex-col">
+              {/* Hero overlay — scroll 0-12% */}
+              <HeroOverlay progress={progress} />
+
+              {/* Canvas area */}
               <div className="relative flex-1 min-h-0">
                 <div className="h-full px-6 py-8">
                   <FlowCanvas
@@ -129,51 +127,23 @@ function PlaygroundPage() {
                   />
                 </div>
 
-                {/* Channel context strip — overlays the canvas bottom area */}
+                {/* Channel context strip anchored at canvas bottom */}
                 <div className="absolute bottom-3 left-6 right-6">
-                  <div
-                    className="flex flex-col gap-1 rounded-lg border border-hairline bg-elevated px-5 py-3 backdrop-blur"
-                    style={{
-                      borderLeft: "3px solid rgba(0, 212, 255, 0.6)",
-                      backgroundColor: "rgba(10, 14, 26, 0.75)",
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className="font-mono uppercase text-accent-cyan"
-                        style={{ fontSize: "10px", letterSpacing: "0.16em" }}
-                      >
-                        // CHANNEL · {activeChannel.label.toUpperCase()}
-                      </span>
-                      <span
-                        className="font-mono text-muted-canvas"
-                        style={{ fontSize: "10px", letterSpacing: "0.04em" }}
-                      >
-                        flow · {activeChannel.flowType}
-                      </span>
-                    </div>
-                    <p
-                      className="font-mono text-secondary-canvas"
-                      style={{ fontSize: "12px" }}
-                    >
-                      {activeChannel.context}
-                    </p>
-                  </div>
+                  <ChannelContextStrip channel={activeChannel} />
                 </div>
               </div>
 
-              {/* Timeline scrubber — sticky bottom of the experience */}
+              {/* Timeline scrubber */}
               <TimelineScrubber
                 flow={flow}
                 progress={progress}
                 onReset={handleReset}
-                style={{ height: SCRUBBER_HEIGHT }}
               />
             </div>
           </div>
         </section>
 
-        {/* Below-the-fold footer section */}
+        {/* Footer */}
         <section className="border-t border-hairline px-6 py-12">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
             <div>
@@ -219,7 +189,7 @@ function PlaygroundPage() {
             className="mx-auto mt-8 max-w-7xl text-center font-mono text-muted-canvas"
             style={{ fontSize: "10px", letterSpacing: "0.12em" }}
           >
-            PHASE 3 · SCROLL-DRIVEN ANIMATION · HERO OVERLAY + VARIANTS ARRIVING NEXT
+            PHASE 4 · HERO OVERLAY + CONTEXT STRIP · VARIANTS + DRAWER NEXT
           </p>
         </section>
       </main>
