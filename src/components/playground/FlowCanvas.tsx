@@ -15,6 +15,8 @@ interface FlowCanvasProps {
   progress: number;
   /** Called when a step/node is clicked to open its artifact. */
   onStepClick?: (stepId: string) => void;
+  /** Called when a node card is clicked to inspect the latest step targeting it. */
+  onNodeClick?: (nodeId: NodeId) => void;
 }
 
 /**
@@ -72,7 +74,7 @@ function channelSteps(stepId: string): boolean {
  *   - Manual AML: the AML/Last Look packets now route through Network Core
  *     as defined by their source/target in flows.ts.
  */
-export function FlowCanvas({ activeChannel, progress, onStepClick }: FlowCanvasProps) {
+export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }: FlowCanvasProps) {
   const flow = getFlow(activeChannel.flowType);
   const labels = nodeLabels(activeChannel.flowType);
 
@@ -201,6 +203,7 @@ export function FlowCanvas({ activeChannel, progress, onStepClick }: FlowCanvasP
         hexId="0x7a3f"
         className="absolute left-[2%] top-[15%] h-[70%] w-[18%]"
         lit={litNodes.has("ofi")}
+        onClick={() => onNodeClick?.("ofi")}
       >
         <ModuleSlot label="Quote book" hexId="0xa1b2" />
         <ModuleSlot label="Payment init" hexId="0xb3c4" />
@@ -217,6 +220,7 @@ export function FlowCanvas({ activeChannel, progress, onStepClick }: FlowCanvasP
         large
         className="absolute left-[22.5%] top-[5%] h-[88%] w-[40%]"
         lit={litNodes.has("network")}
+        onClick={() => onNodeClick?.("network")}
       >
         <div className="grid grid-cols-2 gap-1.5">
           <ModuleSlot label="Quote Aggregator" hexId="0xN001" compact />
@@ -249,6 +253,7 @@ export function FlowCanvas({ activeChannel, progress, onStepClick }: FlowCanvasP
         hexId="0x9b1c"
         className="absolute left-[80%] top-[15%] h-[70%] w-[18%]"
         lit={litNodes.has("pop")}
+        onClick={() => onNodeClick?.("pop")}
       >
         <ModuleSlot label="Quote Publish" hexId="0xP001" />
         <ModuleSlot label="ECDSA sign" hexId="0xP002" />

@@ -1,8 +1,10 @@
 import { useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 
 import { AmbientGrid } from "@/components/playground/AmbientGrid";
 import { ArtifactDrawer } from "@/components/playground/ArtifactDrawer";
+import { BentoFooter } from "@/components/playground/BentoFooter";
 import { ChannelBar } from "@/components/playground/ChannelBar";
 import { ChannelContextStrip } from "@/components/playground/ChannelContextStrip";
 import { FlowCanvas } from "@/components/playground/FlowCanvas";
@@ -12,8 +14,13 @@ import { LiveTicker } from "@/components/playground/LiveTicker";
 import { TimelineScrubber } from "@/components/playground/TimelineScrubber";
 import { CHANNELS, type ChannelId, getChannel } from "@/data/channels";
 import { getFlow, type ArtifactType } from "@/data/flows";
+import {
+  publishQuoteFn,
+  acceptPaymentFn,
+  processPayoutFn,
+} from "@/lib/t0/t0.functions";
 import { useScrollProgress } from "@/lib/playground/animation";
-import { Button } from "@/components/ui/button";
+import type { NodeId } from "@/data/flows";
 
 import playgroundCss from "../playground.css?url";
 
@@ -42,17 +49,7 @@ const TICKER_HEIGHT = 56;
 /**
  * T-0 Command Center
  *
- * Phase 6 layout: artifact drawer.
- *   [TopBar 60px sticky]
- *   [LiveTicker 56px sticky]
- *   [320vh scroll trigger]
- *     [sticky canvas pane]
- *       [HeroOverlay: 0-12%]
- *       [FlowCanvas: clickable packets + nodes]
- *       [ChannelContextStrip]
- *       [TimelineScrubber: clickable markers]
- *       [ArtifactDrawer: when a step is selected]
- *   [Footer section]
+ * Phase 7: real sandbox wiring + Bento footer.
  */
 function PlaygroundPage() {
   const [activeId, setActiveId] = useState<ChannelId>(CHANNELS[0].id);
@@ -63,6 +60,12 @@ function PlaygroundPage() {
     type: ArtifactType;
     stepId: string;
   } | null>(null);
+
+  const [liveIds, setLiveIds] = useState<{ paymentId?: string; quoteId?: string }>({});
+
+  const publishQuote = useServerFn(publishQuoteFn);
+  const acceptPayment = useServerFn(acceptPaymentFn);
+  const processPayout = useServerFn(processPayoutFn);
 
   const triggerRef = useRef<HTMLElement>(null);
   const progress = useScrollProgress(triggerRef);
@@ -78,8 +81,66 @@ function PlaygroundPage() {
     }
   }
 
+  function handleNodeClick(nodeId: NodeId) {
+    const latest = [...flow.steps]
+      .filter((s) => s.target === nodeId && progress >= s.t)
+      .sort((a, b) => b.t - a.t)[0];
+    if (latest) {
+      setSelectedArtifact({ type: latest.artifactType, stepId: latest.id });
+    }
+  }
+
   function handleCloseArtifact() {
     setSelectedArtifact(null);
+  }
+
+  // Fire real sandbox calls when Pay-Out steps cross their thresholds.
+  // We track which step IDs we've already fired so they don't re-trigger.
+  const firedRef = useRef<Set<string>>(new Set());
+
+  if (activeChannel.flowType === "pay-out") {
+    const steps = flow.steps;
+
+    // UpdateQuote → publishQuote
+    const updateQuote = steps.find((s) => s.id === "update-quote");
+    if (updateQuote && progress >= updateQuote.t && !firedRef.current.has("update-quote")) {
+      firedRef.current.add("update-quote");
+      publishQuote({ data: { currency: "EUR", band: 1_000, rate: 0.92 } })
+        .then((q) => {
+          if (q && typeof q === "object" && "id" in q) {
+            setLiveIds((prev) => ({ ...prev, quoteId: String((q as { id: string }).id) }));
+          }
+        })
+        .catch(() => {
+          // Fail silently in the visualizer — the mock artifact is still shown.
+        });
+    }
+
+    // CreatePayment → acceptPayment (uses the last published quote id if available)
+    const createPayment = steps.find((s) => s.id === "create-payment");
+    if (createPayment && progress >= createPayment.t && !firedRef.current.has("create-payment")) {
+      firedRef.current.add("create-payment");
+      if (liveIds.quoteId) {
+        acceptPayment({
+          data: { quoteId: liveIds.quoteId, beneficiaryRef: `BEN-${Date.now()}` },
+        })
+          .then((p) => {
+            if (p && typeof p === "object" && "id" in p) {
+              setLiveIds((prev) => ({ ...prev, paymentId: String((p as { id: string }).id) }));
+            }
+          })
+          .catch(() => {});
+      }
+    }
+
+    // FinalizePayout → processPayout success
+    const finalize = steps.find((s) => s.id === "finalize-payout");
+    if (finalize && progress >= finalize.t && !firedRef.current.has("finalize-payout")) {
+      firedRef.current.add("finalize-payout");
+      if (liveIds.paymentId) {
+        processPayout({ data: { paymentId: liveIds.paymentId } }).catch(() => {});
+      }
+    }
   }
 
   const selectedStep = selectedArtifact
@@ -90,7 +151,6 @@ function PlaygroundPage() {
     <div className="playground">
       <AmbientGrid />
 
-      {/* Top bar */}
       <header
         className="sticky top-0 z-30 flex h-[60px] items-center justify-between border-b border-hairline px-6 backdrop-blur"
         style={{ backgroundColor: "rgba(10, 14, 26, 0.7)" }}
@@ -120,7 +180,6 @@ function PlaygroundPage() {
         </div>
       </header>
 
-      {/* Live ticker */}
       <LiveTicker fee={activeChannel.fee} />
 
       <main>
@@ -137,26 +196,23 @@ function PlaygroundPage() {
             }}
           >
             <div className="relative flex h-full flex-col">
-              {/* Hero overlay — scroll 0-12% */}
               <HeroOverlay progress={progress} />
 
-              {/* Canvas area */}
               <div className="relative flex-1 min-h-0">
                 <div className="h-full px-6 py-8">
                   <FlowCanvas
                     activeChannel={activeChannel}
                     progress={progress}
                     onStepClick={handleStepClick}
+                    onNodeClick={handleNodeClick}
                   />
                 </div>
 
-                {/* Channel context strip anchored at canvas bottom */}
                 <div className="absolute bottom-3 left-6 right-6">
                   <ChannelContextStrip channel={activeChannel} />
                 </div>
               </div>
 
-              {/* Timeline scrubber */}
               <TimelineScrubber
                 flow={flow}
                 progress={progress}
@@ -167,7 +223,6 @@ function PlaygroundPage() {
           </div>
         </section>
 
-        {/* Artifact drawer */}
         {selectedArtifact && (
           <ArtifactDrawer
             type={selectedArtifact.type}
@@ -180,55 +235,7 @@ function PlaygroundPage() {
           />
         )}
 
-        {/* Footer */}
-        <section className="border-t border-hairline px-6 py-12">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
-            <div>
-              <p
-                className="font-mono uppercase text-muted-canvas"
-                style={{ fontSize: "10px", letterSpacing: "0.16em" }}
-              >
-                // RUN IT YOURSELF
-              </p>
-              <h2
-                className="mt-2 font-semibold text-foreground"
-                style={{ fontSize: "20px", letterSpacing: "-0.01em" }}
-              >
-                Run this flow against real sandbox endpoints.
-              </h2>
-              <p
-                className="mt-1 max-w-md text-secondary-canvas"
-                style={{ fontSize: "13px", lineHeight: 1.5 }}
-              >
-                The T-0 sandbox mirrors production gRPC + REST contracts. Press
-                reset, scroll, and inspect artifacts — then run the same flow
-                against live endpoints in /sandbox.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Link to="/" className="contents">
-                <Button variant="outline" size="sm">
-                  ← Home
-                </Button>
-              </Link>
-              <Link to="/sandbox" className="contents">
-                <Button size="sm">Open Sandbox</Button>
-              </Link>
-              <Link to="/docs" className="contents">
-                <Button variant="outline" size="sm">
-                  Read Docs
-                </Button>
-              </Link>
-            </div>
-          </div>
-
-          <p
-            className="mx-auto mt-8 max-w-7xl text-center font-mono text-muted-canvas"
-            style={{ fontSize: "10px", letterSpacing: "0.12em" }}
-          >
-            PHASE 6 · ARTIFACT DRAWER · SANDBOX WIRING + BENTO FOOTER NEXT
-          </p>
-        </section>
+        <BentoFooter />
       </main>
     </div>
   );
