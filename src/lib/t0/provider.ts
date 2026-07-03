@@ -144,6 +144,83 @@ export class PayoutProviderService {
     };
   }
 
+  // ── Manual AML / Last Look (Phase 8) ──────────────────────────
+  /**
+   * Complete a manual AML check. Idempotent on paymentId.
+   * Always returns the existing payment with status updated.
+   */
+  completeManualAml(paymentId: string, approved: boolean): Payment {
+    const payment = this.payments.get(paymentId);
+    if (!payment) throw new Error("unknown payment");
+    payment.status = approved ? "accepted" : "rejected";
+    this.log({
+      type: "PaymentConfirmed",
+      paymentId: payment.id,
+      at: this.now(),
+    });
+    return payment;
+  }
+
+  /**
+   * Approve / refresh a payment quote (Last Look). Idempotent on paymentId.
+   * Bumps the quote TTL via a fresh publishQuote-style call.
+   */
+  approvePaymentQuote(paymentId: string, quoteId: string): Quote {
+    const quote = this.quotes.get(quoteId);
+    if (!quote) throw new Error("unknown quote");
+    const payment = this.payments.get(paymentId);
+    if (!payment) throw new Error("unknown payment");
+    quote.expiresAt = this.now() + 60_000;
+    this.log({
+      type: "PaymentConfirmed",
+      paymentId: payment.id,
+      at: this.now(),
+    });
+    return quote;
+  }
+
+  // ── Payment Intent (Phase 8) ──────────────────────────────────
+  /**
+   * Create a payment intent (rate is indicative until funds are confirmed).
+   */
+  createPaymentIntent(input: { quoteId: string; beneficiaryRef: string }): Payment {
+    const quote = this.quotes.get(input.quoteId);
+    if (!quote) throw new Error("unknown quote");
+    const payment: Payment = {
+      id: nextId("pi"),
+      quoteId: quote.id,
+      currency: quote.currency,
+      usdAmount: quote.band,
+      localAmount: quote.band * quote.rate,
+      beneficiaryRef: input.beneficiaryRef,
+      status: "pending",
+      createdAt: this.now(),
+    };
+    this.payments.set(payment.id, payment);
+    this.log({
+      type: "PaymentAccepted",
+      paymentId: payment.id,
+      at: this.now(),
+    });
+    return payment;
+  }
+
+  /**
+   * Confirm funds received from the Pay-In Provider. Locks the rate and
+   * transitions the payment to "accepted".
+   */
+  confirmFunds(paymentId: string): Payment {
+    const payment = this.payments.get(paymentId);
+    if (!payment) throw new Error("unknown payment");
+    payment.status = "accepted";
+    this.log({
+      type: "PaymentAccepted",
+      paymentId: payment.id,
+      at: this.now(),
+    });
+    return payment;
+  }
+
   private log(e: NetworkEvent) {
     this.events.push(e);
   }

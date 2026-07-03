@@ -31,3 +31,24 @@ export const processPayoutFn = createServerFn({ method: "POST" })
 export const snapshotFn = createServerFn({ method: "GET" }).handler(async () =>
   providerService.snapshot(),
 );
+
+// Phase 8 — Manual AML / Last Look / Payment Intent
+export const completeManualAmlFn = createServerFn({ method: "POST" })
+  .inputValidator((d: { paymentId: string; approved: boolean }) => d)
+  .handler(async ({ data }) => providerService.completeManualAml(data.paymentId, data.approved));
+
+export const approvePaymentQuoteFn = createServerFn({ method: "POST" })
+  .inputValidator((d: { paymentId: string; quoteId: string }) => d)
+  .handler(async ({ data }) =>
+    providerService.approvePaymentQuote(data.paymentId, data.quoteId),
+  );
+
+export const createPaymentIntentFn = createServerFn({ method: "POST" })
+  .inputValidator((d: { quoteId: string; beneficiaryRef: string }) => d)
+  .handler(async ({ data }) =>
+    providerService.createPaymentIntent(data),
+  );
+
+export const confirmFundsFn = createServerFn({ method: "POST" })
+  .inputValidator((d: { paymentId: string }) => d)
+  .handler(async ({ data }) => providerService.confirmFunds(data.paymentId));

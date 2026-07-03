@@ -69,6 +69,11 @@ export function generateClientQuoteId(band: number = 1000, currency: string = "E
   return `ql-${ts}-${currency.toLowerCase()}-${band}-${seq}`;
 }
 
+/** Generate a stable network quote_id (qt-…) when none is provided. */
+export function generateQuoteId(): string {
+  return `qt-${Math.random().toString(16).slice(2, 18)}`;
+}
+
 /** Compressed secp256k1 public key: 0x + 33 bytes hex = 66 chars. */
 export function generatePublicKey(seed?: number): string {
   const hex = "0123456789abcdef";
@@ -83,6 +88,11 @@ export function generatePublicKey(seed?: number): string {
 
 // ─── Artifact templates ───────────────────────────────────────────────
 
+export interface LiveIds {
+  paymentId?: string;
+  quoteId?: string;
+}
+
 export interface ArtifactTemplate {
   type: ArtifactType;
   /** Top-of-drawer heading. */
@@ -93,18 +103,22 @@ export interface ArtifactTemplate {
    * Render the payload as a structured object. Keys are display labels,
    * values are the actual protocol values. The drawer formats them as
    * a monospace key/value list.
+   *
+   * When `live` is provided, templates substitute real sandbox IDs in
+   * place of the mocked payment_id / quote_id so the drawer reflects
+   * the actual server-side state.
    */
-  build: () => Record<string, string | number | boolean>;
+  build: (live?: LiveIds) => Record<string, string | number | boolean>;
 }
 
 /** Common mock context shared across several artifacts. */
-function mockContext() {
+function mockContext(live?: LiveIds) {
   return {
     currency: "EUR",
     band: 1_000,
     rate: 0.9214,
-    paymentId: generatePaymentId(),
-    quoteId: generateClientQuoteId(),
+    paymentId: live?.paymentId ?? generatePaymentId(),
+    quoteId: live?.quoteId ?? generateQuoteId(),
     signature: generateSignature(),
     hash: generateHash(),
     txHash: generateTxHash(),
@@ -118,8 +132,8 @@ export const ARTIFACT_TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
     type: "update-quote",
     title: "UpdateQuote",
     endpoint: "POST /tzero.v1.payment.NetworkService/UpdateQuote",
-    build: () => {
-      const c = mockContext();
+    build: (live) => {
+      const c = mockContext(live);
       return {
         client_quote_id: c.quoteId,
         currency: c.currency,
@@ -136,10 +150,10 @@ export const ARTIFACT_TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
     type: "get-quote",
     title: "GetQuote (response)",
     endpoint: "tzero.v1.payment.NetworkService/GetQuote",
-    build: () => {
-      const c = mockContext();
+    build: (live) => {
+      const c = mockContext(live);
       return {
-        quote_id: `qt-${Math.random().toString(16).slice(2, 18)}`,
+        quote_id: c.quoteId,
         client_quote_id: c.quoteId,
         currency: c.currency,
         band: c.band,
@@ -153,8 +167,8 @@ export const ARTIFACT_TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
     type: "usdt-settle",
     title: "USDT Settlement",
     endpoint: "chain · USDT-TRC20",
-    build: () => {
-      const c = mockContext();
+    build: (live) => {
+      const c = mockContext(live);
       return {
         chain: "tron",
         asset: "USDT",
@@ -172,8 +186,8 @@ export const ARTIFACT_TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
     type: "update-limit",
     title: "UpdateLimit (webhook)",
     endpoint: "provider.WebhookService/UpdateLimit",
-    build: () => {
-      const c = mockContext();
+    build: (live) => {
+      const c = mockContext(live);
       return {
         counterparty: "ofi-demo",
         credit_limit: 250_000,
@@ -189,11 +203,11 @@ export const ARTIFACT_TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
     type: "create-payment",
     title: "CreatePayment",
     endpoint: "POST /tzero.v1.payment.NetworkService/CreatePayment",
-    build: () => {
-      const c = mockContext();
+    build: (live) => {
+      const c = mockContext(live);
       return {
         payment_id: c.paymentId,
-        quote_id: `qt-${Math.random().toString(16).slice(2, 18)}`,
+        quote_id: c.quoteId,
         rate: c.rate,
         source_amount: `${c.band}.00`,
         settlement_amount: (c.band * c.rate).toFixed(2),
@@ -206,8 +220,8 @@ export const ARTIFACT_TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
     type: "payout-rpc",
     title: "PayOut (RPC)",
     endpoint: "provider.NetworkService/PayOut",
-    build: () => {
-      const c = mockContext();
+    build: (live) => {
+      const c = mockContext(live);
       return {
         payment_id: c.paymentId,
         amount: `${c.band}.00`,
@@ -222,8 +236,8 @@ export const ARTIFACT_TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
     type: "ecdsa-sign",
     title: "ECDSA Sign (Keccak-256 + secp256k1)",
     endpoint: "internal · cryptographically valid against sandbox keypair",
-    build: () => {
-      const c = mockContext();
+    build: (live) => {
+      const c = mockContext(live);
       return {
         public_key: c.publicKey,
         x_signature: c.signature.slice(0, 74) + "...",
@@ -237,8 +251,8 @@ export const ARTIFACT_TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
     type: "finalize-payout",
     title: "FinalizePayout",
     endpoint: "provider.NetworkService/FinalizePayout",
-    build: () => {
-      const c = mockContext();
+    build: (live) => {
+      const c = mockContext(live);
       return {
         payment_id: c.paymentId,
         outcome: "success",
@@ -252,8 +266,8 @@ export const ARTIFACT_TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
     type: "ledger-entry",
     title: "AppendLedgerEntries (double-entry)",
     endpoint: "internal · TransactionID is idempotency key",
-    build: () => {
-      const c = mockContext();
+    build: (live) => {
+      const c = mockContext(live);
       return {
         transaction_id: Math.random().toString(16).slice(2, 14),
         debit: {
@@ -265,6 +279,88 @@ export const ARTIFACT_TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
           amount: `${c.band}.00`,
         },
         timestamp: c.timestamp,
+      };
+    },
+  },
+  // ── Phase 8: new artifact types ──
+  "ivms101-disclosure": {
+    type: "ivms101-disclosure",
+    title: "Travel Rule (IVMS101 disclosure)",
+    endpoint: "POST /tzero.v1.payment.NetworkService/SubmitTravelRule",
+    build: (live) => {
+      const c = mockContext(live);
+      return {
+        payment_id: c.paymentId,
+        originator: {
+          natural_person: {
+            name: "Anna Müller",
+            country: "DE",
+            address: "Friedrichstr. 1, Berlin",
+          },
+          lei: "529900T8BM49AURSDO55",
+        },
+        beneficiary: {
+          natural_person: {
+            name: "Wei Chen",
+            country: "CN",
+            address: "Pudong, Shanghai",
+          },
+        },
+        amount: `${c.band}.00`,
+        currency: c.currency,
+        timestamp: c.timestamp,
+      };
+    },
+  },
+  "aml-pending": {
+    type: "aml-pending",
+    title: "ManualAmlCheck (PENDING_REVIEW)",
+    endpoint: "internal · compliance hold",
+    build: (live) => {
+      const c = mockContext(live);
+      return {
+        payment_id: c.paymentId,
+        status: "PENDING_REVIEW",
+        queue: "tier-2-manual-aml",
+        assigned_to: "compliance-ops@provider",
+        sla_seconds: 90,
+        opened_at: c.timestamp,
+        reason: "high_band_first_time_beneficiary",
+      };
+    },
+  },
+  "last-look-approval": {
+    type: "last-look-approval",
+    title: "ApprovePaymentQuotes (Last Look)",
+    endpoint: "POST /tzero.v1.payment.NetworkService/ApprovePaymentQuotes",
+    build: (live) => {
+      const c = mockContext(live);
+      return {
+        payment_id: c.paymentId,
+        quote_id: c.quoteId,
+        approval: "APPROVED",
+        approved_rate: c.rate,
+        approved_band: c.band,
+        approved_at: c.timestamp,
+        approver: "payout-provider-rpc",
+      };
+    },
+  },
+  "pay-in-receipt": {
+    type: "pay-in-receipt",
+    title: "Pay-In Receipt (off-network rail)",
+    endpoint: "POST /tzero.v1.payment.NetworkService/ConfirmFundsReceived",
+    build: (live) => {
+      const c = mockContext(live);
+      return {
+        payment_id: c.paymentId,
+        payin_provider: "stripe-mock",
+        fiat_amount: `${(c.band * c.rate).toFixed(2)}`,
+        fiat_currency: "EUR",
+        rail: "SEPA Instant",
+        tx_ref: `pi-${Math.random().toString(16).slice(2, 12)}`,
+        received_at: c.timestamp,
+        rate_locked: true,
       };
     },
   },
@@ -280,9 +376,9 @@ export function getArtifactTemplate(type: ArtifactType): ArtifactTemplate {
  * No real secrets are included. Headers and body are synthetic examples
  * that mirror the shape a provider would send.
  */
-export function buildCurlCommand(type: ArtifactType): string {
+export function buildCurlCommand(type: ArtifactType, live?: LiveIds): string {
   const t = getArtifactTemplate(type);
-  const payload = t.build();
+  const payload = t.build(live);
   const url = "https://api-sandbox.t-0.network/v1/";
   const headers = [
     '-H "Content-Type: application/json"',
@@ -319,6 +415,18 @@ export function buildCurlCommand(type: ArtifactType): string {
       break;
     case "ledger-entry":
       path = "ledger";
+      break;
+    case "ivms101-disclosure":
+      path = "travel-rule";
+      break;
+    case "aml-pending":
+      path = "compliance/manual-aml";
+      break;
+    case "last-look-approval":
+      path = "payment:approve";
+      break;
+    case "pay-in-receipt":
+      path = "payin/confirm";
       break;
     default:
       path = "noop";

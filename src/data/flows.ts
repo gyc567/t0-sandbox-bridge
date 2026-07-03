@@ -2,16 +2,22 @@
  * T-0 flow choreography.
  *
  * Each flow is a sequence of timed events (step events, on the 0-1 progress
- * scale shared with the scroll-driven timeline).
+ * scale shared with the playback timeline).
  *
  *   Progress 0   = start of cycle
  *   Progress 1   = fee charged, ready for next payment
- *   Step.t       = the scroll-progress threshold at which the event fires
+ *   Step.t       = the progress threshold at which the event fires
+ *
+ * Phase 8 introduces 4 node IDs to match the real BAXS × T-0 onboarding:
+ *   - ofi         → Originator / Beneficiary (depending on flow)
+ *   - orchestrator → T-0 Network Orchestration (replaces the old "network")
+ *   - pop         → Payout Provider / Pay-In Provider (depending on flow)
+ *   - payin       → Pay-In Provider rail (active only in Payment Intent)
  */
 
 import type { FlowType } from "./channels";
 
-export type NodeId = "ofi" | "network" | "pop";
+export type NodeId = "ofi" | "orchestrator" | "pop" | "payin";
 
 export type PacketColor = "cyan" | "ochre" | "sage" | "slate";
 
@@ -24,7 +30,11 @@ export type ArtifactType =
   | "payout-rpc"
   | "ecdsa-sign"
   | "finalize-payout"
-  | "ledger-entry";
+  | "ledger-entry"
+  | "ivms101-disclosure"
+  | "aml-pending"
+  | "last-look-approval"
+  | "pay-in-receipt";
 
 export interface FlowStep {
   /** Stable ID — used by markers, drawer, animation engine. */
@@ -33,7 +43,7 @@ export interface FlowStep {
   label: string;
   /** Short label (≤12 chars) for compact display. */
   shortLabel: string;
-  /** Scroll-progress threshold on [0, 1]. */
+  /** Progress threshold on [0, 1]. */
   t: number;
   /** Source node (where the packet originates). */
   source: NodeId;
@@ -43,8 +53,10 @@ export interface FlowStep {
   packetColor: PacketColor;
   /** Artifact type the drawer opens when this marker is clicked. */
   artifactType: ArtifactType;
-  /** Whether the network core lights up while this event is in-flight. */
+  /** Whether the orchestrator lights up while this event is in-flight. */
   highlightNetwork: boolean;
+  /** Optional override for the y-coordinate of the packet (for off-rail flows). */
+  railY?: number;
 }
 
 export interface Flow {
@@ -59,7 +71,8 @@ export interface Flow {
 
 const POP = "pop" as const;
 const OFI = "ofi" as const;
-const NET = "network" as const;
+const ORCH = "orchestrator" as const;
+const PAYIN = "payin" as const;
 
 export const FLOWS: Record<FlowType, Flow> = {
   /**
@@ -112,7 +125,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         label: "UpdateLimit",
         shortLabel: "Limit",
         t: 0.35,
-        source: NET,
+        source: ORCH,
         target: OFI,
         packetColor: "slate",
         artifactType: "update-limit",
@@ -124,7 +137,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         shortLabel: "Create",
         t: 0.5,
         source: OFI,
-        target: NET,
+        target: ORCH,
         packetColor: "sage",
         artifactType: "create-payment",
         highlightNetwork: true,
@@ -134,7 +147,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         label: "PayOut RPC",
         shortLabel: "PayOut",
         t: 0.58,
-        source: NET,
+        source: ORCH,
         target: POP,
         packetColor: "sage",
         artifactType: "payout-rpc",
@@ -157,7 +170,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         shortLabel: "Finalize",
         t: 0.78,
         source: POP,
-        target: NET,
+        target: ORCH,
         packetColor: "sage",
         artifactType: "finalize-payout",
         highlightNetwork: true,
@@ -167,8 +180,8 @@ export const FLOWS: Record<FlowType, Flow> = {
         label: "AppendLedger",
         shortLabel: "Ledger",
         t: 0.88,
-        source: NET,
-        target: NET,
+        source: ORCH,
+        target: ORCH,
         packetColor: "slate",
         artifactType: "ledger-entry",
         highlightNetwork: true,
@@ -178,7 +191,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         label: "Fee charged (5 bps)",
         shortLabel: "Fee",
         t: 0.96,
-        source: NET,
+        source: ORCH,
         target: OFI,
         packetColor: "cyan",
         artifactType: "ledger-entry",
@@ -189,6 +202,7 @@ export const FLOWS: Record<FlowType, Flow> = {
 
   /**
    * Manual AML: ~17s, adds a PENDING_REVIEW wait and Last Look quote refresh.
+   * OFI ↔ Orchestrator in the AML/Last Look handoff (not OFI↔POP).
    */
   "manual-aml": {
     type: "manual-aml",
@@ -233,7 +247,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         label: "UpdateLimit",
         shortLabel: "Limit",
         t: 0.26,
-        source: NET,
+        source: ORCH,
         target: OFI,
         packetColor: "slate",
         artifactType: "update-limit",
@@ -245,39 +259,50 @@ export const FLOWS: Record<FlowType, Flow> = {
         shortLabel: "Create",
         t: 0.38,
         source: OFI,
-        target: NET,
+        target: ORCH,
         packetColor: "sage",
         artifactType: "create-payment",
         highlightNetwork: true,
       },
       {
         id: "manual-aml-check",
-        label: "ManualAmlCheck",
+        label: "ManualAmlCheck (PENDING_REVIEW)",
         shortLabel: "AML",
         t: 0.5,
-        source: POP,
-        target: NET,
+        source: ORCH,
+        target: ORCH,
         packetColor: "slate",
-        artifactType: "ecdsa-sign",
+        artifactType: "aml-pending",
         highlightNetwork: true,
       },
       {
-        id: "approve-quotes",
+        id: "ivms-disclosure",
+        label: "Travel Rule (IVMS101)",
+        shortLabel: "IVMS101",
+        t: 0.56,
+        source: OFI,
+        target: ORCH,
+        packetColor: "slate",
+        artifactType: "ivms101-disclosure",
+        highlightNetwork: true,
+      },
+      {
+        id: "last-look-approval",
         label: "ApprovePaymentQuotes (Last Look)",
         shortLabel: "Last Look",
-        t: 0.62,
-        source: NET,
+        t: 0.66,
+        source: ORCH,
         target: OFI,
         packetColor: "cyan",
-        artifactType: "update-quote",
+        artifactType: "last-look-approval",
         highlightNetwork: true,
       },
       {
         id: "payout-rpc",
         label: "PayOut RPC",
         shortLabel: "PayOut",
-        t: 0.72,
-        source: NET,
+        t: 0.74,
+        source: ORCH,
         target: POP,
         packetColor: "sage",
         artifactType: "payout-rpc",
@@ -289,7 +314,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         shortLabel: "Finalize",
         t: 0.84,
         source: POP,
-        target: NET,
+        target: ORCH,
         packetColor: "sage",
         artifactType: "finalize-payout",
         highlightNetwork: true,
@@ -299,7 +324,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         label: "Fee charged (10 bps)",
         shortLabel: "Fee",
         t: 0.96,
-        source: NET,
+        source: ORCH,
         target: OFI,
         packetColor: "cyan",
         artifactType: "ledger-entry",
@@ -310,6 +335,7 @@ export const FLOWS: Record<FlowType, Flow> = {
 
   /**
    * Payment Intent: rate is indicative until ConfirmFundsReceived.
+   * Adds a Pay-In Provider rail for the off-network fiat leg.
    */
   "payment-intent": {
     type: "payment-intent",
@@ -333,7 +359,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         shortLabel: "Intent",
         t: 0.16,
         source: OFI,
-        target: NET,
+        target: ORCH,
         packetColor: "cyan",
         artifactType: "create-payment",
         highlightNetwork: true,
@@ -343,7 +369,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         label: "GetPaymentDetails",
         shortLabel: "Details",
         t: 0.26,
-        source: NET,
+        source: ORCH,
         target: POP,
         packetColor: "cyan",
         artifactType: "get-quote",
@@ -353,20 +379,21 @@ export const FLOWS: Record<FlowType, Flow> = {
         id: "end-user-pays",
         label: "End-user pays (off-network)",
         shortLabel: "FIAT pay",
-        t: 0.5,
-        source: OFI,
+        t: 0.45,
+        source: PAYIN,
         target: POP,
         packetColor: "ochre",
-        artifactType: "usdt-settle",
+        artifactType: "pay-in-receipt",
         highlightNetwork: false,
+        railY: 460,
       },
       {
         id: "confirm-funds",
         label: "ConfirmFundsReceived",
         shortLabel: "Confirm",
-        t: 0.66,
+        t: 0.62,
         source: POP,
-        target: NET,
+        target: ORCH,
         packetColor: "sage",
         artifactType: "create-payment",
         highlightNetwork: true,
@@ -375,9 +402,9 @@ export const FLOWS: Record<FlowType, Flow> = {
         id: "rate-bound",
         label: "Rate locked (binding)",
         shortLabel: "Lock",
-        t: 0.74,
-        source: NET,
-        target: NET,
+        t: 0.72,
+        source: ORCH,
+        target: ORCH,
         packetColor: "cyan",
         artifactType: "update-quote",
         highlightNetwork: true,
@@ -387,7 +414,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         label: "Blockchain settlement",
         shortLabel: "Settle",
         t: 0.86,
-        source: NET,
+        source: ORCH,
         target: POP,
         packetColor: "ochre",
         artifactType: "usdt-settle",
@@ -398,7 +425,7 @@ export const FLOWS: Record<FlowType, Flow> = {
         label: "Intent fee",
         shortLabel: "Fee",
         t: 0.95,
-        source: NET,
+        source: ORCH,
         target: OFI,
         packetColor: "cyan",
         artifactType: "ledger-entry",
