@@ -111,3 +111,11 @@ export function currentStepIndex(
   }
   return -1;
 }
+
+/**
+ * Parse a "12:18" timestamp label into total seconds.
+ */
+export function parseTimeLabel(label: string): number {
+  const [m = 0, s = 0] = label.split(":").map(Number);
+  return m * 60 + s;
+}

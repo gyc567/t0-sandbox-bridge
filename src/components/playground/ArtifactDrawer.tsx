@@ -1,13 +1,19 @@
-import { useEffect } from "react";
-import { X, Copy } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ArtifactType } from "@/data/flows";
-import { getArtifactTemplate, buildCurlCommand } from "@/data/artifacts";
+import {
+  buildCurlCommand,
+  getArtifactTemplate,
+  type LiveIds,
+} from "@/data/artifacts";
 
 interface ArtifactDrawerProps {
   type: ArtifactType;
   /** Relative timestamp label, e.g. "t-3.4s ago". */
   timestamp?: string;
+  /** Real sandbox IDs from server calls — substitute into the template. */
+  liveIds?: LiveIds;
   /** Called when the drawer should close. */
   onClose: () => void;
 }
@@ -20,10 +26,14 @@ interface ArtifactDrawerProps {
  *   - mono payload as key/value rows
  *   - "Copy as cURL" button at the bottom
  *   - closes via X button or Esc key
+ *
+ * Phase 8:
+ *   - liveIds flows real payment_id/quote_id into the template
+ *   - IVMS101 disclosure artifact gets a collapsible Travel-Rule panel
  */
-export function ArtifactDrawer({ type, timestamp, onClose }: ArtifactDrawerProps) {
+export function ArtifactDrawer({ type, timestamp, liveIds, onClose }: ArtifactDrawerProps) {
   const template = getArtifactTemplate(type);
-  const payload = template.build();
+  const payload = template.build(liveIds);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -34,9 +44,11 @@ export function ArtifactDrawer({ type, timestamp, onClose }: ArtifactDrawerProps
   }, [onClose]);
 
   function handleCopy() {
-    const cmd = buildCurlCommand(type);
+    const cmd = buildCurlCommand(type, liveIds);
     navigator.clipboard.writeText(cmd);
   }
+
+  const isIvms = type === "ivms101-disclosure";
 
   return (
     <>
@@ -102,7 +114,10 @@ export function ArtifactDrawer({ type, timestamp, onClose }: ArtifactDrawerProps
 
         {/* Payload rows */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          <div className="space-y-2">
+          {/* IVMS101 disclosure — collapsible Travel-Rule panel */}
+          {isIvms && <IvmsDisclosurePanel payload={payload} />}
+
+          <div className={cn("space-y-2", isIvms && "mt-3")}>
             {Object.entries(payload).map(([key, value]) => (
               <div
                 key={key}
@@ -147,4 +162,60 @@ function formatValue(value: unknown): string {
     return JSON.stringify(value, null, 2);
   }
   return String(value);
+}
+
+/**
+ * Collapsible Travel-Rule (IVMS101) summary. Shows originator +
+ * beneficiary in a tight two-line panel; click to expand inline JSON.
+ */
+function IvmsDisclosurePanel({ payload }: { payload: Record<string, unknown> }) {
+  const [open, setOpen] = useState(true);
+  const originator = payload.originator as
+    | { natural_person?: { name?: string; country?: string }; lei?: string }
+    | undefined;
+  const beneficiary = payload.beneficiary as
+    | { natural_person?: { name?: string; country?: string } }
+    | undefined;
+
+  const oName = originator?.natural_person?.name ?? "—";
+  const oCountry = originator?.natural_person?.country ?? "—";
+  const oLei = originator?.lei;
+  const bName = beneficiary?.natural_person?.name ?? "—";
+  const bCountry = beneficiary?.natural_person?.country ?? "—";
+
+  return (
+    <div className="rounded border border-hairline bg-glass">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-3 py-2 text-left"
+        aria-expanded={open}
+      >
+        <span
+          className="font-mono uppercase text-accent-cyan"
+          style={{ fontSize: "10px", letterSpacing: "0.16em" }}
+        >
+          ▼ Travel Rule (IVMS101)
+        </span>
+        {open ? (
+          <ChevronUp className="h-3.5 w-3.5 text-muted-canvas" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 text-muted-canvas" />
+        )}
+      </button>
+      {open && (
+        <div className="border-t border-hairline px-3 py-2 text-foreground" style={{ fontSize: "11px" }}>
+          <p className="font-mono">
+            <span className="text-muted-canvas">originator  :</span>{" "}
+            {oName}, {oCountry}
+            {oLei ? `, LEI ${oLei}` : ""}
+          </p>
+          <p className="mt-1 font-mono">
+            <span className="text-muted-canvas">beneficiary :</span>{" "}
+            {bName}, {bCountry}
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
