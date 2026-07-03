@@ -13,6 +13,7 @@ import { ThemeToggle } from "./ThemeToggle";
 const NAV = [
   { to: "/", label: "Overview" },
   { to: "/sandbox", label: "Console" },
+  { to: "/integration", label: "Integration" },
   { to: "/docs", label: "Docs" },
 ] as const;
 
