@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -24,12 +23,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, Copy, RefreshCw } from "lucide-react";
+import { Download, Copy, RefreshCw, KeyRound, Terminal } from "lucide-react";
+import { SiteLayout } from "@/components/site/SiteLayout";
+import { cn } from "@/lib/utils";
 
 type Snapshot = { quotes: Quote[]; payments: Payment[]; payouts: Payout[]; events: NetworkEvent[] };
 
 export const Route = createFileRoute("/sandbox")({
-  head: () => ({ meta: [{ title: "T-0 Sandbox Console" }] }),
+  head: () => ({
+    meta: [
+      { title: "Console — T-0 Sandbox Bridge" },
+      { name: "description", content: "Interactive T-0 provider console: publish quotes, simulate settlement, process payouts." },
+    ],
+  }),
   loader: async () => snapshotFn(),
   component: SandboxPage,
 });
@@ -70,32 +76,36 @@ function SandboxPage() {
   }, [data]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6 space-y-6">
-      <header className="flex items-center justify-between border-b border-border pb-6">
-        <div>
-          <h1 className="text-lead font-semibold">T-0 Payout Provider Sandbox</h1>
-          <p className="text-caption text-muted-foreground">Mock mode — flows mirror docs.t-0.network REST contract.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleExportCSV}>
-            <Download className="w-4 h-4 mr-1" />
-            Export CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={refresh} disabled={busy}>
-            <RefreshCw className="w-4 h-4 mr-1" />
-            Refresh
-          </Button>
-        </div>
-      </header>
+    <SiteLayout>
+      <div className="container container-7xl py-section space-y-6">
+        {/* Page header */}
+        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-hairline pb-6">
+          <div className="space-y-2">
+            <p className="eyebrow">CONSOLE · MOCK MODE</p>
+            <h1 className="text-display-md font-semibold tracking-tight text-foreground">
+              Payout Provider Sandbox
+            </h1>
+            <p className="font-mono text-muted-foreground" style={{ fontSize: "12px" }}>
+              flows mirror docs.t-0.network REST contract
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportCSV}>
+              <Download className="w-4 h-4" />
+              Export CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={refresh} disabled={busy}>
+              <RefreshCw className={cn("w-4 h-4", busy && "animate-spin")} />
+              Refresh
+            </Button>
+          </div>
+        </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>1. Publish Quote</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
+        {/* Step 1: Publish quote */}
+        <PanelCard step="01" title="Publish Quote">
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-32 font-mono">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -105,7 +115,7 @@ function SandboxPage() {
               </SelectContent>
             </Select>
             <Select value={String(band)} onValueChange={(v) => setBand(Number(v) as VolumeBand)}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-36 font-mono">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -114,19 +124,15 @@ function SandboxPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Input type="number" step="0.0001" value={rate} onChange={(e) => setRate(Number(e.target.value))} className="w-28" />
-            <Button size="sm" disabled={busy} onClick={() => run(() => publishQuote({ data: { currency, band, rate } }))}>
+            <Input type="number" step="0.0001" value={rate} onChange={(e) => setRate(Number(e.target.value))} className="w-28 font-mono" />
+            <Button size="sm" className="btn-glow" disabled={busy} onClick={() => run(() => publishQuote({ data: { currency, band, rate } }))}>
               Publish quote
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </PanelCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>2. Inbound notifications</CardTitle>
-        </CardHeader>
-        <CardContent>
+        {/* Step 2: Inbound notifications */}
+        <PanelCard step="02" title="Inbound Notifications">
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" disabled={busy} onClick={() => run(() => notifyUsdt({ data: { txHash: `0x${Math.random().toString(16).slice(2, 10)}`, usd: band } }))}>
               Simulate USDT settlement
@@ -135,84 +141,139 @@ function SandboxPage() {
               Simulate credit usage
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </PanelCard>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>3. Quotes ({data.quotes.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {/* Steps 3 & 4 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <PanelCard step="03" title={`Quotes · ${data.quotes.length}`}>
             <List items={data.quotes} render={(q) => (
-              <div key={q.id} className="flex items-center justify-between text-caption border-b py-1">
-                <span>{q.id} · {q.currency} · ${q.band.toLocaleString()} @ {q.rate}</span>
+              <div key={q.id} className="flex items-center justify-between gap-2 border-b border-hairline py-2 last:border-0">
+                <span className="font-mono tabular text-caption text-foreground">
+                  {q.id} · {q.currency} · ${q.band.toLocaleString()} <span className="text-accent-cyan">@ {q.rate}</span>
+                </span>
                 <Button variant="outline" size="sm" disabled={busy} onClick={() => run(() => acceptPayment({ data: { quoteId: q.id, beneficiaryRef: `BEN-${Date.now()}` } }))}>
-                  Accept payment
+                  Accept
                 </Button>
               </div>
             )} />
-          </CardContent>
-        </Card>
+          </PanelCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>4. Payments ({data.payments.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <PanelCard step="04" title={`Payments · ${data.payments.length}`}>
             <List items={data.payments} render={(p) => (
-              <div key={p.id} className="flex items-center justify-between text-caption border-b py-1">
-                <span>{p.id} · {p.status} · {p.currency} {p.localAmount.toFixed(2)}</span>
-                <span className="flex gap-2">
+              <div key={p.id} className="flex items-center justify-between gap-2 border-b border-hairline py-2 last:border-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <StatusDot status={p.status} />
+                  <span className="font-mono tabular text-caption text-foreground truncate">
+                    {p.id} · {p.currency} {p.localAmount.toFixed(2)}
+                  </span>
+                </div>
+                <span className="flex gap-1.5 shrink-0">
                   <Button variant="outline" size="sm" disabled={busy || p.status !== "accepted"} onClick={() => run(() => processPayout({ data: { paymentId: p.id } }))}>
-                    Payout success
+                    Pay
                   </Button>
                   <Button variant="destructive" size="sm" disabled={busy || p.status !== "accepted"} onClick={() => run(() => processPayout({ data: { paymentId: p.id, fail: true } }))}>
-                    Payout fail
+                    Fail
                   </Button>
                 </span>
               </div>
             )} />
-          </CardContent>
-        </Card>
-      </div>
+          </PanelCard>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>5. Payouts ({data.payouts.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {/* Steps 5 & 6 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <PanelCard step="05" title={`Payouts · ${data.payouts.length}`}>
             <List items={data.payouts} render={(p) => (
-              <div key={p.id} className="text-caption border-b py-1">
-                <Badge variant={p.status === "success" ? "default" : p.status === "failed" ? "destructive" : "secondary"}>{p.status}</Badge>
-                {" "}{p.id}{p.reason ? ` (${p.reason})` : ""}
+              <div key={p.id} className="flex items-center gap-2 border-b border-hairline py-2 last:border-0">
+                <StatusDot status={p.status} />
+                <span className="font-mono tabular text-caption text-foreground">{p.id}</span>
+                {p.reason && <span className="font-mono text-caption text-muted-foreground">({p.reason})</span>}
               </div>
             )} />
-          </CardContent>
-        </Card>
+          </PanelCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Event log ({data.events.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-48 overflow-auto font-mono text-fine-print">
-              {data.events.map((e, i) => <div key={i} className="border-b py-1 text-muted-foreground">{new Date(e.at).toISOString()} · {e.type}</div>)}
+          <PanelCard step="06" title={`Event Log · ${data.events.length}`}>
+            <div className="max-h-64 overflow-auto font-mono text-fine-print space-y-0.5">
+              {data.events.length === 0 ? (
+                <p className="text-muted-foreground">No events yet.</p>
+              ) : (
+                data.events.map((e, i) => (
+                  <div key={i} className="flex gap-2 py-1">
+                    <span className="text-muted-canvas shrink-0">{new Date(e.at).toISOString().slice(11, 19)}</span>
+                    <span className="text-accent-cyan">{e.type}</span>
+                  </div>
+                ))
+              )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </PanelCard>
+        </div>
 
-      <APITester />
-    </div>
+        {/* API tester */}
+        <APITester />
+      </div>
+    </SiteLayout>
   );
 }
 
+// ─── Panel card wrapper (glass, numbered) ─────────────────────────────
+
+function PanelCard({
+  step,
+  title,
+  children,
+}: {
+  step: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="border-hairline bg-glass backdrop-blur-xl">
+      <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-hairline">
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-accent-cyan" style={{ fontSize: "11px", letterSpacing: "0.1em" }}>
+            {step}
+          </span>
+          <CardTitle
+            className="font-mono uppercase text-foreground"
+            style={{ fontSize: "12px", letterSpacing: "0.08em" }}
+          >
+            {title}
+          </CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="p-5">{children}</CardContent>
+    </Card>
+  );
+}
+
+// ─── Status indicator ─────────────────────────────────────────────────
+
+function StatusDot({ status }: { status: string }) {
+  const tone =
+    status === "success" || status === "confirmed"
+      ? { bg: "#34c759", glow: "rgba(52,199,89,0.5)" }
+      : status === "failed"
+        ? { bg: "#ff453a", glow: "rgba(255,69,58,0.5)" }
+        : status === "accepted"
+          ? { bg: "#00d4ff", glow: "rgba(0,212,255,0.5)" }
+          : { bg: "#a1a1a6", glow: "rgba(161,161,166,0.3)" };
+  return (
+    <span
+      className="inline-block h-2 w-2 shrink-0 rounded-full"
+      style={{ backgroundColor: tone.bg, boxShadow: `0 0 6px ${tone.glow}` }}
+      aria-hidden
+    />
+  );
+}
+
+// ─── List helper ──────────────────────────────────────────────────────
+
 function List<T>({ items, render }: { items: T[]; render: (item: T) => React.ReactNode }) {
-  if (items.length === 0) return <p className="text-caption text-muted-foreground">Empty</p>;
+  if (items.length === 0) return <p className="font-mono text-muted-foreground" style={{ fontSize: "12px" }}>Empty</p>;
   return <div>{items.map(render)}</div>;
 }
+
+// ─── API tester ───────────────────────────────────────────────────────
 
 function APITester() {
   const [privateKey, setPrivateKey] = useState(() => generatePrivateKey());
@@ -223,6 +284,7 @@ function APITester() {
   const [hash, setHash] = useState("");
   const [signature, setSignature] = useState("");
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
 
   const handleSign = useCallback(async () => {
     setLoading(true);
@@ -240,22 +302,32 @@ function APITester() {
     }
   }, [body, privateKey, url]);
 
-  const handleCopyCurl = useCallback(() => {
-    navigator.clipboard.writeText(curl);
-  }, [curl]);
+  const copy = useCallback((text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 1200);
+  }, []);
 
   const handleGenerateKey = useCallback(() => {
     setPrivateKey(generatePrivateKey());
   }, []);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>API Tester</CardTitle>
+    <Card className="border-hairline bg-glass backdrop-blur-xl">
+      <CardHeader className="border-b border-hairline">
+        <div className="flex items-center gap-2">
+          <Terminal className="w-4 h-4 text-accent-cyan" />
+          <CardTitle className="font-mono uppercase text-foreground" style={{ fontSize: "12px", letterSpacing: "0.08em" }}>
+            API Tester
+          </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5 p-5">
         <div className="space-y-2">
-          <Label htmlFor="privateKey">Private Key (Test Only)</Label>
+          <Label htmlFor="privateKey" className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+            <KeyRound className="inline w-3 h-3 mr-1" />
+            Private Key (Test Only)
+          </Label>
           <div className="flex gap-2">
             <Input
               id="privateKey"
@@ -265,50 +337,74 @@ function APITester() {
             />
             <Button variant="outline" size="sm" onClick={handleGenerateKey}>Generate</Button>
           </div>
-          <p className="text-fine-print text-muted-foreground">Test key - do not use in production</p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-[1fr_1fr]">
+          <div className="space-y-2">
+            <Label htmlFor="url" className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>URL</Label>
+            <Input id="url" value={url} onChange={(e) => setUrl(e.target.value)} className="font-mono text-caption" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pubkey" className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>Public Key</Label>
+            <Input id="pubkey" value={derivePublicKey(privateKey)} readOnly className="font-mono text-caption text-muted-foreground" />
+          </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="url">URL</Label>
-          <Input id="url" value={url} onChange={(e) => setUrl(e.target.value)} />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="body">Request Body</Label>
+          <Label htmlFor="body" className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>Request Body</Label>
           <Textarea
             id="body"
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            rows={4}
+            rows={3}
             className="font-mono text-caption"
           />
         </div>
 
-        <Button onClick={handleSign} disabled={loading}>
-          {loading ? "Signing..." : "Sign Request"}
+        <Button onClick={handleSign} disabled={loading} className="btn-glow">
+          {loading ? "Signing…" : "Sign Request"}
         </Button>
 
         {signature && (
-          <div className="space-y-4 pt-4 border-t">
+          <div className="space-y-4 border-t border-hairline pt-4">
             <div className="space-y-2">
-              <Label>Headers</Label>
-              <div className="bg-muted rounded p-2 font-mono text-caption space-y-1">
+              <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>Headers</Label>
+              <div className="mono-block p-3 font-mono text-caption space-y-1">
                 {Object.entries(headers).map(([k, v]) => (
-                  <div key={k}><span className="text-muted-foreground">{k}:</span> {v.slice(0, 40)}...</div>
+                  <div key={k} className="break-all">
+                    <span className="text-accent-cyan">{k}:</span>{" "}
+                    <span className="text-foreground">{v.slice(0, 48)}{v.length > 48 ? "…" : ""}</span>
+                  </div>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Keccak-256 Hash</Label>
-              <div className="bg-muted rounded p-2 font-mono text-caption break-all">{hash}</div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>Keccak-256 Hash</Label>
+                <div
+                  className="mono-block cursor-pointer p-3 font-mono text-fine-print break-all transition-colors hover:border-accent-cyan"
+                  onClick={() => copy(hash, "hash")}
+                >
+                  {copied === "hash" ? <span className="text-success">✓ copied</span> : hash}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>Signature</Label>
+                <div
+                  className="mono-block cursor-pointer p-3 font-mono text-fine-print break-all transition-colors hover:border-accent-cyan"
+                  onClick={() => copy(signature, "sig")}
+                >
+                  {copied === "sig" ? <span className="text-success">✓ copied</span> : signature.slice(0, 66) + "…"}
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label>cURL Command</Label>
+              <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>cURL Command</Label>
               <div className="flex gap-2">
-                <Textarea value={curl} readOnly rows={4} className="font-mono text-caption" />
-                <Button variant="outline" size="icon" onClick={handleCopyCurl}>
+                <Textarea value={curl} readOnly rows={4} className="font-mono text-fine-print" />
+                <Button variant="outline" size="icon" onClick={() => copy(curl, "curl")}>
                   <Copy className="w-4 h-4" />
                 </Button>
               </div>

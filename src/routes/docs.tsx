@@ -2,8 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import ReactMarkdown from "react-markdown";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
+import { SiteLayout } from "@/components/site/SiteLayout";
 
-// In production, this would be loaded from a file or API
 const docsContent = `
 # T-0 Integration Guide
 
@@ -50,11 +51,24 @@ All API requests must be signed with ECDSA secp256k1:
 - \`PaymentConfirmed\` - Payment confirmed
 `;
 
+const TOC = [
+  { id: "overview", label: "Overview" },
+  { id: "quick-start", label: "Quick Start" },
+  { id: "api-authentication", label: "API Authentication" },
+  { id: "supported-currencies", label: "Supported Currencies" },
+  { id: "volume-bands", label: "Volume Bands" },
+  { id: "event-types", label: "Event Types" },
+];
+
 export const Route = createFileRoute("/docs")({
   head: () => ({
     meta: [
-      { title: "Documentation - T-0 Sandbox Bridge" },
-      { name: "description", content: "T-0 Integration Guide and API Documentation" },
+      { title: "BAXS · T-0 — Documentation & Integration Guide" },
+      {
+        name: "description",
+        content:
+          "BAXS PAY LIMITED · T-0 Network sandbox bridge. Integration Guide and API Documentation.",
+      },
     ],
   }),
   component: DocsPage,
@@ -62,26 +76,77 @@ export const Route = createFileRoute("/docs")({
 
 function DocsPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="container py-4 flex items-center justify-between">
-          <h1 className="text-tagline font-semibold">T-0 Sandbox Bridge</h1>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/sandbox">Open Sandbox</Link>
-          </Button>
-        </div>
-      </header>
+    <SiteLayout>
+      <div className="container container-7xl py-section">
+        <div className="grid gap-8 lg:grid-cols-[1fr_220px]">
+          {/* Main content */}
+          <div className="min-w-0">
+            <div className="mb-8 space-y-2">
+              <p className="eyebrow">BAXS · T-0 · DOCUMENTATION</p>
+              <h1 className="text-display-md font-semibold tracking-tight text-foreground">
+                Integration Guide
+              </h1>
+              <p className="text-tagline text-muted-foreground">
+                BAXS PAY LIMITED · T-0 Network sandbox bridge.
+                How to wire your provider into the T-0 Network REST contract.
+              </p>
+            </div>
 
-      <main className="container py-section max-w-3xl">
-        <Card>
-          <CardHeader>
-            <CardTitle>Integration Guide</CardTitle>
-          </CardHeader>
-          <CardContent className="prose max-w-none">
-            <ReactMarkdown>{docsContent}</ReactMarkdown>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+            <Card className="border-hairline bg-glass backdrop-blur-xl">
+              <CardContent className="prose max-w-none p-8">
+                <ReactMarkdown>{docsContent}</ReactMarkdown>
+              </CardContent>
+            </Card>
+
+            <div className="mt-8 flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <Link to="/sandbox">
+                  Open Console
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+
+          {/* Sticky TOC */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-24 space-y-4">
+              <div className="space-y-3">
+                <h4
+                  className="font-mono uppercase text-muted-canvas"
+                  style={{ fontSize: "10px", letterSpacing: "0.14em" }}
+                >
+                  On this page
+                </h4>
+                <nav className="space-y-1.5">
+                  {TOC.map((item) => (
+                    <a
+                      key={item.id}
+                      href={`#${item.id}`}
+                      className="block font-mono text-secondary-canvas transition-colors hover:text-accent-cyan"
+                      style={{ fontSize: "11px", letterSpacing: "0.04em" }}
+                    >
+                      {item.label}
+                    </a>
+                  ))}
+                </nav>
+              </div>
+
+              <div className="rounded-lg border border-hairline bg-glass p-4 space-y-2">
+                <p className="font-mono text-accent-cyan" style={{ fontSize: "10px", letterSpacing: "0.12em" }}>
+                  BAXS INTEGRATION
+                </p>
+                <p className="text-fine-print text-muted-foreground">
+                  For the full BAXS × T-0 architecture deep-dive, see the architecture page.
+                </p>
+                <Button asChild variant="outline" size="sm" className="w-full">
+                  <Link to="/integration">View Architecture</Link>
+                </Button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </SiteLayout>
   );
 }
