@@ -9,7 +9,16 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:contract": "vitest run $(find src -name '*.contract.test.ts' -type f)",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "test:e2e:smoke": "node scripts/e2e-smoke.mjs",
+    "test:e2e:deep": "node scripts/e2e-deep-check.mjs",
+    "verify": "bun run scripts/ci.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
