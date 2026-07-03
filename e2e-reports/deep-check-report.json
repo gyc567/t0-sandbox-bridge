@@ -1,0 +1,64 @@
+{
+  "baseUrl": "http://127.0.0.1:4173",
+  "timestamp": "2026-07-03T08:58:15.914Z",
+  "results": [
+    {
+      "name": "sandbox console loads",
+      "status": "PASS",
+      "durationMs": 174
+    },
+    {
+      "name": "six primary console cards present",
+      "status": "PASS",
+      "durationMs": 97,
+      "note": ""
+    },
+    {
+      "name": "API Tester section mounted with controls",
+      "status": "PASS",
+      "durationMs": 18,
+      "note": "pk prefix 0xd1"
+    },
+    {
+      "name": "Generate produces a valid-looking key pair",
+      "status": "PASS",
+      "durationMs": 382,
+      "note": "pub 0x03f63b…"
+    },
+    {
+      "name": "Sign Request yields signature output",
+      "status": "PASS",
+      "durationMs": 38
+    },
+    {
+      "name": "Publish quote updates Quotes card",
+      "status": "PASS",
+      "durationMs": 57,
+      "note": "Quotes · 1"
+    },
+    {
+      "name": "Simulate USDT settlement updates Payments and Event Log",
+      "status": "PASS",
+      "durationMs": 31,
+      "note": "Payments · 0, Event Log · 208"
+    },
+    {
+      "name": "Simulate credit usage updates Payouts and Event Log",
+      "status": "PASS",
+      "durationMs": 28,
+      "note": "Payouts · 0, Event Log · 208"
+    },
+    {
+      "name": "Event Log has entries after simulations",
+      "status": "PASS",
+      "durationMs": 7,
+      "note": "Event Log · 308"
+    }
+  ],
+  "consoleErrors": [],
+  "summary": {
+    "total": 9,
+    "pass": 9,
+    "fail": 0
+  }
+}

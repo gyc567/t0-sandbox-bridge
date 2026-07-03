@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { themeBootstrapScript } from "@/lib/theme/theme";
 
 function NotFoundComponent() {
   return (
@@ -77,16 +78,31 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "T-0 Sandbox Bridge" },
-      { name: "description", content: "T-0 Sandbox Bridge - Provider sandbox for quote, settlement, payment, payout flows." },
-      { name: "author", content: "T-0 Sandbox Bridge" },
-      { property: "og:title", content: "T-0 Sandbox Bridge" },
-      { property: "og:description", content: "T-0 Sandbox Bridge - Provider sandbox for quote, settlement, payment, payout flows." },
+      { name: "color-scheme", content: "dark light" },
+      { title: "BAXS · T-0 Sandbox Bridge — Real-time settlement simulation" },
+      {
+        name: "description",
+        content:
+          "BAXS PAY LIMITED · T-0 Network sandbox bridge. Watch money move before it moves — a provider sandbox visualizing quote, settlement, payment, and payout flows.",
+      },
+      { name: "author", content: "BAXS PAY LIMITED · T-0 Sandbox Bridge" },
+      { property: "og:title", content: "BAXS · T-0 Sandbox Bridge" },
+      {
+        property: "og:description",
+        content:
+          "BAXS PAY LIMITED · T-0 Network. Watch money move before it moves — a real-time settlement simulation sandbox.",
+      },
+      { property: "og:site_name", content: "BAXS · T-0 Sandbox Bridge" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@t0sandbox" },
+      { name: "twitter:site", content: "@baxspay" },
+      { name: "twitter:title", content: "BAXS · T-0 Sandbox Bridge" },
     ],
     links: [
+      {
+        rel: "icon",
+        href: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%2300d4ff' d='M16 2l12 7v14l-12 7L4 23V9z'/%3E%3Ctext x='16' y='21' text-anchor='middle' fill='%230a0e1a' font-size='11' font-weight='700' font-family='monospace'%3E0%3C/text%3E%3C/svg%3E",
+      },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -107,16 +123,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <HeadContent />
       </head>
       <body>
+        <ThemeBootstrap />
         {children}
         <Scripts />
       </body>
     </html>
   );
+}
+
+/**
+ * Apply the dark command-center theme by default before first paint.
+ *
+ * Respects an explicit `?theme=light` opt-in or a persisted preference,
+ * otherwise defaults to dark.
+ */
+function ThemeBootstrap() {
+  return <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript() }} />;
 }
 
 function RootComponent() {

@@ -3,17 +3,11 @@
 // Low coupling: talks to the network only via T0Client.
 
 import type { T0Client } from "./client";
-import type {
-  Currency,
-  NetworkEvent,
-  Payment,
-  Payout,
-  Quote,
-  VolumeBand,
-} from "./types";
+import type { Currency, NetworkEvent, Payment, Payout, Quote, VolumeBand } from "./types";
 
 let counter = 0;
-const nextId = (prefix: string) => `${prefix}_${Date.now().toString(36)}_${(++counter).toString(36)}`;
+const nextId = (prefix: string) =>
+  `${prefix}_${Date.now().toString(36)}_${(++counter).toString(36)}`;
 
 export interface PublishQuoteInput {
   currency: Currency;
@@ -40,7 +34,10 @@ export class PayoutProviderService {
   private payouts = new Map<string, Payout>();
   private events: NetworkEvent[] = [];
 
-  constructor(private readonly client: T0Client, private readonly now: () => number = Date.now) {}
+  constructor(
+    private readonly client: T0Client,
+    private readonly now: () => number = Date.now,
+  ) {}
 
   // ── 1. UpdateQuote ────────────────────────────────────────────
   async publishQuote(input: PublishQuoteInput): Promise<Quote> {
@@ -142,6 +139,83 @@ export class PayoutProviderService {
       payouts: [...this.payouts.values()],
       events: [...this.events],
     };
+  }
+
+  // ── Manual AML / Last Look (Phase 8) ──────────────────────────
+  /**
+   * Complete a manual AML check. Idempotent on paymentId.
+   * Always returns the existing payment with status updated.
+   */
+  completeManualAml(paymentId: string, approved: boolean): Payment {
+    const payment = this.payments.get(paymentId);
+    if (!payment) throw new Error("unknown payment");
+    payment.status = approved ? "accepted" : "rejected";
+    this.log({
+      type: "PaymentConfirmed",
+      paymentId: payment.id,
+      at: this.now(),
+    });
+    return payment;
+  }
+
+  /**
+   * Approve / refresh a payment quote (Last Look). Idempotent on paymentId.
+   * Bumps the quote TTL via a fresh publishQuote-style call.
+   */
+  approvePaymentQuote(paymentId: string, quoteId: string): Quote {
+    const quote = this.quotes.get(quoteId);
+    if (!quote) throw new Error("unknown quote");
+    const payment = this.payments.get(paymentId);
+    if (!payment) throw new Error("unknown payment");
+    quote.expiresAt = this.now() + 60_000;
+    this.log({
+      type: "PaymentConfirmed",
+      paymentId: payment.id,
+      at: this.now(),
+    });
+    return quote;
+  }
+
+  // ── Payment Intent (Phase 8) ──────────────────────────────────
+  /**
+   * Create a payment intent (rate is indicative until funds are confirmed).
+   */
+  createPaymentIntent(input: { quoteId: string; beneficiaryRef: string }): Payment {
+    const quote = this.quotes.get(input.quoteId);
+    if (!quote) throw new Error("unknown quote");
+    const payment: Payment = {
+      id: nextId("pi"),
+      quoteId: quote.id,
+      currency: quote.currency,
+      usdAmount: quote.band,
+      localAmount: quote.band * quote.rate,
+      beneficiaryRef: input.beneficiaryRef,
+      status: "pending",
+      createdAt: this.now(),
+    };
+    this.payments.set(payment.id, payment);
+    this.log({
+      type: "PaymentAccepted",
+      paymentId: payment.id,
+      at: this.now(),
+    });
+    return payment;
+  }
+
+  /**
+   * Confirm funds received from the Pay-In Provider. Locks the rate and
+   * transitions the payment to "accepted".
+   */
+  confirmFunds(paymentId: string): Payment {
+    const payment = this.payments.get(paymentId);
+    if (!payment) throw new Error("unknown payment");
+    payment.status = "accepted";
+    this.log({
+      type: "PaymentAccepted",
+      paymentId: payment.id,
+      at: this.now(),
+    });
+    return payment;
   }
 
   private log(e: NetworkEvent) {

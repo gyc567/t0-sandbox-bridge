@@ -8,12 +8,7 @@
 
 export type FlowType = "pay-out" | "manual-aml" | "payment-intent";
 
-export type ChannelId =
-  | "cross-border"
-  | "trading"
-  | "fintech"
-  | "payroll"
-  | "marketplace";
+export type ChannelId = "cross-border" | "trading" | "fintech" | "payroll" | "marketplace";
 
 export interface Channel {
   id: ChannelId;

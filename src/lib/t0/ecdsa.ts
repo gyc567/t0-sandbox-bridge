@@ -66,10 +66,7 @@ export async function signRequest(
 /**
  * Verify a signature produced by signRequest.
  */
-export async function verifySignature(
-  body: string,
-  result: SignatureResult,
-): Promise<boolean> {
+export async function verifySignature(body: string, result: SignatureResult): Promise<boolean> {
   const payload = buildPayload(body, result.timestamp);
   const hash = keccak_256(payload);
   const sig = result.signature.startsWith("0x") ? result.signature.slice(2) : result.signature;

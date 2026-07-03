@@ -70,11 +70,7 @@ export type StepStatus = "pending" | "flying" | "settled";
  * - `flying`  — packet is in flight (in the WINDOW before its threshold)
  * - `settled` — packet has reached target, target is lit
  */
-export function stepStatus(
-  progress: number,
-  stepT: number,
-  window: number = 0.04,
-): StepStatus {
+export function stepStatus(progress: number, stepT: number, window: number = 0.04): StepStatus {
   if (progress >= stepT) return "settled";
   if (progress >= stepT - window) return "flying";
   return "pending";
@@ -110,4 +106,12 @@ export function currentStepIndex(
     if (progress >= steps[i].t - window) return i;
   }
   return -1;
+}
+
+/**
+ * Parse a "12:18" timestamp label into total seconds.
+ */
+export function parseTimeLabel(label: string): number {
+  const [m = 0, s = 0] = label.split(":").map(Number);
+  return m * 60 + s;
 }

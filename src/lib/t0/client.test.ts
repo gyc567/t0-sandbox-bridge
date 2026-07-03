@@ -3,7 +3,12 @@ import { HttpT0Client, MockT0Client } from "./client";
 import type { Quote } from "./types";
 
 const quote: Quote = {
-  id: "q1", currency: "USD", band: 1000, rate: 1, createdAt: 0, expiresAt: 1,
+  id: "q1",
+  currency: "USD",
+  band: 1000,
+  rate: 1,
+  createdAt: 0,
+  expiresAt: 1,
 };
 
 describe("MockT0Client", () => {
@@ -19,7 +24,9 @@ describe("MockT0Client", () => {
 
 describe("HttpT0Client", () => {
   it("POSTs quotes and events with auth header", async () => {
-    const fetchImpl = vi.fn(async () => new Response("{}", { status: 200 })) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(
+      async () => new Response("{}", { status: 200 }),
+    ) as unknown as typeof fetch;
     const c = new HttpT0Client("https://api.test", "key123", fetchImpl);
     await c.updateQuote(quote);
     await c.emit({ type: "PayoutSuccess", payoutId: "p", at: 0 });
@@ -30,7 +37,9 @@ describe("HttpT0Client", () => {
   });
 
   it("throws on non-2xx response", async () => {
-    const fetchImpl = vi.fn(async () => new Response("nope", { status: 500 })) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(
+      async () => new Response("nope", { status: 500 }),
+    ) as unknown as typeof fetch;
     const c = new HttpT0Client("https://api.test", "k", fetchImpl);
     await expect(c.updateQuote(quote)).rejects.toThrow(/500/);
   });

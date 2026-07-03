@@ -65,21 +65,9 @@ export function GlowDot({
         />
       )}
       {!isSettled && (
-        <circle
-          cx={x}
-          cy={y}
-          r={9}
-          fill={glowColor}
-          opacity="0.55"
-          filter="url(#packet-blur)"
-        />
+        <circle cx={x} cy={y} r={9} fill={glowColor} opacity="0.55" filter="url(#packet-blur)" />
       )}
-      <circle
-        cx={x}
-        cy={y}
-        r={isSettled ? 3.5 : 4.5}
-        fill={color}
-      />
+      <circle cx={x} cy={y} r={isSettled ? 3.5 : 4.5} fill={color} />
       {isSettled && (
         <circle
           cx={x}

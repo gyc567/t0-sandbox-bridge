@@ -1,0 +1,50 @@
+{
+  "baseUrl": "http://127.0.0.1:4173",
+  "passed": 1,
+  "results": [
+    {
+      "name": "landing",
+      "path": "/",
+      "status": "PASS",
+      "durationMs": 1389,
+      "consoleMessages": [],
+      "failedRequests": [],
+      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge-test-framework/e2e-reports/landing.png"
+    },
+    {
+      "name": "sandbox",
+      "path": "/sandbox",
+      "status": "PASS",
+      "durationMs": 1211,
+      "consoleMessages": [],
+      "failedRequests": [],
+      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge-test-framework/e2e-reports/sandbox.png"
+    },
+    {
+      "name": "playground-route-returns-404",
+      "path": "/playground",
+      "status": "PASS",
+      "durationMs": 0,
+      "consoleMessages": [],
+      "failedRequests": []
+    },
+    {
+      "name": "sandbox",
+      "path": "/sandbox",
+      "status": "PASS",
+      "durationMs": 1179,
+      "consoleMessages": [],
+      "failedRequests": [],
+      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge-test-framework/e2e-reports/sandbox.png"
+    },
+    {
+      "name": "docs",
+      "path": "/docs",
+      "status": "PASS",
+      "durationMs": 1135,
+      "consoleMessages": [],
+      "failedRequests": [],
+      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge-test-framework/e2e-reports/docs.png"
+    }
+  ]
+}

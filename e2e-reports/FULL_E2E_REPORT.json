@@ -1,0 +1,81 @@
+{
+  "report": "T-0 Sandbox Bridge E2E Test Report",
+  "generatedAt": "2026-07-03T07:35:00Z",
+  "branch": "feat/ai-first-test-framework",
+  "environment": {
+    "node": "v24.14.0",
+    "bun": "v1.3.14",
+    "vitest": "v4.1.9",
+    "playwright": "v1.61.1",
+    "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "baseUrl": "http://localhost:8080",
+    "prodUrl": "https://t0-sandbox-bridge-3ja989q88-gyc567s-projects.vercel.app"
+  },
+  "summary": {
+    "tests": { "status": "PASS", "passed": 153, "failed": 0, "files": 9 },
+    "coverage": {
+      "status": "PASS",
+      "statements": "99.41%",
+      "branches": "96.85%",
+      "functions": "98.79%",
+      "lines": "100%"
+    },
+    "build": { "status": "PASS" },
+    "e2eSmoke": { "status": "PASS", "passed": 5, "failed": 0 },
+    "e2eDeep": {
+      "status": "FAIL",
+      "passed": 1,
+      "failed": 7,
+      "reason": "outdated script targeting old playground UI"
+    },
+    "typecheck": { "status": "FAIL", "errors": 8, "fromNewCode": false },
+    "lint": { "status": "FAIL", "errors": 200, "warnings": 29, "fromNewCode": false },
+    "prodUrl": { "status": "BLOCKED", "reason": "Vercel SSO redirect" }
+  },
+  "ci": {
+    "script": "./scripts/ci.sh --full --skip-typecheck",
+    "stages": [
+      { "name": "typecheck", "status": "skipped", "note": "8 pre-existing errors" },
+      { "name": "lint", "status": "fail", "note": "200 pre-existing prettier errors" },
+      { "name": "test", "status": "pass", "durationMs": 1305 },
+      { "name": "contract", "status": "pass", "durationMs": 872 },
+      { "name": "coverage", "status": "pass" },
+      { "name": "build", "status": "pass", "durationMs": 2897 },
+      { "name": "e2e_smoke", "status": "pass" }
+    ]
+  },
+  "findings": [
+    {
+      "severity": "high",
+      "area": "e2e",
+      "message": "scripts/e2e-deep-check.mjs expects old playground UI; needs rewrite for new /sandbox Console"
+    },
+    {
+      "severity": "high",
+      "area": "typecheck",
+      "message": "8 existing TS errors in csv.ts, router.tsx, tests, vercel.ts"
+    },
+    {
+      "severity": "medium",
+      "area": "lint",
+      "message": "200 prettier format errors across components and routes"
+    },
+    {
+      "severity": "medium",
+      "area": "coverage",
+      "message": "Legacy gaps in playback.ts:61, csv.ts:83, provider.ts:100,107,172"
+    },
+    {
+      "severity": "low",
+      "area": "deploy",
+      "message": "Production preview URL protected by Vercel SSO"
+    }
+  ],
+  "recommendations": [
+    "Rewrite e2e-deep-check.mjs for redesigned Payout Provider Console",
+    "Fix 8 existing TypeScript errors",
+    "Run prettier --write globally or auto-format in CI",
+    "Backfill tests for playback.ts, csv.ts, provider.ts uncovered branches",
+    "Resolve Vercel SSO or run production e2e against www.agtpay.xyz"
+  ]
+}

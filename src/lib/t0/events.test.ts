@@ -109,7 +109,11 @@ describe("broadcastEvent", () => {
     const event1: NetworkEvent = { type: "QuotePublished", quoteId: "qt_1", at: 1_700_000_000_000 };
     broadcastEvent(event1);
 
-    const event2: NetworkEvent = { type: "PaymentAccepted", paymentId: "pm_1", at: 1_700_000_001_000 };
+    const event2: NetworkEvent = {
+      type: "PaymentAccepted",
+      paymentId: "pm_1",
+      at: 1_700_000_001_000,
+    };
     broadcastEvent(event2);
 
     expect(goodCb).toHaveBeenCalledTimes(2);
@@ -197,7 +201,7 @@ describe("formatSSEMessage", () => {
     const message = formatSSEMessage(event);
 
     expect(message).toContain("data: ");
-    expect(message).toEndWith("\n\n");
+    expect(message.endsWith("\n\n")).toBe(true);
   });
 
   it("formats different event types correctly", () => {

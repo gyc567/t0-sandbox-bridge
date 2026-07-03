@@ -35,10 +35,7 @@ export function RateLockBadge({ active }: RateLockBadgeProps) {
           Rate locked
         </span>
       </div>
-      <span
-        className="font-mono tabular text-secondary-canvas"
-        style={{ fontSize: "11px" }}
-      >
+      <span className="font-mono tabular text-secondary-canvas" style={{ fontSize: "11px" }}>
         Binding at ConfirmFundsReceived
       </span>
 

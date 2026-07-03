@@ -34,10 +34,7 @@ export function AmbientGrid() {
   }, []);
 
   return (
-    <div
-      aria-hidden
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-    >
+    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
       {/* Top cyan radial glow */}
       <div
         className="absolute inset-x-0 top-0 h-[60vh]"
@@ -57,17 +54,9 @@ export function AmbientGrid() {
       />
 
       {/* Dot pattern — fullscreen SVG */}
-      <svg
-        className="absolute inset-0 h-full w-full"
-        xmlns="http://www.w3.org/2000/svg"
-      >
+      <svg className="absolute inset-0 h-full w-full" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <pattern
-            id="playground-dots"
-            width="32"
-            height="32"
-            patternUnits="userSpaceOnUse"
-          >
+          <pattern id="playground-dots" width="32" height="32" patternUnits="userSpaceOnUse">
             <circle cx="1" cy="1" r="1" fill="rgba(255,255,255,0.05)" />
           </pattern>
         </defs>

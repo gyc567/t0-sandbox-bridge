@@ -32,7 +32,12 @@ function fmtTime(seconds: number): string {
  * Active step markers grow + glow; current step gets a hover label
  * (shortLabel) below it. The cyan fill bar tracks scroll progress.
  */
-export function TimelineScrubber({ flow, progress, onReset, onMarkerClick }: TimelineScrubberProps) {
+export function TimelineScrubber({
+  flow,
+  progress,
+  onReset,
+  onMarkerClick,
+}: TimelineScrubberProps) {
   const totalSec = parseTimeLabel(flow.totalLabel);
   const currentSec = progress * totalSec;
 
@@ -68,10 +73,7 @@ export function TimelineScrubber({ flow, progress, onReset, onMarkerClick }: Tim
 
           {/* Track (centered vertically) */}
           <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
-            <div
-              className="h-px w-full"
-              style={{ backgroundColor: "rgba(255, 255, 255, 0.1)" }}
-            />
+            <div className="h-px w-full" style={{ backgroundColor: "rgba(255, 255, 255, 0.1)" }} />
             <div
               className="absolute left-0 top-0 h-px"
               style={{
@@ -101,9 +103,7 @@ export function TimelineScrubber({ flow, progress, onReset, onMarkerClick }: Tim
                       width: isCurrent ? 10 : 6,
                       height: isCurrent ? 10 : 6,
                       backgroundColor: isActive ? "#00d4ff" : "rgba(255, 255, 255, 0.28)",
-                      boxShadow: isCurrent
-                        ? "0 0 10px 3px rgba(0, 212, 255, 0.7)"
-                        : "none",
+                      boxShadow: isCurrent ? "0 0 10px 3px rgba(0, 212, 255, 0.7)" : "none",
                     }}
                   />
                   {isCurrent && (
@@ -139,8 +139,7 @@ export function TimelineScrubber({ flow, progress, onReset, onMarkerClick }: Tim
           className="font-mono tabular text-foreground"
           style={{ fontSize: "11px", letterSpacing: "0.04em" }}
         >
-          <span className="text-accent-cyan">time://</span>{" "}
-          <span>{fmtTime(currentSec)}</span>
+          <span className="text-accent-cyan">time://</span> <span>{fmtTime(currentSec)}</span>
           <span className="text-muted-canvas"> / {fmtTime(totalSec)}</span>
         </div>
       </div>

@@ -41,10 +41,7 @@ export function ChannelContextStrip({ channel, className }: ChannelContextStripP
         </span>
       </div>
 
-      <p
-        className="font-mono text-secondary-canvas"
-        style={{ fontSize: "12px", lineHeight: 1.5 }}
-      >
+      <p className="font-mono text-secondary-canvas" style={{ fontSize: "12px", lineHeight: 1.5 }}>
         {channel.context}
       </p>
 

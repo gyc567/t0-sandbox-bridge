@@ -32,28 +32,25 @@ export function BentoFooter() {
 
         <div className="grid auto-rows-[140px] grid-cols-1 gap-4 md:grid-cols-3">
           {/* Quick Start — tall left */}
-          <div
-            className="group relative row-span-2 flex flex-col justify-between rounded-2xl border border-hairline bg-glass p-5 transition-colors hover:border-hairline-strong hover:bg-[rgba(255,255,255,0.06)]"
-          >
+          <div className="group relative row-span-2 flex flex-col justify-between rounded-2xl border border-hairline bg-glass p-5 transition-colors hover:border-hairline-strong hover:bg-[rgba(255,255,255,0.06)]">
             <div>
               <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-glass text-accent-cyan">
                 <Wallet className="h-4 w-4" />
               </div>
-              <h3
-                className="mt-4 font-semibold text-foreground"
-                style={{ fontSize: "17px" }}
-              >
+              <h3 className="mt-4 font-semibold text-foreground" style={{ fontSize: "17px" }}>
                 Quick Start
               </h3>
               <p
                 className="mt-2 text-secondary-canvas"
                 style={{ fontSize: "13px", lineHeight: 1.5 }}
               >
-                Run your first quote → settlement → payout cycle in the sandbox.
-                No KYB required.
+                Run your first quote → settlement → payout cycle in the sandbox. No KYB required.
               </p>
             </div>
-            <div className="flex items-center gap-2 font-mono text-accent-cyan group-hover:underline" style={{ fontSize: "11px" }}>
+            <div
+              className="flex items-center gap-2 font-mono text-accent-cyan group-hover:underline"
+              style={{ fontSize: "11px" }}
+            >
               <span>Open /sandbox</span>
               <ArrowUpRight className="h-3 w-3" />
             </div>
@@ -65,10 +62,7 @@ export function BentoFooter() {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-glass text-secondary-canvas">
                 <Code2 className="h-4 w-4" />
               </div>
-              <h3
-                className="mt-3 font-semibold text-foreground"
-                style={{ fontSize: "15px" }}
-              >
+              <h3 className="mt-3 font-semibold text-foreground" style={{ fontSize: "15px" }}>
                 SDKs
               </h3>
               <p
@@ -89,10 +83,7 @@ export function BentoFooter() {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-glass text-secondary-canvas">
                 <Boxes className="h-4 w-4" />
               </div>
-              <h3
-                className="mt-3 font-semibold text-foreground"
-                style={{ fontSize: "15px" }}
-              >
+              <h3 className="mt-3 font-semibold text-foreground" style={{ fontSize: "15px" }}>
                 Pricing
               </h3>
               <p
@@ -113,21 +104,21 @@ export function BentoFooter() {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-glass text-secondary-canvas">
                 <FileText className="h-4 w-4" />
               </div>
-              <h3
-                className="mt-3 font-semibold text-foreground"
-                style={{ fontSize: "15px" }}
-              >
+              <h3 className="mt-3 font-semibold text-foreground" style={{ fontSize: "15px" }}>
                 FAQ & Integration Guide
               </h3>
               <p
                 className="mt-1 text-secondary-canvas"
                 style={{ fontSize: "12px", lineHeight: 1.45 }}
               >
-                KYB, key generation, idempotency rules, settlement procedures,
-                and webhook signatures.
+                KYB, key generation, idempotency rules, settlement procedures, and webhook
+                signatures.
               </p>
             </div>
-            <div className="hidden items-center gap-2 font-mono text-accent-cyan group-hover:underline md:flex" style={{ fontSize: "11px" }}>
+            <div
+              className="hidden items-center gap-2 font-mono text-accent-cyan group-hover:underline md:flex"
+              style={{ fontSize: "11px" }}
+            >
               <span>Read /docs</span>
               <ArrowUpRight className="h-3 w-3" />
             </div>

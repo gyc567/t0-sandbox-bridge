@@ -12,27 +12,27 @@
 
 ### 1.1 必须修正的问题
 
-| 优先级 | 问题 | 影响 | 优化意见 |
-|---|---|---|---|
-| P0 | “WebSocket 实时推送”与实现里的 SSE 混用 | 文档误导实现和验收 | 统一命名为 SSE。除非需要双向通信，不做 WebSocket |
-| P0 | 签名示例存在 API 与格式不确定性 | 认证演示可能产出错误签名 | 用 `@noble/secp256k1` 或已验证的项目依赖实现 `v+r+s`，补一个固定向量测试 |
-| P0 | 原计划新增大量组件和页面 | 工期膨胀，偏离 sandbox 核心 | 复用现有 `src/components/ui/*`，只新增业务组件 |
-| P0 | CSV 导出没有处理逗号、引号、换行、空值 | 导出数据会损坏 | 用一个小的 `csvCell()` 转义函数，不引入依赖 |
-| P1 | API 端点设计与 TanStack Start server functions 并存 | 两套调用方式会增加维护成本 | 优先沿用 `createServerFn`；只有 SSE/CSV 这种浏览器原生下载或流式能力才加 HTTP endpoint |
-| P1 | 幂等性只写原则，没有落到现有 `PayoutProviderService` | 重复 payout 可能重复执行 | 在服务层按业务 id 做去重，不在 UI 层补丁 |
-| P1 | 支持货币列表与当前 `Currency` 类型不一致 | UI 可选项和类型不匹配 | 第一版只支持现有 `USD/EUR/GBP/CNH/MXN/BRL/NGN/INR`，扩币种先改类型和测试 |
-| P2 | 计划包含 Landing、交易详情、独立报价页等 | 对核心闭环价值低 | 首页只替换空白占位；主控制台先承载完整流程 |
+| 优先级 | 问题                                                 | 影响                        | 优化意见                                                                               |
+| ------ | ---------------------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------- |
+| P0     | “WebSocket 实时推送”与实现里的 SSE 混用              | 文档误导实现和验收          | 统一命名为 SSE。除非需要双向通信，不做 WebSocket                                       |
+| P0     | 签名示例存在 API 与格式不确定性                      | 认证演示可能产出错误签名    | 用 `@noble/secp256k1` 或已验证的项目依赖实现 `v+r+s`，补一个固定向量测试               |
+| P0     | 原计划新增大量组件和页面                             | 工期膨胀，偏离 sandbox 核心 | 复用现有 `src/components/ui/*`，只新增业务组件                                         |
+| P0     | CSV 导出没有处理逗号、引号、换行、空值               | 导出数据会损坏              | 用一个小的 `csvCell()` 转义函数，不引入依赖                                            |
+| P1     | API 端点设计与 TanStack Start server functions 并存  | 两套调用方式会增加维护成本  | 优先沿用 `createServerFn`；只有 SSE/CSV 这种浏览器原生下载或流式能力才加 HTTP endpoint |
+| P1     | 幂等性只写原则，没有落到现有 `PayoutProviderService` | 重复 payout 可能重复执行    | 在服务层按业务 id 做去重，不在 UI 层补丁                                               |
+| P1     | 支持货币列表与当前 `Currency` 类型不一致             | UI 可选项和类型不匹配       | 第一版只支持现有 `USD/EUR/GBP/CNH/MXN/BRL/NGN/INR`，扩币种先改类型和测试               |
+| P2     | 计划包含 Landing、交易详情、独立报价页等             | 对核心闭环价值低            | 首页只替换空白占位；主控制台先承载完整流程                                             |
 
 ### 1.2 可以删除或推迟
 
-| 项目 | 处理 |
-|---|---|
-| `zustand` | 暂不新增。私钥输入只需组件局部 state，刷新丢失符合“仅内存”要求 |
-| 独立 `/sandbox/quotes` 页面 | 暂不做。当前 `/sandbox` 已覆盖报价管理 |
-| 独立 `/sandbox/transactions` 列表页 | 暂不做。除非交易量大到主控制台不可读 |
+| 项目                                             | 处理                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------ |
+| `zustand`                                        | 暂不新增。私钥输入只需组件局部 state，刷新丢失符合“仅内存”要求     |
+| 独立 `/sandbox/quotes` 页面                      | 暂不做。当前 `/sandbox` 已覆盖报价管理                             |
+| 独立 `/sandbox/transactions` 列表页              | 暂不做。除非交易量大到主控制台不可读                               |
 | 自定义 `StatusBadge/StatsCard/CodeBlock` 基础 UI | 不新增基础 UI。先复用已有 `badge/card/table/textarea/input/button` |
-| WebSocket server | 不做。SSE 足够覆盖服务端事件推送 |
-| PDF 再转换 | 已存在 `src/docs/baxs_t0_integration_guide.md`，无需重复转换 |
+| WebSocket server                                 | 不做。SSE 足够覆盖服务端事件推送                                   |
+| PDF 再转换                                       | 已存在 `src/docs/baxs_t0_integration_guide.md`，无需重复转换       |
 
 ---
 
@@ -107,11 +107,11 @@ Browser (React)
 
 幂等性应落在 `PayoutProviderService`：
 
-| 操作 | 幂等 key | 行为 |
-|---|---|---|
-| `acceptPayment` | `quoteId + beneficiaryRef` 或未来接入的 `payment_client_id` | 重复请求返回同一 payment |
-| `processPayout` | `paymentId` | 已有 payout 时返回原 payout，不重复执行 |
-| inbound notification | `txHash` | 重复 tx 不重复写事件 |
+| 操作                 | 幂等 key                                                    | 行为                                    |
+| -------------------- | ----------------------------------------------------------- | --------------------------------------- |
+| `acceptPayment`      | `quoteId + beneficiaryRef` 或未来接入的 `payment_client_id` | 重复请求返回同一 payment                |
+| `processPayout`      | `paymentId`                                                 | 已有 payout 时返回原 payout，不重复执行 |
+| inbound notification | `txHash`                                                    | 重复 tx 不重复写事件                    |
 
 第一版至少修 `processPayout(paymentId)`，因为重复付款风险最高。
 
@@ -182,26 +182,26 @@ const csvCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""'
 
 ### 6.1 新增文件
 
-| 文件 | 用途 |
-|---|---|
-| `src/lib/t0/ecdsa.ts` | 签名、验签、密钥生成 |
-| `src/lib/t0/ecdsa.test.ts` | 固定向量测试 |
-| `src/lib/t0/csv.ts` | CSV 序列化 |
-| `src/lib/t0/csv.test.ts` | CSV 转义测试 |
-| `src/lib/t0/events.ts` | SSE subscriber 与 broadcast |
-| `src/routes/docs.tsx` | Markdown 文档页 |
+| 文件                       | 用途                        |
+| -------------------------- | --------------------------- |
+| `src/lib/t0/ecdsa.ts`      | 签名、验签、密钥生成        |
+| `src/lib/t0/ecdsa.test.ts` | 固定向量测试                |
+| `src/lib/t0/csv.ts`        | CSV 序列化                  |
+| `src/lib/t0/csv.test.ts`   | CSV 转义测试                |
+| `src/lib/t0/events.ts`     | SSE subscriber 与 broadcast |
+| `src/routes/docs.tsx`      | Markdown 文档页             |
 
 ### 6.2 修改文件
 
-| 文件 | 修改 |
-|---|---|
-| `src/routes/index.tsx` | 替换空白占位 |
-| `src/routes/sandbox.tsx` | 复用 UI 组件，加入 API Tester 和 SSE 事件 |
-| `src/lib/t0/provider.ts` | 增加幂等保护和事件广播 hook |
-| `src/lib/t0/t0.functions.ts` | 视需要补充导出用 snapshot |
-| `src/lib/t0/index.ts` | 导出新增模块 |
-| `src/server.ts` | 只在需要时挂 `/api/events` 和 `/api/export.csv` |
-| `package.json` | 只新增签名必需依赖；不新增 `zustand` |
+| 文件                         | 修改                                            |
+| ---------------------------- | ----------------------------------------------- |
+| `src/routes/index.tsx`       | 替换空白占位                                    |
+| `src/routes/sandbox.tsx`     | 复用 UI 组件，加入 API Tester 和 SSE 事件       |
+| `src/lib/t0/provider.ts`     | 增加幂等保护和事件广播 hook                     |
+| `src/lib/t0/t0.functions.ts` | 视需要补充导出用 snapshot                       |
+| `src/lib/t0/index.ts`        | 导出新增模块                                    |
+| `src/server.ts`              | 只在需要时挂 `/api/events` 和 `/api/export.csv` |
+| `package.json`               | 只新增签名必需依赖；不新增 `zustand`            |
 
 ---
 
@@ -211,10 +211,10 @@ const csvCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""'
 
 只允许新增签名确实需要的依赖：
 
-| 依赖 | 原因 |
-|---|---|
+| 依赖               | 原因                                      |
+| ------------------ | ----------------------------------------- |
 | `@noble/secp256k1` | secp256k1 签名/验签，浏览器和 Node 都可用 |
-| `@noble/hashes` | Keccak-256 与 bytes 工具 |
+| `@noble/hashes`    | Keccak-256 与 bytes 工具                  |
 
 如果改用已有可用库，则不加新依赖。不要为了 CSV、状态管理、代码块展示增加包。
 
@@ -252,16 +252,16 @@ const csvCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""'
 
 ## 九、验收清单
 
-| 项目 | 验收方式 |
-|---|---|
-| 首页 | 不再出现 Lovable placeholder，入口可跳转 |
-| 主流程 | 从发布报价到 payout success 可完整走通 |
+| 项目   | 验收方式                                            |
+| ------ | --------------------------------------------------- |
+| 首页   | 不再出现 Lovable placeholder，入口可跳转            |
+| 主流程 | 从发布报价到 payout success 可完整走通              |
 | 幂等性 | 重复 `processPayout(paymentId)` 不新增第二个 payout |
-| 签名 | 固定向量测试通过，header 长度正确 |
-| CSV | 含逗号/引号/换行的数据导出仍是合法 CSV |
-| SSE | 新事件不用刷新即可出现在 Event Log |
-| 文档 | `/docs` 可阅读现有集成指南 |
-| 构建 | `npm run build` 通过 |
+| 签名   | 固定向量测试通过，header 长度正确                   |
+| CSV    | 含逗号/引号/换行的数据导出仍是合法 CSV              |
+| SSE    | 新事件不用刷新即可出现在 Event Log                  |
+| 文档   | `/docs` 可阅读现有集成指南                          |
+| 构建   | `npm run build` 通过                                |
 
 ---
 

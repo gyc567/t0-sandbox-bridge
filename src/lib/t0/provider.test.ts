@@ -26,7 +26,9 @@ describe("PayoutProviderService", () => {
   it("uses custom ttl and rejects non-positive rate", async () => {
     const q = await svc.publishQuote({ currency: "USD", band: 5000, rate: 1, ttlMs: 5_000 });
     expect(q.expiresAt).toBe(clock + 5_000);
-    await expect(svc.publishQuote({ currency: "USD", band: 1000, rate: 0 })).rejects.toThrow(/rate/);
+    await expect(svc.publishQuote({ currency: "USD", band: 1000, rate: 0 })).rejects.toThrow(
+      /rate/,
+    );
   });
 
   it("logs USDT settlement and credit usage; rejects bad usd", () => {
@@ -42,14 +44,21 @@ describe("PayoutProviderService", () => {
     const p = await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "ACC-1" });
     expect(p.status).toBe("accepted");
     expect(p.localAmount).toBeCloseTo(900);
-    expect(client.outbound.at(-1)).toMatchObject({ kind: "event", payload: { type: "PaymentAccepted" } });
+    expect(client.outbound.at(-1)).toMatchObject({
+      kind: "event",
+      payload: { type: "PaymentAccepted" },
+    });
   });
 
   it("rejects unknown or expired quotes", async () => {
-    await expect(svc.acceptPayment({ quoteId: "nope", beneficiaryRef: "x" })).rejects.toThrow(/unknown quote/);
+    await expect(svc.acceptPayment({ quoteId: "nope", beneficiaryRef: "x" })).rejects.toThrow(
+      /unknown quote/,
+    );
     const q = await svc.publishQuote({ currency: "USD", band: 1000, rate: 1, ttlMs: 10 });
     clock += 1000;
-    await expect(svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "x" })).rejects.toThrow(/expired/);
+    await expect(svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "x" })).rejects.toThrow(
+      /expired/,
+    );
   });
 
   it("completes the full payout lifecycle and confirms the payment", async () => {
@@ -108,5 +117,91 @@ describe("PayoutProviderService", () => {
     expect(po2.id).toBe(po1.id);
     expect(po2.status).toBe("failed");
     expect(svc.snapshot().payouts).toHaveLength(1);
+  });
+});
+
+// ── Phase 8: manual-aml / last-look / payment-intent ──────────────
+
+describe("PayoutProviderService (Phase 8 methods)", () => {
+  beforeEach(() => {
+    clock = 1_700_000_000_000;
+    client = new MockT0Client();
+    svc = new PayoutProviderService(client, now);
+  });
+
+  it("completeManualAml approves a payment and logs PaymentConfirmed", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1000, rate: 0.9 });
+    const p = await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "B" });
+
+    const updated = svc.completeManualAml(p.id, true);
+    expect(updated.status).toBe("accepted");
+    const types = svc.snapshot().events.map((e) => e.type);
+    expect(types).toContain("PaymentConfirmed");
+  });
+
+  it("completeManualAml rejects when approved=false", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1000, rate: 0.9 });
+    const p = await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "B" });
+
+    const updated = svc.completeManualAml(p.id, false);
+    expect(updated.status).toBe("rejected");
+  });
+
+  it("completeManualAml throws on unknown payment", () => {
+    expect(() => svc.completeManualAml("nope", true)).toThrow(/unknown payment/);
+  });
+
+  it("approvePaymentQuote bumps quote TTL and returns the quote", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1000, rate: 0.9, ttlMs: 1_000 });
+    const p = await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "B" });
+
+    const updated = svc.approvePaymentQuote(p.id, q.id);
+    expect(updated.id).toBe(q.id);
+    expect(updated.expiresAt).toBe(clock + 60_000);
+  });
+
+  it("approvePaymentQuote throws on unknown payment or quote", async () => {
+    // unknown quote checked first
+    expect(() => svc.approvePaymentQuote("nope", "nope")).toThrow(/unknown quote/);
+    const q = await svc.publishQuote({ currency: "EUR", band: 1000, rate: 0.9 });
+    const p = await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "B" });
+    expect(() => svc.approvePaymentQuote(p.id, "nope")).toThrow(/unknown quote/);
+    // unknown payment (quote exists but payment does not)
+    expect(() => svc.approvePaymentQuote("ghost_pm", q.id)).toThrow(/unknown payment/);
+  });
+
+  it("processPayout throws when payment is in a non-accepted state", async () => {
+    const q = await svc.publishQuote({ currency: "USD", band: 1000, rate: 1 });
+    // createPaymentIntent yields a payment in "pending" state, which is
+    // not "accepted" → triggers the wrong-status branch.
+    const intent = svc.createPaymentIntent({ quoteId: q.id, beneficiaryRef: "Y" });
+    await expect(svc.processPayout(intent.id)).rejects.toThrow(/not in accepted/);
+  });
+
+  it("createPaymentIntent creates a pending payment with quote-linked amounts", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1000, rate: 0.9 });
+    const intent = svc.createPaymentIntent({ quoteId: q.id, beneficiaryRef: "INT-1" });
+    expect(intent.id).toMatch(/^pi_/);
+    expect(intent.status).toBe("pending");
+    expect(intent.localAmount).toBeCloseTo(900);
+    expect(svc.snapshot().events.at(-1)).toMatchObject({ type: "PaymentAccepted" });
+  });
+
+  it("createPaymentIntent throws on unknown quote", () => {
+    expect(() => svc.createPaymentIntent({ quoteId: "nope", beneficiaryRef: "X" })).toThrow(
+      /unknown quote/,
+    );
+  });
+
+  it("confirmFunds transitions payment to accepted", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1000, rate: 0.9 });
+    const intent = svc.createPaymentIntent({ quoteId: q.id, beneficiaryRef: "INT-1" });
+
+    const updated = svc.confirmFunds(intent.id);
+    expect(updated.status).toBe("accepted");
+  });
+
+  it("confirmFunds throws on unknown payment", () => {
+    expect(() => svc.confirmFunds("nope")).toThrow(/unknown payment/);
   });
 });

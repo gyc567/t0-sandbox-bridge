@@ -1,17 +1,13 @@
 import { cn } from "@/lib/utils";
 import type { Channel } from "@/data/channels";
-import {
-  getFlow,
-  type FlowStep,
-  type NodeId,
-  type PacketColor,
-} from "@/data/flows";
+import { getFlow, type FlowStep, type NodeId, type PacketColor } from "@/data/flows";
 import { GlowDot } from "@/components/playground/GlowDot";
 import { RateLockBadge } from "@/components/playground/RateLockBadge";
+import { NodeCard } from "@/components/playground/NodeCard";
 
 interface FlowCanvasProps {
   activeChannel: Channel;
-  /** Master scroll progress [0, 1]. Drives all packet animations. */
+  /** Master progress [0, 1]. Drives all packet animations. */
   progress: number;
   /** Called when a step/node is clicked to open its artifact. */
   onStepClick?: (stepId: string) => void;
@@ -20,21 +16,28 @@ interface FlowCanvasProps {
 }
 
 /**
- * Node centers in SVG viewBox (0 0 1000 600) coordinates.
+ * 4-node topology centers in SVG viewBox (0 0 1200 600).
+ *
+ *   ofi(120) → orchestrator(470) → pop(870); payin(1080) hangs off the right
+ *
+ *   Y=300   main rail (OFI ↔ Orchestrator ↔ POP)
+ *   Y=460   pay-in rail (only active for Payment Intent flow)
+ *   Y=520   USDT transfer channel (ochre dashed)
+ *
  * `preserveAspectRatio="none"` on the parent SVG means these scale
  * linearly with the container, so they line up with the absolute-
  * positioned node cards below.
  */
 const NODE_CENTERS: Record<NodeId, { x: number; y: number }> = {
-  ofi: { x: 110, y: 300 },
-  network: { x: 425, y: 300 },
-  pop: { x: 890, y: 300 },
+  ofi: { x: 120, y: 300 },
+  orchestrator: { x: 470, y: 300 },
+  pop: { x: 870, y: 300 },
+  payin: { x: 1080, y: 460 },
 };
 
 /**
- * For Payment Intent, the "OFI" node is reinterpreted as the Beneficiary
- * and "POP" as the Pay-In Provider. The wiring stays the same; only labels
- * change.
+ * For Payment Intent, OFI is the Beneficiary and POP/PayIn are the rail
+ * endpoints. Wiring stays the same; only labels change.
  */
 function nodeLabels(flowType: Channel["flowType"]) {
   if (flowType === "payment-intent") {
@@ -43,6 +46,8 @@ function nodeLabels(flowType: Channel["flowType"]) {
       ofiSubtitle: "Intent originator",
       pop: "Pay-In Provider",
       popSubtitle: "Fiat collector",
+      payin: "Pay-In Wallet",
+      payinSubtitle: "End-user funds source",
     };
   }
   return {
@@ -50,29 +55,31 @@ function nodeLabels(flowType: Channel["flowType"]) {
     ofiSubtitle: "Originator",
     pop: "POP",
     popSubtitle: "Payout Provider",
+    payin: "Pay-In Provider",
+    payinSubtitle: "Off-network rail",
   };
 }
 
 /**
- * Some steps traverse the bottom USDT transfer channel instead of
- * the main line. Detect them by id and reroute the packet y.
+ * Steps that traverse the bottom USDT transfer channel (Y=520). The
+ * pay-in rail uses Y=460 only when its source/target is the pay-in node.
  */
-function channelSteps(stepId: string): boolean {
-  return (
-    stepId === "usdt-settle" ||
-    stepId === "end-user-pays" ||
-    stepId === "settlement"
-  );
+function channelY(step: FlowStep): number | undefined {
+  if (step.railY !== undefined) return step.railY;
+  if (step.id === "usdt-settle" || step.id === "end-user-pays" || step.id === "settlement") {
+    return 520;
+  }
+  return undefined;
 }
 
 /**
- * Static three-node topology + scroll-driven packet rendering.
+ * Static four-node topology + scroll-driven packet rendering.
  *
- * Phase 5 adds:
- *   - Flow-aware node labels (Payment Intent shows Beneficiary / Pay-In Provider)
- *   - RateLockBadge in Network Core during Payment Intent "rate-bound" step
- *   - Manual AML: the AML/Last Look packets now route through Network Core
- *     as defined by their source/target in flows.ts.
+ * Phase 8:
+ *   - 4 nodes with explicit y-coords (main rail y=300, pay-in y=460)
+ *   - Manual AML inserts a Travel-Rule (IVMS101) step + an AML hold
+ *   - Payment Intent activates the Pay-In Provider node + pay-in rail
+ *   - RateLockBadge stays in Network Orchestrator during "rate-bound"
  */
 export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }: FlowCanvasProps) {
   const flow = getFlow(activeChannel.flowType);
@@ -89,9 +96,7 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
   // Rate-lock freeze-frame for Payment Intent.
   const rateBoundStep = flow.steps.find((s) => s.id === "rate-bound");
   const rateLockActive =
-    !!rateBoundStep &&
-    progress >= rateBoundStep.t - 0.02 &&
-    progress < rateBoundStep.t + 0.08;
+    !!rateBoundStep && progress >= rateBoundStep.t - 0.02 && progress < rateBoundStep.t + 0.08;
 
   // Packet colors per step.packetColor
   const colorMap: Record<PacketColor, { dot: string; glow: string }> = {
@@ -100,6 +105,8 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
     sage: { dot: "#7ec488", glow: "rgba(126, 196, 136, 0.5)" },
     slate: { dot: "#7e95b0", glow: "rgba(126, 149, 176, 0.5)" },
   };
+
+  const showPayin = activeChannel.flowType === "payment-intent";
 
   return (
     <div
@@ -110,18 +117,12 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
       {/* ─── SVG layer: connections + packets ─── */}
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
-        viewBox="0 0 1000 600"
+        viewBox="0 0 1200 600"
         preserveAspectRatio="none"
         aria-hidden
       >
         <defs>
-          <filter
-            id="packet-blur"
-            x="-50%"
-            y="-50%"
-            width="200%"
-            height="200%"
-          >
+          <filter id="packet-blur" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3" />
           </filter>
           <linearGradient id="usdt-channel-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -131,12 +132,33 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
           </linearGradient>
         </defs>
 
-        {/* OFI ↔ Network Core — two horizontal lines (top section) */}
-        <line x1="190" y1="180" x2="350" y2="180" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
-        <line x1="190" y1="230" x2="350" y2="230" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
-        {/* Network Core ↔ POP — two horizontal lines */}
-        <line x1="650" y1="180" x2="810" y2="180" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
-        <line x1="650" y1="230" x2="810" y2="230" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+        {/* OFI ↔ Orchestrator — two horizontal lines (top section) */}
+        <line x1="200" y1="180" x2="390" y2="180" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+        <line x1="200" y1="230" x2="390" y2="230" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+        {/* Orchestrator ↔ POP — two horizontal lines */}
+        <line x1="700" y1="180" x2="790" y2="180" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+        <line x1="700" y1="230" x2="790" y2="230" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+        {/* Pay-In ↔ POP — angled line down to y=460 (only when Pay-In active) */}
+        {showPayin && (
+          <>
+            <line
+              x1="990"
+              y1="300"
+              x2="1010"
+              y2="440"
+              stroke="rgba(255,255,255,0.12)"
+              strokeWidth="1"
+            />
+            <line
+              x1="990"
+              y1="330"
+              x2="1010"
+              y2="470"
+              stroke="rgba(255,255,255,0.12)"
+              strokeWidth="1"
+            />
+          </>
+        )}
 
         {/* USDT channel — bottom, ochre dashed (shimmer via CSS) */}
         <line
@@ -162,15 +184,16 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
         </text>
 
         {/* Chevron markers */}
-        <polygon points="345,180 353,180 349,184" fill="rgba(255,255,255,0.3)" />
-        <polygon points="655,180 647,180 651,184" fill="rgba(255,255,255,0.3)" />
+        <polygon points="385,180 393,180 389,184" fill="rgba(255,255,255,0.3)" />
+        <polygon points="695,180 687,180 691,184" fill="rgba(255,255,255,0.3)" />
+        {showPayin && <polygon points="1003,425 1003,433 999,429" fill="rgba(255,255,255,0.3)" />}
 
-        {/* Packets (driven by scroll progress) */}
+        {/* Packets (driven by playback progress) */}
         {flow.steps.map((step) => {
           const source = NODE_CENTERS[step.source];
           const target = NODE_CENTERS[step.target];
           const colors = colorMap[step.packetColor];
-          const alongChannel = channelSteps(step.id);
+          const y = channelY(step);
           return (
             <g
               key={step.id}
@@ -181,14 +204,14 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
             >
               <GlowDot
                 sourceX={source.x}
-                sourceY={alongChannel ? 500 : source.y}
+                sourceY={y ?? source.y}
                 targetX={target.x}
-                targetY={alongChannel ? 500 : target.y}
+                targetY={y ?? target.y}
                 progress={progress}
                 stepT={step.t}
                 color={colors.dot}
                 glowColor={colors.glow}
-                trail={!alongChannel}
+                trail={y === undefined}
               />
             </g>
           );
@@ -201,7 +224,7 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
         subtitle={labels.ofiSubtitle}
         accentColor="neutral"
         hexId="0x7a3f"
-        className="absolute left-[2%] top-[15%] h-[70%] w-[18%]"
+        className="absolute left-[1%] top-[15%] h-[70%] w-[14%]"
         lit={litNodes.has("ofi")}
         onClick={() => onNodeClick?.("ofi")}
       >
@@ -211,16 +234,16 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
         <ModuleSlot label="Fiat rail" hexId="0xd7e8" muted />
       </NodeCard>
 
-      {/* ─── Network Core ─── */}
+      {/* ─── Orchestrator node (T-0 core services) ─── */}
       <NodeCard
-        title="T-0 Network Core"
+        title="T-0 Network Orchestration"
         subtitle={`flow · ${activeChannel.flowType}`}
         accentColor="cyan"
         hexId="M4IN.0"
         large
-        className="absolute left-[22.5%] top-[5%] h-[88%] w-[40%]"
-        lit={litNodes.has("network")}
-        onClick={() => onNodeClick?.("network")}
+        className="absolute left-[17%] top-[5%] h-[88%] w-[36%]"
+        lit={litNodes.has("orchestrator")}
+        onClick={() => onNodeClick?.("orchestrator")}
       >
         <div className="grid grid-cols-2 gap-1.5">
           <ModuleSlot label="Quote Aggregator" hexId="0xN001" compact />
@@ -251,7 +274,7 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
         subtitle={labels.popSubtitle}
         accentColor="neutral"
         hexId="0x9b1c"
-        className="absolute left-[80%] top-[15%] h-[70%] w-[18%]"
+        className="absolute left-[55%] top-[15%] h-[70%] w-[14%]"
         lit={litNodes.has("pop")}
         onClick={() => onNodeClick?.("pop")}
       >
@@ -260,6 +283,23 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
         <ModuleSlot label="PayOut RPC" hexId="0xP003" />
         <ModuleSlot label="Finalize" hexId="0xP004" />
       </NodeCard>
+
+      {/* ─── Pay-In node (only active for Payment Intent) ─── */}
+      {showPayin && (
+        <NodeCard
+          title={labels.payin}
+          subtitle={labels.payinSubtitle}
+          accentColor="neutral"
+          hexId="0xc4f2"
+          className="absolute left-[72%] top-[55%] h-[42%] w-[14%]"
+          lit={litNodes.has("payin")}
+          onClick={() => onNodeClick?.("payin")}
+        >
+          <ModuleSlot label="End-user wallet" hexId="0xPi01" compact />
+          <ModuleSlot label="Off-network rail" hexId="0xPi02" muted compact />
+          <ModuleSlot label="FIAT → stablecoin" hexId="0xPi03" accent="usdt" compact />
+        </NodeCard>
+      )}
 
       {/* ─── Local keyframes ─── */}
       <style>{`
@@ -299,101 +339,6 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
 
 // ─── Sub-components ──────────────────────────────────────────────────
 
-interface NodeCardProps {
-  title: string;
-  subtitle?: string;
-  hexId?: string;
-  large?: boolean;
-  accentColor?: "neutral" | "cyan";
-  className?: string;
-  lit?: boolean;
-  onClick?: () => void;
-  children: React.ReactNode;
-}
-
-function NodeCard({
-  title,
-  subtitle,
-  hexId,
-  large,
-  accentColor = "neutral",
-  className,
-  lit,
-  onClick,
-  children,
-}: NodeCardProps) {
-  return (
-    <div
-      className={cn(
-        "flex flex-col rounded-xl border backdrop-blur bg-glass transition-colors duration-700",
-        large && "rounded-2xl",
-        !lit && accentColor === "cyan" && "border-[rgba(0,212,255,0.18)]",
-        !lit && accentColor === "neutral" && "border-hairline",
-        lit && "border-[rgba(0,212,255,0.5)]",
-        onClick && "cursor-pointer hover:bg-[rgba(255,255,255,0.06)]",
-        className,
-      )}
-      onClick={onClick}
-      role={onClick ? "button" : undefined}
-      aria-label={onClick ? `Inspect ${title}` : undefined}
-      style={{
-        boxShadow: lit
-          ? "0 0 26px 0 rgba(0, 212, 255, 0.32), inset 0 1px 0 0 rgba(255, 255, 255, 0.06)"
-          : large
-            ? "0 0 24px 0 rgba(0, 212, 255, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.04)"
-            : "inset 0 1px 0 0 rgba(255, 255, 255, 0.03)",
-        transition: "box-shadow 700ms cubic-bezier(0.16, 1, 0.3, 1), border-color 700ms ease-out",
-      }}
-    >
-      <header
-        className={cn(
-          "border-b border-hairline",
-          large ? "px-4 py-3" : "px-3 py-2",
-        )}
-      >
-        <div className="flex items-center justify-between">
-          <h3
-            className={cn(
-              "font-mono uppercase text-foreground",
-              accentColor === "cyan" && "text-accent-cyan",
-            )}
-            style={{ fontSize: large ? "12px" : "11px", letterSpacing: "0.1em" }}
-          >
-            {title}
-          </h3>
-          {hexId && (
-            <span
-              className={cn(
-                "font-mono tabular",
-                lit ? "text-accent-cyan" : "text-muted-canvas heartbeat",
-              )}
-              style={{ fontSize: "9px", letterSpacing: "0.04em" }}
-            >
-              {hexId}
-            </span>
-          )}
-        </div>
-        {subtitle && (
-          <p
-            className="font-mono text-muted-canvas"
-            style={{ fontSize: "10px", letterSpacing: "0.04em" }}
-          >
-            // {subtitle}
-          </p>
-        )}
-      </header>
-      <div
-        className={cn(
-          "relative flex flex-1 flex-col gap-1.5",
-          large ? "px-4 py-3" : "px-3 py-2",
-        )}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
 interface ModuleSlotProps {
   label: string;
   hexId?: string;
@@ -404,11 +349,7 @@ interface ModuleSlotProps {
 
 function ModuleSlot({ label, hexId, accent, muted, compact }: ModuleSlotProps) {
   const heartbeatClass =
-    accent === "usdt"
-      ? "heartbeat-2"
-      : accent === "cyan"
-        ? "heartbeat-3"
-        : "heartbeat";
+    accent === "usdt" ? "heartbeat-2" : accent === "cyan" ? "heartbeat-3" : "heartbeat";
   return (
     <div
       className={cn(

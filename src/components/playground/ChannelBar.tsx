@@ -4,6 +4,11 @@ import { cn } from "@/lib/utils";
 interface ChannelBarProps {
   active: ChannelId;
   onChange: (id: ChannelId) => void;
+  /**
+   * Show a small green "auto-play" indicator on the active pill. Off
+   * when the engine is paused or in scrubbing mode.
+   */
+  autoPlay?: boolean;
 }
 
 /**
@@ -17,12 +22,9 @@ interface ChannelBarProps {
  * updates the parent state (fee + flowType), which Phase 3 will
  * wire to the animation engine.
  */
-export function ChannelBar({ active, onChange }: ChannelBarProps) {
+export function ChannelBar({ active, onChange, autoPlay = false }: ChannelBarProps) {
   return (
-    <nav
-      className="flex items-center gap-1.5"
-      aria-label="Protocol channels"
-    >
+    <nav className="flex items-center gap-1.5" aria-label="Protocol channels">
       {CHANNELS.map((channel) => {
         const isActive = channel.id === active;
         return (
@@ -32,7 +34,7 @@ export function ChannelBar({ active, onChange }: ChannelBarProps) {
             onClick={() => onChange(channel.id)}
             aria-pressed={isActive}
             className={cn(
-              "rounded-full border px-3 py-1 font-mono transition-all duration-200",
+              "relative rounded-full border px-3 py-1 font-mono transition-all duration-200",
               "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               isActive
                 ? "border-accent-cyan text-accent-cyan"
@@ -44,12 +46,21 @@ export function ChannelBar({ active, onChange }: ChannelBarProps) {
               boxShadow: isActive
                 ? "0 0 14px 2px rgba(0, 212, 255, 0.35), inset 0 0 0 1px rgba(0, 212, 255, 0.2)"
                 : undefined,
-              backgroundColor: isActive
-                ? "rgba(0, 212, 255, 0.06)"
-                : undefined,
+              backgroundColor: isActive ? "rgba(0, 212, 255, 0.06)" : undefined,
             }}
           >
             {channel.label}
+            {isActive && autoPlay && (
+              <span
+                aria-label="auto-playing"
+                title="auto-playing"
+                className="absolute -right-1 -top-1 inline-block h-2 w-2 rounded-full"
+                style={{
+                  backgroundColor: "#7ec488",
+                  boxShadow: "0 0 6px 1px rgba(126, 196, 136, 0.85)",
+                }}
+              />
+            )}
           </button>
         );
       })}

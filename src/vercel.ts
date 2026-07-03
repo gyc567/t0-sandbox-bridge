@@ -1,13 +1,8 @@
 /**
- * Vercel 服务端入口
+ * Vercel server-side entry.
  *
- * 将 TanStack Start 适配到 Vercel Edge Functions
- * 使用 createStartHandler 从 @tanstack/start-server-core
+ * Delegates to the shared SSR handler in server.ts (which also normalises
+ * catastrophic h3 500 responses). Kept as a thin re-export so the Vercel
+ * build pipeline can discover it without inheriting the wrapper.
  */
-
-import { createStartHandler } from "@tanstack/start-server";
-import { getRouter } from "./router";
-
-export default createStartHandler({
-  createRouter: () => getRouter(),
-});
+export { default } from "./server";

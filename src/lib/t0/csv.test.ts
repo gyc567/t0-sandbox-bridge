@@ -140,7 +140,9 @@ describe("snapshotToCSV", () => {
   });
 
   it("handles empty snapshot", () => {
-    const csv = snapshotToCSV(createSnapshot({ quotes: [], payments: [], payouts: [], events: [] }));
+    const csv = snapshotToCSV(
+      createSnapshot({ quotes: [], payments: [], payouts: [], events: [] }),
+    );
     expect(csv).toContain("=== Quotes ===");
     expect(csv).toContain("=== Payments ===");
     expect(csv).toContain("=== Payouts ===");
@@ -158,7 +160,13 @@ describe("snapshotToCSV", () => {
   it("includes payout reason when present", () => {
     const snapshot = createSnapshot({
       payouts: [
-        { id: "po_1", paymentId: "pm_1", status: "failed", reason: "insufficient funds", updatedAt: 1_700_000_100_000 },
+        {
+          id: "po_1",
+          paymentId: "pm_1",
+          status: "failed",
+          reason: "insufficient funds",
+          updatedAt: 1_700_000_100_000,
+        },
       ],
     });
     const csv = snapshotToCSV(snapshot);
@@ -220,7 +228,7 @@ describe("csvFilename", () => {
 
   it("has .csv extension", () => {
     const filename = csvFilename();
-    expect(filename).toEndWith(".csv");
+    expect(filename.endsWith(".csv")).toBe(true);
   });
 
   it("handles all event types in eventId", () => {

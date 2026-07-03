@@ -2,7 +2,7 @@
 // Handles proper escaping for commas, quotes, and newlines.
 
 import type { NetworkEvent, Payment, Payout, Quote } from "./types";
-export type { Snapshot } from "./provider";
+import type { Snapshot } from "./provider";
 
 /**
  * Escape a value for CSV.
