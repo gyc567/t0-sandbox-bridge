@@ -13,12 +13,14 @@
 #   4. contract     (vitest *.contract)   — L4 schema / contract regression
 #   5. coverage     (vitest --coverage)   — L4 threshold gate (100/95/90/100)
 #   6. build        (vite build)          — production build sanity
-#   7. e2e:smoke    (scripts/e2e-smoke)   — live HTTP smoke (only when --e2e)
+#   7. e2e:smoke    (scripts/e2e-smoke)   — live HTTP smoke
+#   8. e2e:deep     (scripts/e2e-deep-check.mjs) — Console interaction
 #
 # Usage:
 #   ./scripts/ci.sh           # local quick gate (no e2e)
-#   ./scripts/ci.sh --full    # include e2e smoke
+#   ./scripts/ci.sh --full    # include e2e smoke + deep check
 #   ./scripts/ci.sh --no-coverage   # skip slow coverage step
+#   ./scripts/ci.sh --skip-typecheck # skip typecheck (e.g. while iterating)
 # =============================================================================
 set -euo pipefail
 
@@ -45,7 +47,7 @@ for arg in "$@"; do
     --no-coverage)    WITH_COVERAGE=false ;;
     --skip-typecheck) SKIP_TYPECHECK=true ;;
     -h|--help)
-      sed -n '2,20p' "$0"
+      sed -n '2,22p' "$0"
       exit 0
       ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
@@ -53,10 +55,15 @@ for arg in "$@"; do
 done
 
 if $WITH_E2E; then
-  TOTAL=7
+  TOTAL=8
 else
   TOTAL=6
 fi
+
+# ---- configuration --------------------------------------------------------
+PROJECT_NAME="t0-sandbox-bridge"
+BUILD_COMMAND="bun run build"
+INSTALL_COMMAND="bun install"
 
 # ---- result accumulator --------------------------------------------------
 RESULTS=()
@@ -67,6 +74,11 @@ run_step() {
   local name="$1"; shift
   local start_ms end_ms
   start_ms=$(python3 -c 'import time;print(int(time.time()*1000))')
+  # vitest --coverage wipes coverage/, so recreate the ci subdir on every step.
+  mkdir -p "${REPORT_DIR}"
+  # Ensure the log file exists so downstream tools can tail/read it even if
+  # the step produced no output.
+  : >"${REPORT_DIR}/${name}.log"
   if "$@" >"${REPORT_DIR}/${name}.log" 2>&1; then
     end_ms=$(python3 -c 'import time;print(int(time.time()*1000))')
     pass "$name" $((end_ms - start_ms))
@@ -114,8 +126,40 @@ step 6 "$TOTAL: production build"
 run_step build bun run build || exit 1
 
 if $WITH_E2E; then
+  # Stand up a Nitro preview on the conventional 4173 port so the e2e suite's
+  # default BASE_URL works without manual overrides. The preview is killed
+  # unconditionally at the end so it doesn't leak into the next CI run.
+  if [ ! -d ".vercel/output/functions/__server.func" ]; then
+    warn ".vercel/output not found — e2e needs a prior build. Building now."
+    "$BUILD_COMMAND" >/dev/null 2>&1 || {
+      fail "build required for e2e failed"
+      exit 1
+    }
+  fi
+  E2E_PORT="${E2E_PORT:-4173}"
+  E2E_PID_FILE="${REPORT_DIR}/e2e-server.pid"
+  (cd .vercel/output && export STATIC_DIR="$(pwd)/static" && nohup npx srvx serve --port "$E2E_PORT" --prod --static "$STATIC_DIR" ./functions/__server.func/index.mjs >"${REPORT_DIR}/e2e-server.log" 2>&1 &
+   echo $! >"$E2E_PID_FILE")
+  # Wait for the preview server to be reachable (max ~10s).
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if curl -sI -o /dev/null "http://127.0.0.1:${E2E_PORT}/" 2>/dev/null; then
+      ok "e2e preview server up on :${E2E_PORT}"
+      break
+    fi
+    sleep 1
+  done
+  export BASE_URL="http://127.0.0.1:${E2E_PORT}"
+  trap 'kill "$(cat "$E2E_PID_FILE" 2>/dev/null)" 2>/dev/null || true' EXIT
+
   step 7 "$TOTAL: e2e smoke (live HTTP)"
   run_step e2e_smoke bun run test:e2e:smoke || exit 1
+  step 8 "$TOTAL: e2e deep check (live HTTP)"
+  # Deep check writes its own structured report into e2e-reports/.
+  BASE_URL="$BASE_URL" node scripts/e2e-deep-check.mjs >"${REPORT_DIR}/e2e_deep.log" 2>&1 || {
+    fail "e2e deep check failed (full log: ${REPORT_DIR}/e2e_deep.log)"
+    exit 1
+  }
+  ok "e2e_deep"
 fi
 
 # ---- summary -------------------------------------------------------------

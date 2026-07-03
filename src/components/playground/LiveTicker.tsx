@@ -52,10 +52,7 @@ export function LiveTicker({
     >
       <div className="mx-auto flex max-w-7xl items-stretch divide-x divide-[rgba(255,255,255,0.05)]">
         {segments.map((seg, i) => (
-          <div
-            key={i}
-            className="flex flex-1 items-baseline gap-3 px-6 py-3"
-          >
+          <div key={i} className="flex flex-1 items-baseline gap-3 px-6 py-3">
             <span
               className="font-mono uppercase text-muted-canvas"
               style={{ fontSize: "10px", letterSpacing: "0.12em" }}

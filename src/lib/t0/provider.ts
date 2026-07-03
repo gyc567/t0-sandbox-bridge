@@ -3,17 +3,11 @@
 // Low coupling: talks to the network only via T0Client.
 
 import type { T0Client } from "./client";
-import type {
-  Currency,
-  NetworkEvent,
-  Payment,
-  Payout,
-  Quote,
-  VolumeBand,
-} from "./types";
+import type { Currency, NetworkEvent, Payment, Payout, Quote, VolumeBand } from "./types";
 
 let counter = 0;
-const nextId = (prefix: string) => `${prefix}_${Date.now().toString(36)}_${(++counter).toString(36)}`;
+const nextId = (prefix: string) =>
+  `${prefix}_${Date.now().toString(36)}_${(++counter).toString(36)}`;
 
 export interface PublishQuoteInput {
   currency: Currency;
@@ -40,7 +34,10 @@ export class PayoutProviderService {
   private payouts = new Map<string, Payout>();
   private events: NetworkEvent[] = [];
 
-  constructor(private readonly client: T0Client, private readonly now: () => number = Date.now) {}
+  constructor(
+    private readonly client: T0Client,
+    private readonly now: () => number = Date.now,
+  ) {}
 
   // ── 1. UpdateQuote ────────────────────────────────────────────
   async publishQuote(input: PublishQuoteInput): Promise<Quote> {

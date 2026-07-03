@@ -1,15 +1,27 @@
 /**
- * Phase 8 deep-check: validates the 4-node topology, 4 server fns wired
- * to real IDs, transport bar, and live event log behaviour.
+ * Deep E2E check for the redesigned /sandbox Payout Provider Console.
+ *
+ * Verifies:
+ *   1. Console loads and 6 primary cards are present
+ *   2. "Publish quote" interaction produces a quote card
+ *   3. "Simulate USDT settlement" triggers an inbound notification
+ *   4. Event log receives entries
+ *   5. API Tester can derive public key and generate a signature
+ *
+ * Run with:
+ *   BASE_URL=http://localhost:8080 node scripts/e2e-deep-check.mjs
  */
 import { chromium } from "playwright";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const BASE_URL = process.env.BASE_URL || "http://127.0.0.1:4173";
 const REPORT_DIR = path.resolve(__dirname, "..", "e2e-reports");
+
+await fs.mkdir(REPORT_DIR, { recursive: true });
 
 const results = [];
 function record(name, status, durationMs, details = {}) {
@@ -20,7 +32,11 @@ function record(name, status, durationMs, details = {}) {
 
 const browser = await chromium.launch({
   headless: true,
-  executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  executablePath:
+    process.env.PLAYWRIGHT_EXECUTABLE_PATH ||
+    (process.platform === "darwin"
+      ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+      : undefined),
 });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
@@ -32,214 +48,212 @@ page.on("console", (m) => {
 page.on("pageerror", (e) => consoleMsgs.push(`pageerror: ${e.message}`));
 
 const t0 = Date.now();
-// /playground is now a 302 redirect wrapper to /sandbox (phase 3 plan).
-// We hit /sandbox directly since the redirect target is the surface we want to verify.
-await page.goto(`${BASE_URL}/sandbox`, { waitUntil: "domcontentloaded", timeout: 15000 });
-await page.waitForSelector("main", { timeout: 5000 });
-record("sandbox page loads", "PASS", Date.now() - t0);
+await page.goto(`${BASE_URL}/sandbox`, { waitUntil: "domcontentloaded", timeout: 20000 });
+record("sandbox console loads", "PASS", Date.now() - t0);
 
-// 1. Default flow (Cross-Border → pay-out) — 3 node cards, no Pay-In
+// 1. Six primary cards visible
 {
   const start = Date.now();
-  const cardCount = await page.evaluate(() =>
-    document.querySelectorAll('[aria-label^="Inspect "]').length
-  );
+  const expectedCards = [
+    "Publish Quote",
+    "Inbound Notifications",
+    "Quotes",
+    "Payments",
+    "Payouts",
+    "Event Log",
+  ];
+  const mainText = await page.textContent("main");
+  const missing = expectedCards.filter((c) => !mainText.includes(c));
   record(
-    "sandbox console: 3 node cards (no Pay-In)",
-    cardCount === 3 ? "PASS" : "FAIL",
+    "six primary console cards present",
+    missing.length === 0 ? "PASS" : "FAIL",
     Date.now() - start,
-    { note: `found ${cardCount} (expected 3)` }
+    { note: missing.length ? `missing: ${missing.join(", ")}` : "" },
   );
 }
 
-// 2. TransportBar visible in auto mode
+// 2. API Tester section is visible and interactive
 {
   const start = Date.now();
-  const bar = await page.$('[aria-label="Playback transport"]');
-  const playBtn = await page.$('button[aria-label^="Pause"]');
+  const signBtn = await page.$('button:has-text("Sign Request")');
+  const generateBtn = await page.$('button:has-text("Generate")');
+  const privateKey = await page.$eval("#privateKey", (el) => el.value).catch(() => null);
   record(
-    "TransportBar + Pause button in auto mode",
-    bar && playBtn ? "PASS" : "FAIL",
-    Date.now() - start
-  );
-}
-
-// 3. Speed selector shows 0.5x / 1x / 2x
-{
-  const start = Date.now();
-  const speeds = await page.$$eval(
-    '[aria-label="Playback speed"] button',
-    (els) => els.map((e) => e.textContent)
-  );
-  record(
-    "Speed selector has 0.5x / 1x / 2x",
-    JSON.stringify(speeds) === '["0.5x","1x","2x"]' ? "PASS" : "FAIL",
+    "API Tester section mounted with controls",
+    signBtn && generateBtn && privateKey ? "PASS" : "FAIL",
     Date.now() - start,
-    { note: `got ${JSON.stringify(speeds)}` }
+    { note: privateKey ? `pk prefix ${privateKey.slice(0, 4)}` : "no privateKey" },
   );
 }
 
-// 4. Live event log mounted
+// 3. Generate a new key pair
 {
   const start = Date.now();
-  const log = await page.$('section[aria-label="Live network event log"]');
-  record("Live event log present", log ? "PASS" : "FAIL", Date.now() - start);
-}
-
-// 5. Auto-play advances progress over 5s
-{
-  const start = Date.now();
-  await page.waitForTimeout(5000);
-  const width = await page.evaluate(() => {
-    let best = 0;
-    for (const t of document.querySelectorAll('div[style*="width:"]')) {
-      const m = t.style.width.match(/^(\d+(?:\.\d+)?)%$/);
-      if (m) best = Math.max(best, parseFloat(m[1]));
-    }
-    return best;
-  });
+  await page.click('button:has-text("Generate")');
+  await page.waitForTimeout(300);
+  const publicKey = await page.$eval("#pubkey", (el) => el.value).catch(() => "");
+  const privateKey = await page.$eval("#privateKey", (el) => el.value).catch(() => "");
+  const looksLikeKey = /^0x[0-9a-f]{66}$/i.test(publicKey);
   record(
-    "auto-play progress > 0.3% after 5s",
-    width > 0.3 ? "PASS" : "FAIL",
+    "Generate produces a valid-looking key pair",
+    looksLikeKey && privateKey.length === 66 ? "PASS" : "FAIL",
     Date.now() - start,
-    { note: `fill=${width.toFixed(3)}%` }
+    { note: `pub ${publicKey.slice(0, 8)}…` },
   );
 }
 
-// 6. Click a packet/marker → ArtifactDrawer opens with liveIds
+// 4. Sign Request produces a signature
 {
   const start = Date.now();
-  // Click the create-payment marker (the timeline scrubber is sticky-bottom,
-  // markers are buttons with title="CreatePayment" in the scrubber).
-  const marker = await page.$('button[aria-label="Open artifact for CreatePayment"]');
-  if (marker) {
-    await marker.click();
-    await page.waitForSelector('[role="dialog"]', { timeout: 3000 });
-    const dialogText = await page.textContent('[role="dialog"]');
-    const hasPaymentId = /payment_id|payment\.id|pm_/i.test(dialogText);
-    record(
-      "ArtifactDrawer opens with payment_id field",
-      hasPaymentId ? "PASS" : "FAIL",
-      Date.now() - start,
-      { note: hasPaymentId ? "" : "no payment_id pattern found" }
+  await page.locator('button:has-text("Sign Request")').click();
+  try {
+    await page.waitForFunction(
+      () => {
+        const text = document.body.innerText || "";
+        return /Signature|curl -X/.test(text) && /0x[0-9a-f]{64,}/i.test(text);
+      },
+      null,
+      { timeout: 5000 },
     );
-    // Close drawer
-    await page.click('button[aria-label="Close artifact drawer"]');
-  } else {
-    record("ArtifactDrawer opens with payment_id field", "FAIL", Date.now() - start, {
-      note: "marker not found",
+    record("Sign Request yields signature output", "PASS", Date.now() - start);
+  } catch {
+    const text = await page.textContent("main");
+    record("Sign Request yields signature output", "FAIL", Date.now() - start, {
+      note: `main text contains Signature: ${text.includes("Signature")}`,
     });
   }
 }
 
-// 7. Switch to Trading (manual-aml) channel
-{
-  const start = Date.now();
-  await page.click('button:has-text("Trading Desk")');
-  await page.waitForTimeout(500);
-  const flowLabel = await page.textContent(".font-mono:has-text('flow · manual-aml')").catch(() => null);
-  record(
-    "Switching to Trading Desk changes flow to manual-aml",
-    flowLabel !== null ? "PASS" : "FAIL",
-    Date.now() - start
+// Helper: click a button and wait for the snapshot to update.
+// `predicate` is a function body (with `text` in scope) returning boolean.
+async function waitForCount(predicate, timeoutMs = 15000) {
+  await page.waitForFunction(
+    (body) => {
+      // eslint-disable-next-line no-new-func
+      const fn = new Function("text", body);
+      return fn(document.body.textContent || "");
+    },
+    predicate,
+    { timeout: timeoutMs },
   );
 }
 
-// 8. Switch to Fintech (payment-intent) — Pay-In node should appear
+// 5. Publish quote flow
 {
   const start = Date.now();
-  await page.click('button:has-text("Fintech")');
-  await page.waitForTimeout(500);
-  const cards = await page.$$eval(
-    '[aria-label^="Inspect"]',
-    (els) => els.map((e) => e.getAttribute("aria-label"))
-  );
-  const hasPayin = cards.includes("Inspect Pay-In Wallet");
-  record(
-    "Fintech flow shows Pay-In node",
-    hasPayin ? "PASS" : "FAIL",
-    Date.now() - start,
-    { note: `cards: ${JSON.stringify(cards)}` }
-  );
-}
-
-// 9. Switch to Trading (manual-aml) — IVMS101 disclosure should appear
-{
-  const start = Date.now();
-  await page.click('button:has-text("Trading Desk")');
-  await page.waitForTimeout(500);
-  const ivmsMarker = await page.$(
-    'button[aria-label="Open artifact for Travel Rule (IVMS101)"]'
-  );
-  if (ivmsMarker) {
-    await ivmsMarker.click();
-    await page.waitForSelector('[role="dialog"]', { timeout: 3000 });
-    const t = await page.textContent('[role="dialog"]');
-    const hasIvms = /Travel Rule|IVMS101|originator|beneficiary/i.test(t);
-    record(
-      "IVMS101 disclosure artifact opens (manual-aml)",
-      hasIvms ? "PASS" : "FAIL",
-      Date.now() - start,
-      { note: hasIvms ? "" : "no IVMS marker in drawer" }
-    );
-    await page.click('button[aria-label="Close artifact drawer"]');
+  const publishBtn = page.locator('button:has-text("Publish quote")').first();
+  if (await publishBtn.count()) {
+    await publishBtn.click();
+    try {
+      await waitForCount("return /Quotes\\s*·\\s*([1-9]\\d*)/.test(text);", 15000);
+      const pageText = (await page.textContent("main")) || "";
+      const quoteCount = pageText.match(/Quotes\s*·\s*(\d+)/)?.[1] ?? "0";
+      record(
+        "Publish quote updates Quotes card",
+        Number(quoteCount) > 0 ? "PASS" : "FAIL",
+        Date.now() - start,
+        { note: `Quotes · ${quoteCount}` },
+      );
+    } catch {
+      const pageText = (await page.textContent("main")) || "";
+      const quoteCount = pageText.match(/Quotes\s*·\s*(\d+)/)?.[1] ?? "0";
+      record("Publish quote updates Quotes card", "FAIL", Date.now() - start, {
+        note: `Quotes · ${quoteCount} (timeout)`,
+      });
+    }
   } else {
-    record("IVMS101 disclosure artifact opens (manual-aml)", "FAIL", Date.now() - start, {
-      note: "marker not found",
+    record("Publish quote updates Quotes card", "FAIL", Date.now() - start, {
+      note: "button not found",
     });
   }
 }
 
-// 9. Pause button works
+// 6. Simulate USDT settlement
 {
   const start = Date.now();
-  await page.click('button[aria-label="Pause auto-playback"]');
-  await page.waitForTimeout(500);
-  const width1 = await page.evaluate(() => {
-    let best = 0;
-    for (const t of document.querySelectorAll('div[style*="width:"]')) {
-      const m = t.style.width.match(/^(\d+(?:\.\d+)?)%$/);
-      if (m) best = Math.max(best, parseFloat(m[1]));
+  const btn = page.locator('button:has-text("Simulate USDT settlement")').first();
+  if (await btn.count()) {
+    await btn.click();
+    try {
+      await waitForCount(
+        "return /Payments\\s*·\\s*([1-9]\\d*)/.test(text) || /Event Log\\s*·\\s*([1-9]\\d*)/.test(text);",
+        15000,
+      );
+      const pageText = (await page.textContent("main")) || "";
+      const paymentsCount = pageText.match(/Payments\s*·\s*(\d+)/)?.[1] ?? "0";
+      const eventCount = pageText.match(/Event Log\s*·\s*(\d+)/)?.[1] ?? "0";
+      record(
+        "Simulate USDT settlement updates Payments and Event Log",
+        Number(paymentsCount) > 0 || Number(eventCount) > 0 ? "PASS" : "FAIL",
+        Date.now() - start,
+        { note: `Payments · ${paymentsCount}, Event Log · ${eventCount}` },
+      );
+    } catch {
+      const pageText = (await page.textContent("main")) || "";
+      const paymentsCount = pageText.match(/Payments\s*·\s*(\d+)/)?.[1] ?? "0";
+      const eventCount = pageText.match(/Event Log\s*·\s*(\d+)/)?.[1] ?? "0";
+      record(
+        "Simulate USDT settlement updates Payments and Event Log",
+        "FAIL",
+        Date.now() - start,
+        { note: `Payments · ${paymentsCount}, Event Log · ${eventCount} (timeout)` },
+      );
     }
-    return best;
-  });
-  await page.waitForTimeout(2000);
-  const width2 = await page.evaluate(() => {
-    let best = 0;
-    for (const t of document.querySelectorAll('div[style*="width:"]')) {
-      const m = t.style.width.match(/^(\d+(?:\.\d+)?)%$/);
-      if (m) best = Math.max(best, parseFloat(m[1]));
-    }
-    return best;
-  });
-  const paused = Math.abs(width2 - width1) < 0.05;
-  record(
-    "Pause freezes progress",
-    paused ? "PASS" : "FAIL",
-    Date.now() - start,
-    { note: `before=${width1.toFixed(3)}% after2s=${width2.toFixed(3)}%` }
-  );
+  } else {
+    record("Simulate USDT settlement updates Payments and Event Log", "FAIL", Date.now() - start, {
+      note: "button not found",
+    });
+  }
 }
 
-// 10. Speed=2x advances faster
+// 7. Simulate credit usage
 {
   const start = Date.now();
-  await page.click('button[aria-label="Resume auto-playback"]');
-  await page.click('button[role="radio"]:has-text("2x")');
-  await page.waitForTimeout(3000);
-  const width = await page.evaluate(() => {
-    let best = 0;
-    for (const t of document.querySelectorAll('div[style*="width:"]')) {
-      const m = t.style.width.match(/^(\d+(?:\.\d+)?)%$/);
-      if (m) best = Math.max(best, parseFloat(m[1]));
+  const btn = page.locator('button:has-text("Simulate credit usage")').first();
+  if (await btn.count()) {
+    await btn.click();
+    try {
+      await waitForCount(
+        "return /Payouts\\s*·\\s*([1-9]\\d*)/.test(text) || /Event Log\\s*·\\s*([1-9]\\d*)/.test(text);",
+        15000,
+      );
+      const pageText = (await page.textContent("main")) || "";
+      const payoutsCount = pageText.match(/Payouts\s*·\s*(\d+)/)?.[1] ?? "0";
+      const eventCount = pageText.match(/Event Log\s*·\s*(\d+)/)?.[1] ?? "0";
+      record(
+        "Simulate credit usage updates Payouts and Event Log",
+        Number(payoutsCount) > 0 || Number(eventCount) > 0 ? "PASS" : "FAIL",
+        Date.now() - start,
+        { note: `Payouts · ${payoutsCount}, Event Log · ${eventCount}` },
+      );
+    } catch {
+      const pageText = (await page.textContent("main")) || "";
+      const payoutsCount = pageText.match(/Payouts\s*·\s*(\d+)/)?.[1] ?? "0";
+      const eventCount = pageText.match(/Event Log\s*·\s*(\d+)/)?.[1] ?? "0";
+      record("Simulate credit usage updates Payouts and Event Log", "FAIL", Date.now() - start, {
+        note: `Payouts · ${payoutsCount}, Event Log · ${eventCount} (timeout)`,
+      });
     }
-    return best;
+  } else {
+    record("Simulate credit usage updates Payouts and Event Log", "FAIL", Date.now() - start, {
+      note: "button not found",
+    });
+  }
+}
+
+// 8. Event log contains entries
+{
+  const start = Date.now();
+  const eventCount = await page.$eval("main", (el) => {
+    const text = el.textContent || "";
+    const m = text.match(/Event Log\s*·\s*(\d+)/);
+    return m ? Number(m[1]) : 0;
   });
   record(
-    "2x speed advances ≥ 1% in 3s",
-    width > 1 ? "PASS" : "FAIL",
+    "Event Log has entries after simulations",
+    eventCount > 0 ? "PASS" : "FAIL",
     Date.now() - start,
-    { note: `width=${width.toFixed(3)}%` }
+    { note: `Event Log · ${eventCount}` },
   );
 }
 
@@ -253,6 +267,23 @@ console.log(`Console errors during run: ${consoleMsgs.length}`);
 if (consoleMsgs.length) {
   for (const m of consoleMsgs.slice(0, 5)) console.log(`  ! ${m.slice(0, 200)}`);
 }
+
+const reportPath = path.join(REPORT_DIR, "deep-check-report.json");
+await fs.writeFile(
+  reportPath,
+  JSON.stringify(
+    {
+      baseUrl: BASE_URL,
+      timestamp: new Date().toISOString(),
+      results,
+      consoleErrors: consoleMsgs,
+      summary: { total: results.length, pass: passed, fail: failed },
+    },
+    null,
+    2,
+  ),
+);
+console.log(`Report: ${reportPath}`);
 
 await browser.close();
 process.exit(failed > 0 ? 1 : 0);

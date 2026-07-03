@@ -64,9 +64,9 @@ export function HeroOverlay({ progress }: HeroOverlayProps) {
           className="mx-auto mt-6 max-w-xl text-secondary-canvas"
           style={{ fontSize: "16px", lineHeight: 1.55 }}
         >
-          Scroll to advance through live protocol steps. Inspect artifacts,
-          switch channels, and see how OFI, Network Core, and POP nodes
-          exchange quotes, USDT, signatures, and ledger entries.
+          Scroll to advance through live protocol steps. Inspect artifacts, switch channels, and see
+          how OFI, Network Core, and POP nodes exchange quotes, USDT, signatures, and ledger
+          entries.
         </p>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">

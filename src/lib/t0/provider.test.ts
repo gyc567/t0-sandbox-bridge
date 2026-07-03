@@ -26,7 +26,9 @@ describe("PayoutProviderService", () => {
   it("uses custom ttl and rejects non-positive rate", async () => {
     const q = await svc.publishQuote({ currency: "USD", band: 5000, rate: 1, ttlMs: 5_000 });
     expect(q.expiresAt).toBe(clock + 5_000);
-    await expect(svc.publishQuote({ currency: "USD", band: 1000, rate: 0 })).rejects.toThrow(/rate/);
+    await expect(svc.publishQuote({ currency: "USD", band: 1000, rate: 0 })).rejects.toThrow(
+      /rate/,
+    );
   });
 
   it("logs USDT settlement and credit usage; rejects bad usd", () => {
@@ -42,14 +44,21 @@ describe("PayoutProviderService", () => {
     const p = await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "ACC-1" });
     expect(p.status).toBe("accepted");
     expect(p.localAmount).toBeCloseTo(900);
-    expect(client.outbound.at(-1)).toMatchObject({ kind: "event", payload: { type: "PaymentAccepted" } });
+    expect(client.outbound.at(-1)).toMatchObject({
+      kind: "event",
+      payload: { type: "PaymentAccepted" },
+    });
   });
 
   it("rejects unknown or expired quotes", async () => {
-    await expect(svc.acceptPayment({ quoteId: "nope", beneficiaryRef: "x" })).rejects.toThrow(/unknown quote/);
+    await expect(svc.acceptPayment({ quoteId: "nope", beneficiaryRef: "x" })).rejects.toThrow(
+      /unknown quote/,
+    );
     const q = await svc.publishQuote({ currency: "USD", band: 1000, rate: 1, ttlMs: 10 });
     clock += 1000;
-    await expect(svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "x" })).rejects.toThrow(/expired/);
+    await expect(svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "x" })).rejects.toThrow(
+      /expired/,
+    );
   });
 
   it("completes the full payout lifecycle and confirms the payment", async () => {
@@ -157,6 +166,16 @@ describe("PayoutProviderService (Phase 8 methods)", () => {
     const q = await svc.publishQuote({ currency: "EUR", band: 1000, rate: 0.9 });
     const p = await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "B" });
     expect(() => svc.approvePaymentQuote(p.id, "nope")).toThrow(/unknown quote/);
+    // unknown payment (quote exists but payment does not)
+    expect(() => svc.approvePaymentQuote("ghost_pm", q.id)).toThrow(/unknown payment/);
+  });
+
+  it("processPayout throws when payment is in a non-accepted state", async () => {
+    const q = await svc.publishQuote({ currency: "USD", band: 1000, rate: 1 });
+    // createPaymentIntent yields a payment in "pending" state, which is
+    // not "accepted" → triggers the wrong-status branch.
+    const intent = svc.createPaymentIntent({ quoteId: q.id, beneficiaryRef: "Y" });
+    await expect(svc.processPayout(intent.id)).rejects.toThrow(/not in accepted/);
   });
 
   it("createPaymentIntent creates a pending payment with quote-linked amounts", async () => {

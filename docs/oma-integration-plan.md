@@ -55,11 +55,11 @@ OMA_MODEL=your-model
 
 第一版只保留 3 个 agent:
 
-| Agent | 职责 | 工具 |
-|---|---|---|
-| `scenario-planner` | 将目标拆成 T-0 sandbox steps | 无写工具 |
-| `t0-analyst` | 读取 snapshot/events，判断状态 | `get_snapshot` |
-| `verifier` | 对执行结果给出 pass/fail verdict | `get_snapshot` |
+| Agent              | 职责                             | 工具           |
+| ------------------ | -------------------------------- | -------------- |
+| `scenario-planner` | 将目标拆成 T-0 sandbox steps     | 无写工具       |
+| `t0-analyst`       | 读取 snapshot/events，判断状态   | `get_snapshot` |
+| `verifier`         | 对执行结果给出 pass/fail verdict | `get_snapshot` |
 
 ## 白名单步骤
 
@@ -101,21 +101,21 @@ type SandboxStep =
 
 新增:
 
-| 文件 | 用途 |
-|---|---|
-| `src/lib/oma/client.ts` | 创建 OMA orchestrator |
-| `src/lib/oma/team.ts` | agent 配置 |
-| `src/lib/oma/schema.ts` | `SandboxStep` 和结果类型 |
-| `src/lib/oma/executor.ts` | 白名单步骤执行器 |
-| `src/lib/oma/oma.functions.ts` | TanStack server functions |
+| 文件                                 | 用途                               |
+| ------------------------------------ | ---------------------------------- |
+| `src/lib/oma/client.ts`              | 创建 OMA orchestrator              |
+| `src/lib/oma/team.ts`                | agent 配置                         |
+| `src/lib/oma/schema.ts`              | `SandboxStep` 和结果类型           |
+| `src/lib/oma/executor.ts`            | 白名单步骤执行器                   |
+| `src/lib/oma/oma.functions.ts`       | TanStack server functions          |
 | `src/components/agent-test-flow.tsx` | `/sandbox` 的 Agent Test Flow 面板 |
 
 修改:
 
-| 文件 | 修改 |
-|---|---|
-| `package.json` | 增加 `@open-multi-agent/core` |
-| `src/routes/sandbox.tsx` | 嵌入 Agent Test Flow 面板 |
+| 文件                     | 修改                                   |
+| ------------------------ | -------------------------------------- |
+| `package.json`           | 增加 `@open-multi-agent/core`          |
+| `src/routes/sandbox.tsx` | 嵌入 Agent Test Flow 面板              |
 | `src/lib/t0/provider.ts` | 确保事件广播与幂等逻辑可被自动测试验证 |
 
 ## Server Function 设计

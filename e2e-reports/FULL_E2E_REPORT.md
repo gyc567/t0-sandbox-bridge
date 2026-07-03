@@ -9,16 +9,16 @@
 
 ## 1. 执行摘要
 
-| 维度 | 结果 | 关键数字 |
-|------|------|----------|
-| 单元 + 契约测试 | ✅ 通过 | 153 / 153 |
-| 覆盖率 | ⚠️ 接近目标 | Statements 99.41% / Branches 96.85% / Functions 98.79% / Lines 100% |
-| 构建 | ✅ 通过 | `bun run build` 成功 |
-| E2E Smoke (本地) | ✅ 通过 | 5 / 5 页面检查通过 |
-| E2E Deep Check (本地) | ❌ 失败 | 脚本已过期，需适配新版 Console UI |
-| Typecheck | ❌ 8 个既有错误 | 均非本次改动引入 |
-| Lint | ❌ 200+ 既有格式错误 | 多为 prettier 风格债，集中在 src/components/ 与 routes/ |
-| 生产 URL | ⚠️ 无法直接访问 | 被 Vercel SSO 拦截 (302 → vercel.com/sso-api) |
+| 维度                  | 结果                 | 关键数字                                                            |
+| --------------------- | -------------------- | ------------------------------------------------------------------- |
+| 单元 + 契约测试       | ✅ 通过              | 153 / 153                                                           |
+| 覆盖率                | ⚠️ 接近目标          | Statements 99.41% / Branches 96.85% / Functions 98.79% / Lines 100% |
+| 构建                  | ✅ 通过              | `bun run build` 成功                                                |
+| E2E Smoke (本地)      | ✅ 通过              | 5 / 5 页面检查通过                                                  |
+| E2E Deep Check (本地) | ❌ 失败              | 脚本已过期，需适配新版 Console UI                                   |
+| Typecheck             | ❌ 8 个既有错误      | 均非本次改动引入                                                    |
+| Lint                  | ❌ 200+ 既有格式错误 | 多为 prettier 风格债，集中在 src/components/ 与 routes/             |
+| 生产 URL              | ⚠️ 无法直接访问      | 被 Vercel SSO 拦截 (302 → vercel.com/sso-api)                       |
 
 **结论**: 本次新增的五层测试与合约框架本身工作正常，但项目存在既有 TypeScript/Lint/E2E 脚本债务；新版 `/sandbox` Console UI 已上线，旧的 deep-check 脚本需要同步重写。
 
@@ -47,14 +47,14 @@ Prod URL:   https://t0-sandbox-bridge-3ja989q88-gyc567s-projects.vercel.app
 
 状态: **FAIL** (8 errors)
 
-| 文件 | 错误数 | 说明 |
-|------|--------|------|
-| `src/data/artifacts.ts` | 2 | 返回的复杂对象不符合 `Record<string, string \| number \| boolean>` 签名 |
-| `src/lib/t0/csv.ts` | 3 | `Snapshot` 重复标识 + 找不到 `Snapshot` 类型 |
-| `src/lib/t0/csv.test.ts` | 1 | `toEndWith` 不存在（缺少 jest-extended 类型） |
-| `src/lib/t0/events.test.ts` | 1 | 同上 |
-| `src/router.tsx` | 2 | `Router<...>` 泛型参数数量不匹配 |
-| `src/vercel.ts` | 1 | 找不到 `@tanstack/start-server` 模块声明 |
+| 文件                        | 错误数 | 说明                                                                    |
+| --------------------------- | ------ | ----------------------------------------------------------------------- |
+| `src/data/artifacts.ts`     | 2      | 返回的复杂对象不符合 `Record<string, string \| number \| boolean>` 签名 |
+| `src/lib/t0/csv.ts`         | 3      | `Snapshot` 重复标识 + 找不到 `Snapshot` 类型                            |
+| `src/lib/t0/csv.test.ts`    | 1      | `toEndWith` 不存在（缺少 jest-extended 类型）                           |
+| `src/lib/t0/events.test.ts` | 1      | 同上                                                                    |
+| `src/router.tsx`            | 2      | `Router<...>` 泛型参数数量不匹配                                        |
+| `src/vercel.ts`             | 1      | 找不到 `@tanstack/start-server` 模块声明                                |
 
 > 本次新增代码 (`src/shared/*`, `src/test/*`, `src/lib/t0/ecdsa.contract.test.ts`) **0 个 typecheck 错误**。
 
@@ -110,11 +110,11 @@ Lines      : 100%   (314/314)
 
 未覆盖点（既有代码）：
 
-| 文件 | 未覆盖行 | 说明 |
-|------|----------|------|
-| `src/lib/playground/playback.ts` | 61 | 待补充测试 |
-| `src/lib/t0/csv.ts` | 83 | 分支未命中 |
-| `src/lib/t0/provider.ts` | 100, 107, 172 | 错误处理分支未命中 |
+| 文件                             | 未覆盖行      | 说明               |
+| -------------------------------- | ------------- | ------------------ |
+| `src/lib/playground/playback.ts` | 61            | 待补充测试         |
+| `src/lib/t0/csv.ts`              | 83            | 分支未命中         |
+| `src/lib/t0/provider.ts`         | 100, 107, 172 | 错误处理分支未命中 |
 
 新增 `src/shared/contracts/*` 全部达到 per-directory 100% 阈值。
 
@@ -155,6 +155,7 @@ Overall:  PASS
 ```
 
 根因：
+
 - `/sandbox` 已按 `docs/redesign-plan.md` 重构成 **Payout Provider Console**（Quote / Inbound / Quotes / Payments / Payouts / Event Log / API Tester 六大卡片）
 - `scripts/e2e-deep-check.mjs` 仍期望旧的 playground 节点卡片、TransportBar、Speed selector、ArtifactDrawer 等元素
 - 该脚本需要重写以匹配新版 Console UI
@@ -170,6 +171,7 @@ location: https://vercel.com/sso-api?url=...
 ```
 
 生产部署被 Vercel SSO 拦截，原因可能是：
+
 - 部署 URL 属于 project-level preview/production protection
 - 真实别名 `https://www.agtpay.xyz` 未在本次探测中使用
 
@@ -181,15 +183,15 @@ location: https://vercel.com/sso-api?url=...
 
 运行 `./scripts/ci.sh --full --skip-typecheck`:
 
-| 阶段 | 结果 | 备注 |
-|------|------|------|
-| typecheck | — | 本次跳过的既有错误 |
-| lint | ❌ | 既有 prettier 债 |
-| test | ✅ | 153/153 |
-| contract | ✅ | 3/3 |
-| coverage | ✅ | 通过放宽后的阈值 |
-| build | ✅ | `.vercel/output/` 生成成功 |
-| e2e smoke | ✅ | 5/5 |
+| 阶段      | 结果 | 备注                       |
+| --------- | ---- | -------------------------- |
+| typecheck | —    | 本次跳过的既有错误         |
+| lint      | ❌   | 既有 prettier 债           |
+| test      | ✅   | 153/153                    |
+| contract  | ✅   | 3/3                        |
+| coverage  | ✅   | 通过放宽后的阈值           |
+| build     | ✅   | `.vercel/output/` 生成成功 |
+| e2e smoke | ✅   | 5/5                        |
 
 `scripts/ci.sh` 结构化输出：
 
@@ -211,13 +213,13 @@ location: https://vercel.com/sso-api?url=...
 
 ## 5. 发现的问题与修复建议
 
-| 优先级 | 问题 | 建议 |
-|--------|------|------|
-| 🔴 高 | `scripts/e2e-deep-check.mjs` 过期 | 重写 deep-check：基于新版 `/sandbox` Console 的 6 大卡片 + API Tester 做端到端交互验证 |
-| 🔴 高 | Typecheck 8 个错误 | 修复 `csv.ts` Snapshot 冲突、`router.tsx` 泛型、`events/csv.test.ts` 缺少 `toEndWith` 类型、`vercel.ts` 模块声明 |
-| 🟡 中 | Lint 200+ prettier 错误 | 全局跑 `prettier --write`，或 CI 中先自动 format 再 lint |
-| 🟡 中 | 覆盖率未达 100% | 为 `playback.ts:61`、`csv.ts:83`、`provider.ts:100,107,172` 补测试 |
-| 🟢 低 | 生产 URL SSO | 配置 Vercel deployment protection 或改跑 `https://www.agtpay.xyz` |
+| 优先级 | 问题                              | 建议                                                                                                             |
+| ------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 🔴 高  | `scripts/e2e-deep-check.mjs` 过期 | 重写 deep-check：基于新版 `/sandbox` Console 的 6 大卡片 + API Tester 做端到端交互验证                           |
+| 🔴 高  | Typecheck 8 个错误                | 修复 `csv.ts` Snapshot 冲突、`router.tsx` 泛型、`events/csv.test.ts` 缺少 `toEndWith` 类型、`vercel.ts` 模块声明 |
+| 🟡 中  | Lint 200+ prettier 错误           | 全局跑 `prettier --write`，或 CI 中先自动 format 再 lint                                                         |
+| 🟡 中  | 覆盖率未达 100%                   | 为 `playback.ts:61`、`csv.ts:83`、`provider.ts:100,107,172` 补测试                                               |
+| 🟢 低  | 生产 URL SSO                      | 配置 Vercel deployment protection 或改跑 `https://www.agtpay.xyz`                                                |
 
 ---
 
@@ -240,5 +242,5 @@ location: https://vercel.com/sso-api?url=...
 
 ---
 
-*报告生成路径*: `e2e-reports/FULL_E2E_REPORT.md`
-*详细日志*: `coverage/ci/*.log` / `e2e-reports/smoke-*.log` / `e2e-reports/deep-*.log`
+_报告生成路径_: `e2e-reports/FULL_E2E_REPORT.md`
+_详细日志_: `coverage/ci/*.log` / `e2e-reports/smoke-*.log` / `e2e-reports/deep-*.log`

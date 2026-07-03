@@ -108,7 +108,7 @@ export interface ArtifactTemplate {
    * place of the mocked payment_id / quote_id so the drawer reflects
    * the actual server-side state.
    */
-  build: (live?: LiveIds) => Record<string, string | number | boolean>;
+  build: (live?: LiveIds) => Record<string, unknown>;
 }
 
 /** Common mock context shared across several artifacts. */

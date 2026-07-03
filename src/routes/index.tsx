@@ -36,7 +36,10 @@ function Index() {
         {/* ─── HERO ─────────────────────────────────────────────────── */}
         <section className="relative overflow-hidden">
           {/* Perspective horizon grid */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[40vh] opacity-40" aria-hidden>
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-[40vh] opacity-40"
+            aria-hidden
+          >
             <div
               className="absolute inset-0"
               style={{
@@ -56,7 +59,9 @@ function Index() {
               <div className="space-y-7">
                 <div className="inline-flex items-center gap-2 rounded-full border border-hairline bg-glass px-3 py-1.5">
                   <span className="status-dot" aria-hidden />
-                  <span className="eyebrow">BAXS · T-0 SANDBOX BRIDGE · INSTANT SETTLEMENT SIM</span>
+                  <span className="eyebrow">
+                    BAXS · T-0 SANDBOX BRIDGE · INSTANT SETTLEMENT SIM
+                  </span>
                 </div>
 
                 <h1
@@ -69,8 +74,8 @@ function Index() {
                 </h1>
 
                 <p className="max-w-xl text-tagline text-muted-foreground">
-                  Built by BAXS PAY LIMITED · T-0 is the sandbox where it runs.
-                  在 T-0 Network 上,每一笔报价、结算、支付与放款的全链路都可观测、可回放、可验证。
+                  Built by BAXS PAY LIMITED · T-0 is the sandbox where it runs. 在 T-0 Network
+                  上,每一笔报价、结算、支付与放款的全链路都可观测、可回放、可验证。
                 </p>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -142,11 +147,7 @@ function Index() {
           />
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {CHANNELS.map((c) => (
-              <Link
-                key={c.id}
-                to="/playground"
-                className="group"
-              >
+              <Link key={c.id} to="/sandbox" className="group">
                 <Card className="card-hover h-full border-hairline bg-glass backdrop-blur-xl">
                   <CardContent className="space-y-3 p-5">
                     <div className="flex items-center justify-between">
@@ -156,17 +157,17 @@ function Index() {
                       >
                         {c.label}
                       </h3>
-                      <span
-                        className="font-mono text-accent-cyan"
-                        style={{ fontSize: "11px" }}
-                      >
+                      <span className="font-mono text-accent-cyan" style={{ fontSize: "11px" }}>
                         {c.fee}
                       </span>
                     </div>
                     <p className="text-caption text-muted-foreground leading-relaxed">
                       {c.context}
                     </p>
-                    <div className="flex items-center gap-1.5 pt-1 font-mono text-muted-canvas" style={{ fontSize: "10px", letterSpacing: "0.04em" }}>
+                    <div
+                      className="flex items-center gap-1.5 pt-1 font-mono text-muted-canvas"
+                      style={{ fontSize: "10px", letterSpacing: "0.04em" }}
+                    >
                       <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
                       {c.flowType}
                     </div>
@@ -186,10 +187,18 @@ function Index() {
           />
           <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_1.3fr] items-start">
             <div className="space-y-4">
-              <Step n="01" title="Build payload" desc="body + 8-byte little-endian Unix timestamp" />
+              <Step
+                n="01"
+                title="Build payload"
+                desc="body + 8-byte little-endian Unix timestamp"
+              />
               <Step n="02" title="Hash" desc="Keccak-256(payload) → 32 bytes" />
               <Step n="03" title="Sign" desc="secp256k1 private key → 65 bytes (v + r + s)" />
-              <Step n="04" title="Send" desc="X-Signature / X-Public-Key / X-Signature-Timestamp headers" />
+              <Step
+                n="04"
+                title="Send"
+                desc="X-Signature / X-Public-Key / X-Signature-Timestamp headers"
+              />
               <Button asChild variant="outline" size="sm" className="mt-2">
                 <Link to="/sandbox">
                   Try in API Tester
@@ -251,21 +260,11 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SectionHeading({
-  eyebrow,
-  title,
-  sub,
-}: {
-  eyebrow: string;
-  title: string;
-  sub: string;
-}) {
+function SectionHeading({ eyebrow, title, sub }: { eyebrow: string; title: string; sub: string }) {
   return (
     <div className="space-y-3">
       <p className="eyebrow">{eyebrow}</p>
-      <h2 className="text-display-md font-semibold tracking-tight text-foreground">
-        {title}
-      </h2>
+      <h2 className="text-display-md font-semibold tracking-tight text-foreground">{title}</h2>
       <p className="max-w-2xl text-tagline text-muted-foreground">{sub}</p>
     </div>
   );
@@ -283,7 +282,11 @@ function CapabilityCard({
   accent: "cyan" | "violet" | "usdt";
 }) {
   const accentColor =
-    accent === "cyan" ? "text-accent-cyan" : accent === "violet" ? "text-accent-violet" : "text-accent-usdt";
+    accent === "cyan"
+      ? "text-accent-cyan"
+      : accent === "violet"
+        ? "text-accent-violet"
+        : "text-accent-usdt";
   const glow =
     accent === "cyan"
       ? "rgba(0,212,255,0.15)"
@@ -339,7 +342,10 @@ function MonoSnippet() {
         <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f56]" />
         <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
         <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
-        <span className="ml-2 font-mono text-muted-canvas" style={{ fontSize: "10px", letterSpacing: "0.08em" }}>
+        <span
+          className="ml-2 font-mono text-muted-canvas"
+          style={{ fontSize: "10px", letterSpacing: "0.08em" }}
+        >
           sign-request.ts
         </span>
       </div>
@@ -347,19 +353,26 @@ function MonoSnippet() {
         <code>
           <span className="text-muted-canvas">{"// 1. build payload"}</span>
           {"\n"}
-          <span className="text-accent-violet">const</span> <span className="text-foreground">payload</span> = <span className="text-accent-cyan">body</span> + <span className="text-accent-usdt">timestamp</span>
+          <span className="text-accent-violet">const</span>{" "}
+          <span className="text-foreground">payload</span> ={" "}
+          <span className="text-accent-cyan">body</span> +{" "}
+          <span className="text-accent-usdt">timestamp</span>
           {"\n\n"}
           <span className="text-muted-canvas">{"// 2. keccak-256 hash"}</span>
           {"\n"}
-          <span className="text-accent-violet">const</span> <span className="text-foreground">hash</span> = keccak256(<span className="text-foreground">payload</span>)
-          {"\n\n"}
+          <span className="text-accent-violet">const</span>{" "}
+          <span className="text-foreground">hash</span> = keccak256(
+          <span className="text-foreground">payload</span>){"\n\n"}
           <span className="text-muted-canvas">{"// 3. secp256k1 sign"}</span>
           {"\n"}
-          <span className="text-accent-violet">const</span> <span className="text-foreground">sig</span> = sign(<span className="text-foreground">hash</span>, <span className="text-foreground">privateKey</span>)
-          {"\n\n"}
+          <span className="text-accent-violet">const</span>{" "}
+          <span className="text-foreground">sig</span> = sign(
+          <span className="text-foreground">hash</span>,{" "}
+          <span className="text-foreground">privateKey</span>){"\n\n"}
           <span className="text-muted-canvas">{"// 4. headers"}</span>
           {"\n"}
-          <span className="text-accent-cyan">X-Signature</span>: <span className="text-accent-usdt">0x</span>
+          <span className="text-accent-cyan">X-Signature</span>:{" "}
+          <span className="text-accent-usdt">0x</span>
           <span className="text-muted-canvas">{"{65 bytes hex}"}</span>
         </code>
       </pre>
@@ -384,11 +397,16 @@ function MiniFlowPreview() {
       <div className="flex items-center justify-between border-b border-hairline px-4 py-2.5">
         <div className="flex items-center gap-2">
           <span className="status-dot" aria-hidden />
-          <span className="font-mono text-accent-cyan" style={{ fontSize: "10px", letterSpacing: "0.14em" }}>
+          <span
+            className="font-mono text-accent-cyan"
+            style={{ fontSize: "10px", letterSpacing: "0.14em" }}
+          >
             LIVE PLAYBACK
           </span>
         </div>
-        <span className="font-mono text-muted-canvas" style={{ fontSize: "10px" }}>t = 12:18</span>
+        <span className="font-mono text-muted-canvas" style={{ fontSize: "10px" }}>
+          t = 12:18
+        </span>
       </div>
 
       {/* topology */}
@@ -427,7 +445,13 @@ function MiniTopology() {
           strokeWidth="1"
           strokeDasharray="4 4"
         >
-          <animate attributeName="stroke-dashoffset" from="0" to="-16" dur="3s" repeatCount="indefinite" />
+          <animate
+            attributeName="stroke-dashoffset"
+            from="0"
+            to="-16"
+            dur="3s"
+            repeatCount="indefinite"
+          />
         </line>
       </svg>
 
@@ -469,9 +493,16 @@ function NodeTag({
           boxShadow: highlight ? "0 0 16px rgba(0,212,255,0.15)" : "none",
         }}
       >
-        <span className="status-dot" aria-hidden style={highlight ? {} : { background: "rgba(255,255,255,0.4)", boxShadow: "none" }} />
+        <span
+          className="status-dot"
+          aria-hidden
+          style={highlight ? {} : { background: "rgba(255,255,255,0.4)", boxShadow: "none" }}
+        />
       </div>
-      <div className="font-mono text-foreground" style={{ fontSize: "10px", letterSpacing: "0.08em" }}>
+      <div
+        className="font-mono text-foreground"
+        style={{ fontSize: "10px", letterSpacing: "0.08em" }}
+      >
         {label}
       </div>
       <div className="font-mono text-muted-canvas" style={{ fontSize: "8px" }}>

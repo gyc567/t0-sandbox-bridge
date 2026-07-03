@@ -52,12 +52,7 @@ export function NodeCard({
         transition: "box-shadow 700ms cubic-bezier(0.16, 1, 0.3, 1), border-color 700ms ease-out",
       }}
     >
-      <header
-        className={cn(
-          "border-b border-hairline",
-          large ? "px-4 py-3" : "px-3 py-2",
-        )}
-      >
+      <header className={cn("border-b border-hairline", large ? "px-4 py-3" : "px-3 py-2")}>
         <div className="flex items-center justify-between">
           <h3
             className={cn(
@@ -90,10 +85,7 @@ export function NodeCard({
         )}
       </header>
       <div
-        className={cn(
-          "relative flex flex-1 flex-col gap-1.5",
-          large ? "px-4 py-3" : "px-3 py-2",
-        )}
+        className={cn("relative flex flex-1 flex-col gap-1.5", large ? "px-4 py-3" : "px-3 py-2")}
       >
         {children}
       </div>

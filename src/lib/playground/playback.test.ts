@@ -1,11 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import React, { act, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import {
-  advanceProgress,
-  usePlayback,
-  type PlaybackSpeed,
-} from "./playback";
+import { advanceProgress, usePlayback, type PlaybackSpeed } from "./playback";
 
 /**
  * Tests for usePlayback hook.

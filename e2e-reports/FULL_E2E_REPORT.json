@@ -13,10 +13,21 @@
   },
   "summary": {
     "tests": { "status": "PASS", "passed": 153, "failed": 0, "files": 9 },
-    "coverage": { "status": "PASS", "statements": "99.41%", "branches": "96.85%", "functions": "98.79%", "lines": "100%" },
+    "coverage": {
+      "status": "PASS",
+      "statements": "99.41%",
+      "branches": "96.85%",
+      "functions": "98.79%",
+      "lines": "100%"
+    },
     "build": { "status": "PASS" },
     "e2eSmoke": { "status": "PASS", "passed": 5, "failed": 0 },
-    "e2eDeep": { "status": "FAIL", "passed": 1, "failed": 7, "reason": "outdated script targeting old playground UI" },
+    "e2eDeep": {
+      "status": "FAIL",
+      "passed": 1,
+      "failed": 7,
+      "reason": "outdated script targeting old playground UI"
+    },
     "typecheck": { "status": "FAIL", "errors": 8, "fromNewCode": false },
     "lint": { "status": "FAIL", "errors": 200, "warnings": 29, "fromNewCode": false },
     "prodUrl": { "status": "BLOCKED", "reason": "Vercel SSO redirect" }
@@ -34,11 +45,31 @@
     ]
   },
   "findings": [
-    { "severity": "high", "area": "e2e", "message": "scripts/e2e-deep-check.mjs expects old playground UI; needs rewrite for new /sandbox Console" },
-    { "severity": "high", "area": "typecheck", "message": "8 existing TS errors in csv.ts, router.tsx, tests, vercel.ts" },
-    { "severity": "medium", "area": "lint", "message": "200 prettier format errors across components and routes" },
-    { "severity": "medium", "area": "coverage", "message": "Legacy gaps in playback.ts:61, csv.ts:83, provider.ts:100,107,172" },
-    { "severity": "low", "area": "deploy", "message": "Production preview URL protected by Vercel SSO" }
+    {
+      "severity": "high",
+      "area": "e2e",
+      "message": "scripts/e2e-deep-check.mjs expects old playground UI; needs rewrite for new /sandbox Console"
+    },
+    {
+      "severity": "high",
+      "area": "typecheck",
+      "message": "8 existing TS errors in csv.ts, router.tsx, tests, vercel.ts"
+    },
+    {
+      "severity": "medium",
+      "area": "lint",
+      "message": "200 prettier format errors across components and routes"
+    },
+    {
+      "severity": "medium",
+      "area": "coverage",
+      "message": "Legacy gaps in playback.ts:61, csv.ts:83, provider.ts:100,107,172"
+    },
+    {
+      "severity": "low",
+      "area": "deploy",
+      "message": "Production preview URL protected by Vercel SSO"
+    }
   ],
   "recommendations": [
     "Rewrite e2e-deep-check.mjs for redesigned Payout Provider Console",

@@ -24,10 +24,7 @@ interface ChannelBarProps {
  */
 export function ChannelBar({ active, onChange, autoPlay = false }: ChannelBarProps) {
   return (
-    <nav
-      className="flex items-center gap-1.5"
-      aria-label="Protocol channels"
-    >
+    <nav className="flex items-center gap-1.5" aria-label="Protocol channels">
       {CHANNELS.map((channel) => {
         const isActive = channel.id === active;
         return (
@@ -49,9 +46,7 @@ export function ChannelBar({ active, onChange, autoPlay = false }: ChannelBarPro
               boxShadow: isActive
                 ? "0 0 14px 2px rgba(0, 212, 255, 0.35), inset 0 0 0 1px rgba(0, 212, 255, 0.2)"
                 : undefined,
-              backgroundColor: isActive
-                ? "rgba(0, 212, 255, 0.06)"
-                : undefined,
+              backgroundColor: isActive ? "rgba(0, 212, 255, 0.06)" : undefined,
             }}
           >
             {channel.label}

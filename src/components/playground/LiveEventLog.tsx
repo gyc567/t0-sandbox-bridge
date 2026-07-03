@@ -77,10 +77,7 @@ export function LiveEventLog({ events, max = 20 }: LiveEventLogProps) {
             // LIVE EVENTS
           </span>
         </div>
-        <span
-          className="font-mono text-muted-canvas tabular"
-          style={{ fontSize: "10px" }}
-        >
+        <span className="font-mono text-muted-canvas tabular" style={{ fontSize: "10px" }}>
           {events.length} total
         </span>
       </header>
@@ -90,16 +87,9 @@ export function LiveEventLog({ events, max = 20 }: LiveEventLogProps) {
         ) : (
           <ul className="space-y-1">
             {shown.map((e, i) => (
-              <li
-                key={`${e.at}-${e.type}-${i}`}
-                className="flex items-center gap-3 tabular"
-              >
-                <span className="w-20 shrink-0 text-muted-canvas">
-                  {fmtTime(e.at)}
-                </span>
-                <span className={TYPE_COLOR[e.type] ?? "text-foreground"}>
-                  {e.type}
-                </span>
+              <li key={`${e.at}-${e.type}-${i}`} className="flex items-center gap-3 tabular">
+                <span className="w-20 shrink-0 text-muted-canvas">{fmtTime(e.at)}</span>
+                <span className={TYPE_COLOR[e.type] ?? "text-foreground"}>{e.type}</span>
                 <span className="text-muted-canvas truncate">{shortId(e)}</span>
               </li>
             ))}

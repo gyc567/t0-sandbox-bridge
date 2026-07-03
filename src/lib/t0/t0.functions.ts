@@ -39,15 +39,11 @@ export const completeManualAmlFn = createServerFn({ method: "POST" })
 
 export const approvePaymentQuoteFn = createServerFn({ method: "POST" })
   .inputValidator((d: { paymentId: string; quoteId: string }) => d)
-  .handler(async ({ data }) =>
-    providerService.approvePaymentQuote(data.paymentId, data.quoteId),
-  );
+  .handler(async ({ data }) => providerService.approvePaymentQuote(data.paymentId, data.quoteId));
 
 export const createPaymentIntentFn = createServerFn({ method: "POST" })
   .inputValidator((d: { quoteId: string; beneficiaryRef: string }) => d)
-  .handler(async ({ data }) =>
-    providerService.createPaymentIntent(data),
-  );
+  .handler(async ({ data }) => providerService.createPaymentIntent(data));
 
 export const confirmFundsFn = createServerFn({ method: "POST" })
   .inputValidator((d: { paymentId: string }) => d)

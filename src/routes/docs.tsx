@@ -87,8 +87,8 @@ function DocsPage() {
                 Integration Guide
               </h1>
               <p className="text-tagline text-muted-foreground">
-                BAXS PAY LIMITED · T-0 Network sandbox bridge.
-                How to wire your provider into the T-0 Network REST contract.
+                BAXS PAY LIMITED · T-0 Network sandbox bridge. How to wire your provider into the
+                T-0 Network REST contract.
               </p>
             </div>
 
@@ -133,14 +133,17 @@ function DocsPage() {
               </div>
 
               <div className="rounded-lg border border-hairline bg-glass p-4 space-y-2">
-                <p className="font-mono text-accent-cyan" style={{ fontSize: "10px", letterSpacing: "0.12em" }}>
+                <p
+                  className="font-mono text-accent-cyan"
+                  style={{ fontSize: "10px", letterSpacing: "0.12em" }}
+                >
                   BAXS INTEGRATION
                 </p>
                 <p className="text-fine-print text-muted-foreground">
                   For the full BAXS × T-0 architecture deep-dive, see the architecture page.
                 </p>
                 <Button asChild variant="outline" size="sm" className="w-full">
-                  <Link to="/integration">View Architecture</Link>
+                  <Link to="/docs">View Architecture</Link>
                 </Button>
               </div>
             </div>

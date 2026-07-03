@@ -156,12 +156,7 @@ export function usePlayback(opts: UsePlaybackOptions): UsePlaybackResult {
       lastTickRef.current = now;
 
       if (modeRef.current === "auto" && durationMs > 0) {
-        const next = advanceProgress(
-          progressRef.current,
-          dt,
-          durationMs,
-          speedRef.current,
-        );
+        const next = advanceProgress(progressRef.current, dt, durationMs, speedRef.current);
         progressRef.current = next;
         setProgress(next);
       }

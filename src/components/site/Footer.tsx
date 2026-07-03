@@ -23,8 +23,8 @@ export function Footer() {
               </span>
             </div>
             <p className="text-caption text-muted-foreground">
-              BAXS PAY LIMITED · T-0 Sandbox Bridge — a provider sandbox for quote,
-              settlement, payment, and payout flows. All data is simulated.
+              BAXS PAY LIMITED · T-0 Sandbox Bridge — a provider sandbox for quote, settlement,
+              payment, and payout flows. All data is simulated.
             </p>
           </div>
 

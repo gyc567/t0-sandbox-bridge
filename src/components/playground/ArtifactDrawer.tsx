@@ -2,11 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ArtifactType } from "@/data/flows";
-import {
-  buildCurlCommand,
-  getArtifactTemplate,
-  type LiveIds,
-} from "@/data/artifacts";
+import { buildCurlCommand, getArtifactTemplate, type LiveIds } from "@/data/artifacts";
 
 interface ArtifactDrawerProps {
   type: ArtifactType;
@@ -77,10 +73,7 @@ export function ArtifactDrawer({ type, timestamp, liveIds, onClose }: ArtifactDr
             >
               // ARTIFACT
             </p>
-            <h2
-              className="mt-0.5 font-semibold text-foreground"
-              style={{ fontSize: "15px" }}
-            >
+            <h2 className="mt-0.5 font-semibold text-foreground" style={{ fontSize: "15px" }}>
               {template.title}
             </h2>
           </div>
@@ -103,10 +96,7 @@ export function ArtifactDrawer({ type, timestamp, liveIds, onClose }: ArtifactDr
             {template.endpoint}
           </p>
           {timestamp && (
-            <p
-              className="mt-0.5 font-mono tabular text-success"
-              style={{ fontSize: "10px" }}
-            >
+            <p className="mt-0.5 font-mono tabular text-success" style={{ fontSize: "10px" }}>
               {timestamp}
             </p>
           )}
@@ -119,10 +109,7 @@ export function ArtifactDrawer({ type, timestamp, liveIds, onClose }: ArtifactDr
 
           <div className={cn("space-y-2", isIvms && "mt-3")}>
             {Object.entries(payload).map(([key, value]) => (
-              <div
-                key={key}
-                className="rounded border border-hairline bg-glass px-3 py-2"
-              >
+              <div key={key} className="rounded border border-hairline bg-glass px-3 py-2">
                 <div
                   className="font-mono uppercase text-muted-canvas"
                   style={{ fontSize: "9px", letterSpacing: "0.1em" }}
@@ -204,15 +191,16 @@ function IvmsDisclosurePanel({ payload }: { payload: Record<string, unknown> }) 
         )}
       </button>
       {open && (
-        <div className="border-t border-hairline px-3 py-2 text-foreground" style={{ fontSize: "11px" }}>
+        <div
+          className="border-t border-hairline px-3 py-2 text-foreground"
+          style={{ fontSize: "11px" }}
+        >
           <p className="font-mono">
-            <span className="text-muted-canvas">originator  :</span>{" "}
-            {oName}, {oCountry}
+            <span className="text-muted-canvas">originator :</span> {oName}, {oCountry}
             {oLei ? `, LEI ${oLei}` : ""}
           </p>
           <p className="mt-1 font-mono">
-            <span className="text-muted-canvas">beneficiary :</span>{" "}
-            {bName}, {bCountry}
+            <span className="text-muted-canvas">beneficiary :</span> {bName}, {bCountry}
           </p>
         </div>
       )}

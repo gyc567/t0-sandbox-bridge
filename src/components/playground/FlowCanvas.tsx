@@ -1,11 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { Channel } from "@/data/channels";
-import {
-  getFlow,
-  type FlowStep,
-  type NodeId,
-  type PacketColor,
-} from "@/data/flows";
+import { getFlow, type FlowStep, type NodeId, type PacketColor } from "@/data/flows";
 import { GlowDot } from "@/components/playground/GlowDot";
 import { RateLockBadge } from "@/components/playground/RateLockBadge";
 import { NodeCard } from "@/components/playground/NodeCard";
@@ -71,11 +66,7 @@ function nodeLabels(flowType: Channel["flowType"]) {
  */
 function channelY(step: FlowStep): number | undefined {
   if (step.railY !== undefined) return step.railY;
-  if (
-    step.id === "usdt-settle" ||
-    step.id === "end-user-pays" ||
-    step.id === "settlement"
-  ) {
+  if (step.id === "usdt-settle" || step.id === "end-user-pays" || step.id === "settlement") {
     return 520;
   }
   return undefined;
@@ -105,9 +96,7 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
   // Rate-lock freeze-frame for Payment Intent.
   const rateBoundStep = flow.steps.find((s) => s.id === "rate-bound");
   const rateLockActive =
-    !!rateBoundStep &&
-    progress >= rateBoundStep.t - 0.02 &&
-    progress < rateBoundStep.t + 0.08;
+    !!rateBoundStep && progress >= rateBoundStep.t - 0.02 && progress < rateBoundStep.t + 0.08;
 
   // Packet colors per step.packetColor
   const colorMap: Record<PacketColor, { dot: string; glow: string }> = {
@@ -133,13 +122,7 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
         aria-hidden
       >
         <defs>
-          <filter
-            id="packet-blur"
-            x="-50%"
-            y="-50%"
-            width="200%"
-            height="200%"
-          >
+          <filter id="packet-blur" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3" />
           </filter>
           <linearGradient id="usdt-channel-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -158,8 +141,22 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
         {/* Pay-In ↔ POP — angled line down to y=460 (only when Pay-In active) */}
         {showPayin && (
           <>
-            <line x1="990" y1="300" x2="1010" y2="440" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
-            <line x1="990" y1="330" x2="1010" y2="470" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+            <line
+              x1="990"
+              y1="300"
+              x2="1010"
+              y2="440"
+              stroke="rgba(255,255,255,0.12)"
+              strokeWidth="1"
+            />
+            <line
+              x1="990"
+              y1="330"
+              x2="1010"
+              y2="470"
+              stroke="rgba(255,255,255,0.12)"
+              strokeWidth="1"
+            />
           </>
         )}
 
@@ -189,9 +186,7 @@ export function FlowCanvas({ activeChannel, progress, onStepClick, onNodeClick }
         {/* Chevron markers */}
         <polygon points="385,180 393,180 389,184" fill="rgba(255,255,255,0.3)" />
         <polygon points="695,180 687,180 691,184" fill="rgba(255,255,255,0.3)" />
-        {showPayin && (
-          <polygon points="1003,425 1003,433 999,429" fill="rgba(255,255,255,0.3)" />
-        )}
+        {showPayin && <polygon points="1003,425 1003,433 999,429" fill="rgba(255,255,255,0.3)" />}
 
         {/* Packets (driven by playback progress) */}
         {flow.steps.map((step) => {
@@ -354,11 +349,7 @@ interface ModuleSlotProps {
 
 function ModuleSlot({ label, hexId, accent, muted, compact }: ModuleSlotProps) {
   const heartbeatClass =
-    accent === "usdt"
-      ? "heartbeat-2"
-      : accent === "cyan"
-        ? "heartbeat-3"
-        : "heartbeat";
+    accent === "usdt" ? "heartbeat-2" : accent === "cyan" ? "heartbeat-3" : "heartbeat";
   return (
     <div
       className={cn(

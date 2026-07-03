@@ -9,11 +9,7 @@ const EXECUTABLE_PATH =
   (process.platform === "darwin"
     ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     : undefined);
-const REPORT_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "e2e-reports",
-);
+const REPORT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "e2e-reports");
 
 const results = [];
 
@@ -64,9 +60,7 @@ async function testPage(context, { name, path: pagePath, checks }) {
       if (check.text) {
         const text = await el.textContent();
         if (!text.includes(check.text)) {
-          throw new Error(
-            `Expected "${check.text}" in ${check.name}, got "${text}"`,
-          );
+          throw new Error(`Expected "${check.text}" in ${check.name}, got "${text}"`);
         }
       }
     }
@@ -158,9 +152,7 @@ async function main() {
           path: "/playground",
           status: passed ? "PASS" : "FAIL",
           durationMs: 0,
-          error: passed
-            ? undefined
-            : `expected /playground to return 404, got status ${status}`,
+          error: passed ? undefined : `expected /playground to return 404, got status ${status}`,
           consoleMessages: [],
           failedRequests: [],
           screenshot: undefined,
@@ -189,7 +181,11 @@ async function main() {
       checks: [
         { name: "page heading", selector: "h1", text: "Payout Provider Sandbox" },
         { name: "currency select", selector: '[role="combobox"]' },
-        { name: "publish button", selector: 'button:has-text("Publish quote")', text: "Publish quote" },
+        {
+          name: "publish button",
+          selector: 'button:has-text("Publish quote")',
+          text: "Publish quote",
+        },
       ],
     });
 
@@ -207,7 +203,9 @@ async function main() {
   }
 
   const reportPath = path.join(REPORT_DIR, "report.json");
-  await (await import("node:fs/promises")).writeFile(
+  await (
+    await import("node:fs/promises")
+  ).writeFile(
     reportPath,
     JSON.stringify({ baseUrl: BASE_URL, passed: allPassed, results }, null, 2),
   );

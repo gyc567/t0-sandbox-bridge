@@ -42,11 +42,11 @@ t0-sandbox-bridge
 
 ### 部署目标
 
-| 目标 | 说明 |
-|------|------|
-| **平台** | Vercel |
-| **运行环境** | Vercel Edge Functions / Node.js |
-| **期望** | SSR 页面正常渲染，API Functions 可用 |
+| 目标         | 说明                                 |
+| ------------ | ------------------------------------ |
+| **平台**     | Vercel                               |
+| **运行环境** | Vercel Edge Functions / Node.js      |
+| **期望**     | SSR 页面正常渲染，API Functions 可用 |
 
 ---
 
@@ -54,12 +54,12 @@ t0-sandbox-bridge
 
 ### 1. 运行时不兼容
 
-| 组件 | 当前配置 | Vercel 要求 |
-|------|----------|-------------|
+| 组件           | 当前配置                  | Vercel 要求           |
+| -------------- | ------------------------- | --------------------- |
 | **Nitro 预设** | Cloudflare Workers (默认) | Vercel Edge / Node.js |
-| **服务端入口** | `src/server.ts` | 需要适配 Vercel 格式 |
-| **环境变量** | `VITE_*` 前缀 | Vercel 环境变量系统 |
-| **状态管理** | 内存存储 | 无状态 (需要外部存储) |
+| **服务端入口** | `src/server.ts`           | 需要适配 Vercel 格式  |
+| **环境变量**   | `VITE_*` 前缀             | Vercel 环境变量系统   |
+| **状态管理**   | 内存存储                  | 无状态 (需要外部存储) |
 
 ### 2. 数据持久化问题
 
@@ -111,13 +111,13 @@ export class PayoutProviderService {
 
 ### 核心改动文件
 
-| 文件 | 操作 | 说明 |
-|------|------|------|
-| `vite.config.ts` | 修改 | 添加 Vercel Nitro 预设 |
-| `src/vercel.ts` | 新建 | Vercel 服务端入口 |
+| 文件             | 操作 | 说明                     |
+| ---------------- | ---- | ------------------------ |
+| `vite.config.ts` | 修改 | 添加 Vercel Nitro 预设   |
+| `src/vercel.ts`  | 新建 | Vercel 服务端入口        |
 | `src/router.tsx` | 修改 | 添加 router named export |
-| `vercel.json` | 新建 | Vercel 构建配置 |
-| `.vercelignore` | 新建 | 排除文件列表 |
+| `vercel.json`    | 新建 | Vercel 构建配置          |
+| `.vercelignore`  | 新建 | 排除文件列表             |
 
 ---
 
@@ -333,6 +333,7 @@ bun run build
 ```
 
 预期输出:
+
 ```
 ✓ built in 12.3s
 ✓ generated .output/public
@@ -349,12 +350,12 @@ vercel dev
 
 ### 3. 功能验证清单
 
-| 功能 | 验证方式 | 预期结果 |
-|------|----------|----------|
-| 首页加载 | 访问 `/` | SSR 渲染的 HTML |
-| 沙盒页面 | 访问 `/sandbox` | 控制台页面正常显示 |
-| 发布报价 | 调用 `POST /api/snapshot` | 返回 quotes 列表 |
-| API 调用 | 浏览器 Network 面板 | 无 5xx 错误 |
+| 功能     | 验证方式                  | 预期结果           |
+| -------- | ------------------------- | ------------------ |
+| 首页加载 | 访问 `/`                  | SSR 渲染的 HTML    |
+| 沙盒页面 | 访问 `/sandbox`           | 控制台页面正常显示 |
+| 发布报价 | 调用 `POST /api/snapshot` | 返回 quotes 列表   |
+| API 调用 | 浏览器 Network 面板       | 无 5xx 错误        |
 
 ### 4. 健康检查
 
@@ -363,6 +364,7 @@ curl -I https://your-project.vercel.app/sandbox
 ```
 
 预期:
+
 ```
 HTTP/2 200
 content-type: text/html; charset=utf-8
@@ -374,24 +376,24 @@ content-type: text/html; charset=utf-8
 
 ### 1. Serverless 冷启动
 
-| 问题 | 影响 | 缓解措施 |
-|------|------|----------|
+| 问题       | 影响       | 缓解措施          |
+| ---------- | ---------- | ----------------- |
 | 冷启动延迟 | 首次请求慢 | Vercel 付费版预热 |
-| 函数超时 | 长时间请求 | 增加超时配置 |
+| 函数超时   | 长时间请求 | 增加超时配置      |
 
 ### 2. 状态持久化
 
-| 问题 | 影响 | 解决方案 |
-|------|------|----------|
+| 问题         | 影响       | 解决方案               |
+| ------------ | ---------- | ---------------------- |
 | 内存状态丢失 | 数据不持久 | 使用 Vercel KV / Redis |
-| 多实例不一致 | 状态分散 | 集中式存储 |
+| 多实例不一致 | 状态分散   | 集中式存储             |
 
 > **注意**: 对于沙盒测试场景，每次部署重置状态是可接受的。如需持久化，可集成 Vercel KV。
 
 ### 3. WebSocket/SSE
 
-| 问题 | 影响 | 解决方案 |
-|------|------|----------|
+| 问题         | 影响         | 解决方案                |
+| ------------ | ------------ | ----------------------- |
 | 不支持长连接 | 实时功能受限 | 改用轮询 / Vercel Polls |
 
 ---
@@ -439,11 +441,13 @@ Error: Hydration mismatch
 ### 调试技巧
 
 1. **启用 Vercel 日志**:
+
    ```bash
    vercel logs your-project
    ```
 
 2. **使用 Edge Functions 日志**:
+
    ```typescript
    // 在函数中添加日志
    console.log("Debug info:", data);
@@ -474,33 +478,33 @@ wrangler pages deploy .output/public
 
 长期方案，完全兼容 Vercel:
 
-| 改动项 | 工作量 |
-|--------|--------|
-| 路由迁移 | 中等 |
-| Server Functions → API Routes | 小 |
-| SSR 适配 | 小 |
-| 状态管理 | 无需改动 |
+| 改动项                        | 工作量   |
+| ----------------------------- | -------- |
+| 路由迁移                      | 中等     |
+| Server Functions → API Routes | 小       |
+| SSR 适配                      | 小       |
+| 状态管理                      | 无需改动 |
 
 ---
 
 ## 总结
 
-| 项目 | 状态 | 说明 |
-|------|------|------|
-| 技术可行性 | ✅ 可行 | Nitro `node` 预设兼容 Vercel |
-| 改动量 | 小 | 4 个文件改动 + 2 个新文件 |
-| 状态持久化 | ⚠️ 需处理 | 沙盒场景可接受内存存储 |
-| 实时功能 | ⚠️ 受限 | 不支持 WebSocket |
+| 项目       | 状态      | 说明                         |
+| ---------- | --------- | ---------------------------- |
+| 技术可行性 | ✅ 可行   | Nitro `node` 预设兼容 Vercel |
+| 改动量     | 小        | 4 个文件改动 + 2 个新文件    |
+| 状态持久化 | ⚠️ 需处理 | 沙盒场景可接受内存存储       |
+| 实时功能   | ⚠️ 受限   | 不支持 WebSocket             |
 
 ### 已完成
 
-| 文件路径 | 状态 |
-|----------|------|
-| `src/vercel.ts` | ✅ 已创建 |
-| `vercel.json` | ✅ 已创建 |
-| `.vercelignore` | ✅ 已创建 |
-| `vite.config.ts` | ✅ 已修改 |
-| `src/router.tsx` | ✅ 已修改 |
+| 文件路径                    | 状态      |
+| --------------------------- | --------- |
+| `src/vercel.ts`             | ✅ 已创建 |
+| `vercel.json`               | ✅ 已创建 |
+| `.vercelignore`             | ✅ 已创建 |
+| `vite.config.ts`            | ✅ 已修改 |
+| `src/router.tsx`            | ✅ 已修改 |
 | `docs/vercel-deployment.md` | ✅ 已创建 |
 
 ### 构建验证
@@ -524,5 +528,5 @@ bun run build
 
 ---
 
-*文档版本: 1.1.0*
-*更新日期: 2026-07-01*
+_文档版本: 1.1.0_
+_更新日期: 2026-07-01_

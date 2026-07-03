@@ -37,11 +37,7 @@ export function TransportBar({
   const speeds: PlaybackSpeed[] = [0.5, 1, 2];
 
   return (
-    <div
-      className="flex items-center gap-2"
-      role="group"
-      aria-label="Playback transport"
-    >
+    <div className="flex items-center gap-2" role="group" aria-label="Playback transport">
       {/* Play / Pause */}
       <button
         type="button"

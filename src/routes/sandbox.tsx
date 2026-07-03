@@ -9,7 +9,15 @@ import {
   publishQuoteFn,
   snapshotFn,
 } from "@/lib/t0/t0.functions";
-import { signRequest, generatePrivateKey, derivePublicKey, buildAuthHeaders, toCurl, snapshotToCSV, csvFilename } from "@/lib/t0";
+import {
+  signRequest,
+  generatePrivateKey,
+  derivePublicKey,
+  buildAuthHeaders,
+  toCurl,
+  snapshotToCSV,
+  csvFilename,
+} from "@/lib/t0";
 import type { Currency, Payment, Payout, Quote, NetworkEvent, VolumeBand } from "@/lib/t0/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +41,11 @@ export const Route = createFileRoute("/sandbox")({
   head: () => ({
     meta: [
       { title: "Console — T-0 Sandbox Bridge" },
-      { name: "description", content: "Interactive T-0 provider console: publish quotes, simulate settlement, process payouts." },
+      {
+        name: "description",
+        content:
+          "Interactive T-0 provider console: publish quotes, simulate settlement, process payouts.",
+      },
     ],
   }),
   loader: async () => snapshotFn(),
@@ -61,7 +73,12 @@ function SandboxPage() {
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
-    try { await fn(); await refresh(); } finally { setBusy(false); }
+    try {
+      await fn();
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleExportCSV = useCallback(() => {
@@ -110,7 +127,9 @@ function SandboxPage() {
               </SelectTrigger>
               <SelectContent>
                 {CURRENCIES.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -120,12 +139,25 @@ function SandboxPage() {
               </SelectTrigger>
               <SelectContent>
                 {BANDS.map((b) => (
-                  <SelectItem key={b} value={String(b)}>${b.toLocaleString()}</SelectItem>
+                  <SelectItem key={b} value={String(b)}>
+                    ${b.toLocaleString()}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Input type="number" step="0.0001" value={rate} onChange={(e) => setRate(Number(e.target.value))} className="w-28 font-mono" />
-            <Button size="sm" className="btn-glow" disabled={busy} onClick={() => run(() => publishQuote({ data: { currency, band, rate } }))}>
+            <Input
+              type="number"
+              step="0.0001"
+              value={rate}
+              onChange={(e) => setRate(Number(e.target.value))}
+              className="w-28 font-mono"
+            />
+            <Button
+              size="sm"
+              className="btn-glow"
+              disabled={busy}
+              onClick={() => run(() => publishQuote({ data: { currency, band, rate } }))}
+            >
               Publish quote
             </Button>
           </div>
@@ -134,10 +166,28 @@ function SandboxPage() {
         {/* Step 2: Inbound notifications */}
         <PanelCard step="02" title="Inbound Notifications">
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" disabled={busy} onClick={() => run(() => notifyUsdt({ data: { txHash: `0x${Math.random().toString(16).slice(2, 10)}`, usd: band } }))}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() =>
+                run(() =>
+                  notifyUsdt({
+                    data: { txHash: `0x${Math.random().toString(16).slice(2, 10)}`, usd: band },
+                  }),
+                )
+              }
+            >
               Simulate USDT settlement
             </Button>
-            <Button variant="outline" size="sm" disabled={busy} onClick={() => run(() => notifyCredit({ data: { counterparty: "ofi-demo", used: band } }))}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() =>
+                run(() => notifyCredit({ data: { counterparty: "ofi-demo", used: band } }))
+              }
+            >
               Simulate credit usage
             </Button>
           </div>
@@ -146,50 +196,96 @@ function SandboxPage() {
         {/* Steps 3 & 4 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <PanelCard step="03" title={`Quotes · ${data.quotes.length}`}>
-            <List items={data.quotes} render={(q) => (
-              <div key={q.id} className="flex items-center justify-between gap-2 border-b border-hairline py-2 last:border-0">
-                <span className="font-mono tabular text-caption text-foreground">
-                  {q.id} · {q.currency} · ${q.band.toLocaleString()} <span className="text-accent-cyan">@ {q.rate}</span>
-                </span>
-                <Button variant="outline" size="sm" disabled={busy} onClick={() => run(() => acceptPayment({ data: { quoteId: q.id, beneficiaryRef: `BEN-${Date.now()}` } }))}>
-                  Accept
-                </Button>
-              </div>
-            )} />
+            <List
+              items={data.quotes}
+              render={(q) => (
+                <div
+                  key={q.id}
+                  className="flex items-center justify-between gap-2 border-b border-hairline py-2 last:border-0"
+                >
+                  <span className="font-mono tabular text-caption text-foreground">
+                    {q.id} · {q.currency} · ${q.band.toLocaleString()}{" "}
+                    <span className="text-accent-cyan">@ {q.rate}</span>
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() =>
+                      run(() =>
+                        acceptPayment({
+                          data: { quoteId: q.id, beneficiaryRef: `BEN-${Date.now()}` },
+                        }),
+                      )
+                    }
+                  >
+                    Accept
+                  </Button>
+                </div>
+              )}
+            />
           </PanelCard>
 
           <PanelCard step="04" title={`Payments · ${data.payments.length}`}>
-            <List items={data.payments} render={(p) => (
-              <div key={p.id} className="flex items-center justify-between gap-2 border-b border-hairline py-2 last:border-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <StatusDot status={p.status} />
-                  <span className="font-mono tabular text-caption text-foreground truncate">
-                    {p.id} · {p.currency} {p.localAmount.toFixed(2)}
+            <List
+              items={data.payments}
+              render={(p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between gap-2 border-b border-hairline py-2 last:border-0"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <StatusDot status={p.status} />
+                    <span className="font-mono tabular text-caption text-foreground truncate">
+                      {p.id} · {p.currency} {p.localAmount.toFixed(2)}
+                    </span>
+                  </div>
+                  <span className="flex gap-1.5 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={busy || p.status !== "accepted"}
+                      onClick={() => run(() => processPayout({ data: { paymentId: p.id } }))}
+                    >
+                      Pay
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={busy || p.status !== "accepted"}
+                      onClick={() =>
+                        run(() => processPayout({ data: { paymentId: p.id, fail: true } }))
+                      }
+                    >
+                      Fail
+                    </Button>
                   </span>
                 </div>
-                <span className="flex gap-1.5 shrink-0">
-                  <Button variant="outline" size="sm" disabled={busy || p.status !== "accepted"} onClick={() => run(() => processPayout({ data: { paymentId: p.id } }))}>
-                    Pay
-                  </Button>
-                  <Button variant="destructive" size="sm" disabled={busy || p.status !== "accepted"} onClick={() => run(() => processPayout({ data: { paymentId: p.id, fail: true } }))}>
-                    Fail
-                  </Button>
-                </span>
-              </div>
-            )} />
+              )}
+            />
           </PanelCard>
         </div>
 
         {/* Steps 5 & 6 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <PanelCard step="05" title={`Payouts · ${data.payouts.length}`}>
-            <List items={data.payouts} render={(p) => (
-              <div key={p.id} className="flex items-center gap-2 border-b border-hairline py-2 last:border-0">
-                <StatusDot status={p.status} />
-                <span className="font-mono tabular text-caption text-foreground">{p.id}</span>
-                {p.reason && <span className="font-mono text-caption text-muted-foreground">({p.reason})</span>}
-              </div>
-            )} />
+            <List
+              items={data.payouts}
+              render={(p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-2 border-b border-hairline py-2 last:border-0"
+                >
+                  <StatusDot status={p.status} />
+                  <span className="font-mono tabular text-caption text-foreground">{p.id}</span>
+                  {p.reason && (
+                    <span className="font-mono text-caption text-muted-foreground">
+                      ({p.reason})
+                    </span>
+                  )}
+                </div>
+              )}
+            />
           </PanelCard>
 
           <PanelCard step="06" title={`Event Log · ${data.events.length}`}>
@@ -199,7 +295,9 @@ function SandboxPage() {
               ) : (
                 data.events.map((e, i) => (
                   <div key={i} className="flex gap-2 py-1">
-                    <span className="text-muted-canvas shrink-0">{new Date(e.at).toISOString().slice(11, 19)}</span>
+                    <span className="text-muted-canvas shrink-0">
+                      {new Date(e.at).toISOString().slice(11, 19)}
+                    </span>
                     <span className="text-accent-cyan">{e.type}</span>
                   </div>
                 ))
@@ -230,7 +328,10 @@ function PanelCard({
     <Card className="border-hairline bg-glass backdrop-blur-xl">
       <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-hairline">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-accent-cyan" style={{ fontSize: "11px", letterSpacing: "0.1em" }}>
+          <span
+            className="font-mono text-accent-cyan"
+            style={{ fontSize: "11px", letterSpacing: "0.1em" }}
+          >
             {step}
           </span>
           <CardTitle
@@ -269,7 +370,12 @@ function StatusDot({ status }: { status: string }) {
 // ─── List helper ──────────────────────────────────────────────────────
 
 function List<T>({ items, render }: { items: T[]; render: (item: T) => React.ReactNode }) {
-  if (items.length === 0) return <p className="font-mono text-muted-foreground" style={{ fontSize: "12px" }}>Empty</p>;
+  if (items.length === 0)
+    return (
+      <p className="font-mono text-muted-foreground" style={{ fontSize: "12px" }}>
+        Empty
+      </p>
+    );
   return <div>{items.map(render)}</div>;
 }
 
@@ -317,14 +423,21 @@ function APITester() {
       <CardHeader className="border-b border-hairline">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-accent-cyan" />
-          <CardTitle className="font-mono uppercase text-foreground" style={{ fontSize: "12px", letterSpacing: "0.08em" }}>
+          <CardTitle
+            className="font-mono uppercase text-foreground"
+            style={{ fontSize: "12px", letterSpacing: "0.08em" }}
+          >
             API Tester
           </CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-5 p-5">
         <div className="space-y-2">
-          <Label htmlFor="privateKey" className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+          <Label
+            htmlFor="privateKey"
+            className="font-mono text-muted-foreground"
+            style={{ fontSize: "11px" }}
+          >
             <KeyRound className="inline w-3 h-3 mr-1" />
             Private Key (Test Only)
           </Label>
@@ -335,23 +448,53 @@ function APITester() {
               onChange={(e) => setPrivateKey(e.target.value)}
               className="font-mono text-caption"
             />
-            <Button variant="outline" size="sm" onClick={handleGenerateKey}>Generate</Button>
+            <Button variant="outline" size="sm" onClick={handleGenerateKey}>
+              Generate
+            </Button>
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-[1fr_1fr]">
           <div className="space-y-2">
-            <Label htmlFor="url" className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>URL</Label>
-            <Input id="url" value={url} onChange={(e) => setUrl(e.target.value)} className="font-mono text-caption" />
+            <Label
+              htmlFor="url"
+              className="font-mono text-muted-foreground"
+              style={{ fontSize: "11px" }}
+            >
+              URL
+            </Label>
+            <Input
+              id="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="font-mono text-caption"
+            />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="pubkey" className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>Public Key</Label>
-            <Input id="pubkey" value={derivePublicKey(privateKey)} readOnly className="font-mono text-caption text-muted-foreground" />
+            <Label
+              htmlFor="pubkey"
+              className="font-mono text-muted-foreground"
+              style={{ fontSize: "11px" }}
+            >
+              Public Key
+            </Label>
+            <Input
+              id="pubkey"
+              value={derivePublicKey(privateKey)}
+              readOnly
+              className="font-mono text-caption text-muted-foreground"
+            />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="body" className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>Request Body</Label>
+          <Label
+            htmlFor="body"
+            className="font-mono text-muted-foreground"
+            style={{ fontSize: "11px" }}
+          >
+            Request Body
+          </Label>
           <Textarea
             id="body"
             value={body}
@@ -368,12 +511,17 @@ function APITester() {
         {signature && (
           <div className="space-y-4 border-t border-hairline pt-4">
             <div className="space-y-2">
-              <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>Headers</Label>
+              <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                Headers
+              </Label>
               <div className="mono-block p-3 font-mono text-caption space-y-1">
                 {Object.entries(headers).map(([k, v]) => (
                   <div key={k} className="break-all">
                     <span className="text-accent-cyan">{k}:</span>{" "}
-                    <span className="text-foreground">{v.slice(0, 48)}{v.length > 48 ? "…" : ""}</span>
+                    <span className="text-foreground">
+                      {v.slice(0, 48)}
+                      {v.length > 48 ? "…" : ""}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -381,7 +529,9 @@ function APITester() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>Keccak-256 Hash</Label>
+                <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                  Keccak-256 Hash
+                </Label>
                 <div
                   className="mono-block cursor-pointer p-3 font-mono text-fine-print break-all transition-colors hover:border-accent-cyan"
                   onClick={() => copy(hash, "hash")}
@@ -390,18 +540,26 @@ function APITester() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>Signature</Label>
+                <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                  Signature
+                </Label>
                 <div
                   className="mono-block cursor-pointer p-3 font-mono text-fine-print break-all transition-colors hover:border-accent-cyan"
                   onClick={() => copy(signature, "sig")}
                 >
-                  {copied === "sig" ? <span className="text-success">✓ copied</span> : signature.slice(0, 66) + "…"}
+                  {copied === "sig" ? (
+                    <span className="text-success">✓ copied</span>
+                  ) : (
+                    signature.slice(0, 66) + "…"
+                  )}
                 </div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>cURL Command</Label>
+              <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                cURL Command
+              </Label>
               <div className="flex gap-2">
                 <Textarea value={curl} readOnly rows={4} className="font-mono text-fine-print" />
                 <Button variant="outline" size="icon" onClick={() => copy(curl, "curl")}>
