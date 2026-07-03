@@ -41,6 +41,9 @@ describe("contracts / assert", () => {
     };
     expect(handle({ k: "a" })).toBe("A");
     expect(handle({ k: "b" })).toBe("B");
+    // Force the never path at runtime with an invalid discriminant.
+    // @ts-expect-error intentional invalid discriminant for contract test
+    expect(() => handle({ k: "c" })).toThrowError(/\[contract:never\]/);
   });
 
   it("assertUnreachable throws", () => {
@@ -70,6 +73,7 @@ describe("contracts / financial", () => {
   it("assertNonNegativeNumber allows zero", () => {
     expect(assertNonNegativeNumber(0)).toBe(0);
     expect(() => assertNonNegativeNumber(-0.01)).toThrow();
+    expect(() => assertNonNegativeNumber(NaN)).toThrow();
   });
 
   it("assertPositiveBigInt", () => {
