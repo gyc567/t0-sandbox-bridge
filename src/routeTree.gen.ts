@@ -10,13 +10,33 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SandboxRouteImport } from './routes/sandbox'
+import { Route as ProviderRouteImport } from './routes/provider'
+import { Route as OfiRouteImport } from './routes/ofi'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as IntegrationRouteImport } from './routes/integration'
 import { Route as DocsRouteImport } from './routes/docs'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiLoginRouteImport } from './routes/api/login'
+import { Route as ApiT0ProviderSplatRouteImport } from './routes/api/t0/provider/$'
 
 const SandboxRoute = SandboxRouteImport.update({
   id: '/sandbox',
   path: '/sandbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProviderRoute = ProviderRouteImport.update({
+  id: '/provider',
+  path: '/provider',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfiRoute = OfiRouteImport.update({
+  id: '/ofi',
+  path: '/ofi',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IntegrationRoute = IntegrationRouteImport.update({
@@ -34,39 +54,97 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLoginRoute = ApiLoginRouteImport.update({
+  id: '/api/login',
+  path: '/api/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiT0ProviderSplatRoute = ApiT0ProviderSplatRouteImport.update({
+  id: '/api/t0/provider/$',
+  path: '/api/t0/provider/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/docs': typeof DocsRoute
   '/integration': typeof IntegrationRoute
+  '/login': typeof LoginRoute
+  '/ofi': typeof OfiRoute
+  '/provider': typeof ProviderRoute
   '/sandbox': typeof SandboxRoute
+  '/api/login': typeof ApiLoginRoute
+  '/api/t0/provider/$': typeof ApiT0ProviderSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/docs': typeof DocsRoute
   '/integration': typeof IntegrationRoute
+  '/login': typeof LoginRoute
+  '/ofi': typeof OfiRoute
+  '/provider': typeof ProviderRoute
   '/sandbox': typeof SandboxRoute
+  '/api/login': typeof ApiLoginRoute
+  '/api/t0/provider/$': typeof ApiT0ProviderSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/docs': typeof DocsRoute
   '/integration': typeof IntegrationRoute
+  '/login': typeof LoginRoute
+  '/ofi': typeof OfiRoute
+  '/provider': typeof ProviderRoute
   '/sandbox': typeof SandboxRoute
+  '/api/login': typeof ApiLoginRoute
+  '/api/t0/provider/$': typeof ApiT0ProviderSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/docs' | '/integration' | '/sandbox'
+  fullPaths:
+    | '/'
+    | '/docs'
+    | '/integration'
+    | '/login'
+    | '/ofi'
+    | '/provider'
+    | '/sandbox'
+    | '/api/login'
+    | '/api/t0/provider/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/docs' | '/integration' | '/sandbox'
-  id: '__root__' | '/' | '/docs' | '/integration' | '/sandbox'
+  to:
+    | '/'
+    | '/docs'
+    | '/integration'
+    | '/login'
+    | '/ofi'
+    | '/provider'
+    | '/sandbox'
+    | '/api/login'
+    | '/api/t0/provider/$'
+  id:
+    | '__root__'
+    | '/'
+    | '/docs'
+    | '/integration'
+    | '/login'
+    | '/ofi'
+    | '/provider'
+    | '/sandbox'
+    | '/api/login'
+    | '/api/t0/provider/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DocsRoute: typeof DocsRoute
   IntegrationRoute: typeof IntegrationRoute
+  LoginRoute: typeof LoginRoute
+  OfiRoute: typeof OfiRoute
+  ProviderRoute: typeof ProviderRoute
   SandboxRoute: typeof SandboxRoute
+  ApiLoginRoute: typeof ApiLoginRoute
+  ApiT0ProviderSplatRoute: typeof ApiT0ProviderSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -76,6 +154,27 @@ declare module '@tanstack/react-router' {
       path: '/sandbox'
       fullPath: '/sandbox'
       preLoaderRoute: typeof SandboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/provider': {
+      id: '/provider'
+      path: '/provider'
+      fullPath: '/provider'
+      preLoaderRoute: typeof ProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ofi': {
+      id: '/ofi'
+      path: '/ofi'
+      fullPath: '/ofi'
+      preLoaderRoute: typeof OfiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/integration': {
@@ -99,6 +198,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/login': {
+      id: '/api/login'
+      path: '/api/login'
+      fullPath: '/api/login'
+      preLoaderRoute: typeof ApiLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/t0/provider/$': {
+      id: '/api/t0/provider/$'
+      path: '/api/t0/provider/$'
+      fullPath: '/api/t0/provider/$'
+      preLoaderRoute: typeof ApiT0ProviderSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -106,7 +219,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DocsRoute: DocsRoute,
   IntegrationRoute: IntegrationRoute,
+  LoginRoute: LoginRoute,
+  OfiRoute: OfiRoute,
+  ProviderRoute: ProviderRoute,
   SandboxRoute: SandboxRoute,
+  ApiLoginRoute: ApiLoginRoute,
+  ApiT0ProviderSplatRoute: ApiT0ProviderSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

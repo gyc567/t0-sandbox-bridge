@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { providerService } from "./index";
+import { providerService, sandboxNetwork } from "./index";
 import type { Currency, VolumeBand } from "./types";
+import type { CreatePaymentInput } from "./network";
 
 export const publishQuoteFn = createServerFn({ method: "POST" })
   .inputValidator((d: { currency: Currency; band: VolumeBand; rate: number; ttlMs?: number }) => d)
@@ -48,3 +49,21 @@ export const createPaymentIntentFn = createServerFn({ method: "POST" })
 export const confirmFundsFn = createServerFn({ method: "POST" })
   .inputValidator((d: { paymentId: string }) => d)
   .handler(async ({ data }) => providerService.confirmFunds(data.paymentId));
+
+// ── OFI-side server functions ───────────────────────────────────────────
+export const ofiSnapshotFn = createServerFn({ method: "GET" }).handler(async () => ({
+  payments: sandboxNetwork.listPayments(),
+  availableCurrencies: ["EUR", "GBP", "JPY", "BRL", "MXN", "PHP", "IDR", "VND"] as Currency[],
+}));
+
+export const ofiGetQuoteFn = createServerFn({ method: "POST" })
+  .inputValidator((d: { usdAmount: number; currency: Currency }) => d)
+  .handler(async ({ data }) => sandboxNetwork.getQuote(data));
+
+export const ofiCreatePaymentFn = createServerFn({ method: "POST" })
+  .inputValidator((d: CreatePaymentInput) => d)
+  .handler(async ({ data }) => sandboxNetwork.createPayment(data));
+
+export const ofiCompleteManualAmlFn = createServerFn({ method: "POST" })
+  .inputValidator((d: { paymentId: string; approved: boolean }) => d)
+  .handler(async ({ data }) => sandboxNetwork.completeManualAml(data.paymentId, data.approved));
