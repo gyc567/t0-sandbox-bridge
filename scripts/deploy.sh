@@ -97,14 +97,16 @@ if [ "$SKIP_BUILD" = true ]; then
     ok "跳过 (--skip-build)"
 else
     $BUILD_COMMAND
-    if [ ! -d ".output/public" ] || [ ! -f ".output/server/index.mjs" ]; then
+    # Vercel preset: build outputs land in .vercel/output/, not .output/.
+    # Layout: .vercel/output/{config.json, nitro.json, static/, functions/__server.func/}
+    if [ ! -d ".vercel/output" ] || [ ! -f ".vercel/output/config.json" ] || [ ! -d ".vercel/output/functions" ]; then
         fail "构建产物不完整"
-        echo "    期望: .output/public/ 和 .output/server/index.mjs"
+        echo "    期望: .vercel/output/{config.json, functions/, static/}"
         exit 1
     fi
-    PUBLIC_SIZE=$(du -sh .output/public | cut -f1)
-    SERVER_SIZE=$(du -sh .output/server | cut -f1)
-    ok "构建成功 (public: $PUBLIC_SIZE, server: $SERVER_SIZE)"
+    STATIC_SIZE=$(du -sh .vercel/output/static 2>/dev/null | cut -f1)
+    FUNCTIONS_SIZE=$(du -sh .vercel/output/functions 2>/dev/null | cut -f1)
+    ok "构建成功 (static: $STATIC_SIZE, functions: $FUNCTIONS_SIZE)"
 fi
 
 # ============= 步骤 4: 部署 =============
