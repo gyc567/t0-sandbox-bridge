@@ -1,0 +1,16 @@
+  ✓ page loads (237ms)
+  ✓ Cross-Border: 3 node cards (no Pay-In) (8ms) — found 3 (expected 3)
+  ✓ TransportBar + Pause button in auto mode (5ms)
+  ✓ Speed selector has 0.5x / 1x / 2x (4ms) — got ["0.5x","1x","2x"]
+  ✓ Live event log present (2ms)
+  ✓ auto-play progress > 0.3% after 5s (5001ms) — fill=0.647%
+  ✓ ArtifactDrawer opens with payment_id field (59ms)
+  ✓ Switching to Trading Desk changes flow to manual-aml (534ms)
+  ✓ Fintech flow shows Pay-In node (524ms) — cards: ["Inspect Beneficiary","Inspect T-0 Network Orchestration","Inspect Pay-In Provider","Inspect Pay-In Wallet"]
+  ✓ IVMS101 disclosure artifact opens (manual-aml) (546ms)
+  ✓ Pause freezes progress (2518ms) — before=0.803% after2s=0.803%
+  ✓ 2x speed advances ≥ 1% in 3s (3046ms) — width=1.369%
+
+=== DEEP CHECK SUMMARY ===
+Total: 12 · PASS: 12 · FAIL: 0
+Console errors during run: 0

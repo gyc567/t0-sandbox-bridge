@@ -1,0 +1,183 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { MockT0Client } from "./client";
+import { PayoutProviderService } from "./provider";
+import { SandboxNetwork } from "./network";
+import { OFIService } from "./ofi";
+
+let clock = 1_700_000_000_000;
+const now = () => clock;
+
+let provider: PayoutProviderService;
+let network: SandboxNetwork;
+let ofi: OFIService;
+
+beforeEach(() => {
+  clock = 1_700_000_000_000;
+  provider = new PayoutProviderService(new MockT0Client(), now);
+  network = new SandboxNetwork(provider);
+  ofi = new OFIService(network, now);
+});
+
+describe("SandboxNetwork.getQuote (oneof semantics)", () => {
+  it("returns failure INVALID_AMOUNT on non-positive usd", () => {
+    const r = ofi.getQuote({ usdAmount: 0, currency: "EUR" });
+    expect(r).toEqual({ failure: { reason: "REASON_INVALID_AMOUNT" } });
+  });
+
+  it("returns failure CURRENCY_NOT_SUPPORTED for unknown currency", () => {
+    // ZWL is not in the supported list — it must be rejected.
+    const r = ofi.getQuote({ usdAmount: 1000, currency: "ZWL" as never });
+    expect(r).toEqual({ failure: { reason: "REASON_CURRENCY_NOT_SUPPORTED" } });
+  });
+
+  it("returns failure NO_QUOTE_AVAILABLE when no provider quotes exist", () => {
+    const r = ofi.getQuote({ usdAmount: 1000, currency: "EUR" });
+    expect(r).toEqual({ failure: { reason: "REASON_NO_QUOTE_AVAILABLE" } });
+  });
+
+  it("returns failure NO_QUOTE_AVAILABLE when no quote covers the amount", async () => {
+    await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const r = ofi.getQuote({ usdAmount: 5_000, currency: "EUR" });
+    expect(r).toEqual({ failure: { reason: "REASON_NO_QUOTE_AVAILABLE" } });
+  });
+
+  it("ignores expired quotes", async () => {
+    await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9, ttlMs: 10 });
+    clock += 11;
+    const r = ofi.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    expect(r).toEqual({ failure: { reason: "REASON_NO_QUOTE_AVAILABLE" } });
+  });
+
+  it("picks the best (lowest local-amount) live quote", async () => {
+    await provider.publishQuote({ currency: "EUR", band: 5_000, rate: 0.95 });
+    await provider.publishQuote({ currency: "EUR", band: 5_000, rate: 0.9 });
+    await provider.publishQuote({ currency: "EUR", band: 5_000, rate: 0.92 });
+    const r = ofi.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    expect("success" in r).toBe(true);
+    if ("success" in r) {
+      expect(r.success.quote.rate).toBe(0.9);
+      expect(r.success.payoutAmount).toBeCloseTo(900);
+      expect(r.success.settlementAmount).toBe(1_000);
+    }
+  });
+});
+
+describe("SandboxNetwork.getQuoteById", () => {
+  it("returns failure INVALID_QUOTE_ID for unknown id", () => {
+    const r = ofi.getQuoteById("nope");
+    expect(r).toEqual({ failure: { reason: "REASON_INVALID_QUOTE_ID" } });
+  });
+
+  it("returns failure QUOTE_EXPIRED for stale quote", async () => {
+    const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9, ttlMs: 10 });
+    clock += 11;
+    const r = ofi.getQuoteById(q.id);
+    expect(r).toEqual({ failure: { reason: "REASON_QUOTE_EXPIRED" } });
+  });
+
+  it("returns success for a live quote", async () => {
+    const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const r = ofi.getQuoteById(q.id);
+    expect(r).toMatchObject({ success: { quote: { id: q.id }, payoutAmount: 900, settlementAmount: 1_000 } });
+  });
+});
+
+describe("SandboxNetwork.createPayment (idempotent on paymentClientId)", () => {
+  it("skip rekey when ids already match (defensive branch)", async () => {
+    // Set paymentClientId to match the provider-generated prefix pattern.
+    const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const r = await ofi.createPayment({ paymentClientId: "baxs_rekey_skip", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 });
+    expect("success" in r).toBe(true);
+    if ("success" in r) {
+      // r.success.payment.id was overwritten by the rekeyPayment call path,
+      // but the provider-side equality check returns same id -> no extra map churn.
+      expect(r.success.payment.id).toBe("baxs_rekey_skip");
+    }
+  });
+
+  it("creates a payment against a live quote", async () => {
+    const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const r = await ofi.createPayment({ paymentClientId: "baxs_001", quoteId: q.id, beneficiaryRef: "BEN-1", usdAmount: 1_000 });
+    expect("success" in r).toBe(true);
+    if ("success" in r) {
+      expect(r.success.created).toBe(true);
+      expect(r.success.payment.id).toBe("baxs_001");
+      expect(r.success.payment.status).toBe("accepted");
+    }
+  });
+
+  it("returns the same payment on duplicate paymentClientId (idempotency rule 1)", async () => {
+    const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const r1 = await ofi.createPayment({ paymentClientId: "baxs_001", quoteId: q.id, beneficiaryRef: "BEN-1", usdAmount: 1_000 });
+    const r2 = await ofi.createPayment({ paymentClientId: "baxs_001", quoteId: q.id, beneficiaryRef: "BEN-DIFF", usdAmount: 1_000 });
+    expect("success" in r1 && "success" in r2).toBe(true);
+    if ("success" in r1 && "success" in r2) {
+      expect(r1.success.created).toBe(true);
+      expect(r2.success.created).toBe(false);
+      expect(r2.success.payment.id).toBe(r1.success.payment.id);
+    }
+  });
+
+  it("returns failure INVALID_QUOTE_ID for unknown quote", async () => {
+    const r = await ofi.createPayment({ paymentClientId: "baxs_002", quoteId: "nope", beneficiaryRef: "X", usdAmount: 1_000 });
+    expect(r).toEqual({ failure: { reason: "REASON_INVALID_QUOTE_ID" } });
+  });
+
+  it("returns failure QUOTE_EXPIRED for stale quote", async () => {
+    const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9, ttlMs: 10 });
+    clock += 11;
+    const r = await ofi.createPayment({ paymentClientId: "baxs_003", quoteId: q.id, beneficiaryRef: "X", usdAmount: 1_000 });
+    expect(r).toEqual({ failure: { reason: "REASON_QUOTE_EXPIRED" } });
+  });
+});
+
+describe("OFIService.snapshot", () => {
+  it("returns empty payments and the full supported-currency list initially", () => {
+    const s = ofi.snapshot();
+    expect(s.payments).toEqual([]);
+    // The dropdown must show all supported currencies even before any quote
+    // is published — see currencies.test.ts for the canonical list.
+    expect(s.availableCurrencies.length).toBeGreaterThan(20);
+    expect(s.availableCurrencies).toContain("USD");
+    expect(s.availableCurrencies).toContain("EUR");
+    expect(s.availableCurrencies).toContain("JPY");
+  });
+
+  it("availableCurrencies does not depend on whether quotes are published", async () => {
+    // Before any quote — list is full.
+    const before = ofi.snapshot().availableCurrencies;
+    expect(before.length).toBeGreaterThan(20);
+
+    // After a quote — list is still the same (order independent of quotes).
+    await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    await provider.publishQuote({ currency: "GBP", band: 1_000, rate: 0.8 });
+    const after = ofi.snapshot().availableCurrencies;
+    expect(after).toEqual(before);
+  });
+
+  it("returns payments in the snapshot", async () => {
+    const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    await ofi.createPayment({ paymentClientId: "baxs_snap_1", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 });
+    expect(ofi.snapshot().payments.length).toBe(1);
+  });
+});
+
+describe("Manual AML (OFI side)", () => {
+  it("approve moves payment to accepted", async () => {
+    const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const r = await ofi.createPayment({ paymentClientId: "baxs_aml_1", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 });
+    expect("success" in r).toBe(true);
+    if (!("success" in r)) return;
+    const p = ofi.completeManualAml(r.success.payment.id, true);
+    expect(p.status).toBe("accepted");
+  });
+
+  it("reject moves payment to rejected", async () => {
+    const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const r = await ofi.createPayment({ paymentClientId: "baxs_aml_2", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 });
+    expect("success" in r).toBe(true);
+    if (!("success" in r)) return;
+    const p = ofi.completeManualAml(r.success.payment.id, false);
+    expect(p.status).toBe("rejected");
+  });
+});

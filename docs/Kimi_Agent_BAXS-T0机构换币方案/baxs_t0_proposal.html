@@ -1,0 +1,424 @@
+
+<!-- ==================== SECTION 3 ==================== -->
+<h1 id="sec3" class="page-break">三、系统架构与集成方案</h1>
+
+<h2 id="sec3-1">3.1 整体架构</h2>
+
+<pre>
+┌─────────────────────────────────────────────────────────────────────┐
+│                         BAXS 下游客户层                               │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐     │
+│  │  电商平台 │ │ Fintech │ │ 贸易公司 │ │ 薪资平台 │ │ Neobank │     │
+│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘     │
+│       └───────────┴───────────┴───────────┴───────────┘            │
+│                         BAXS REST API                                 │
+│                    （3步集成，白标封装）                                 │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      BAXS 中间编排层（核心）                            │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐     │
+│  │ BAXS Global     │  │ BAXS Blockchain │  │ BAXS AI 交易    │     │
+│  │ Account         │  │ Wallet          │  │ 枢纽            │     │
+│  │ (EUR/USD/CNH)   │  │ (ERC20 USDT)    │  │ (智能路由)       │     │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘     │
+│           │                    │                    │               │
+│           └────────────────────┼────────────────────┘               │
+│                                ▼                                    │
+│                    ┌─────────────────────┐                          │
+│                    │ BAXS T-0 适配层      │                          │
+│                    │ (gRPC ↔ REST 转换)   │                          │
+│                    │ 信用额度管理          │                          │
+│                    │ Travel Rule 封装      │                          │
+│                    │ 状态机同步           │                          │
+│                    └──────────┬──────────┘                          │
+└─────────────────────────────┼───────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      T-0 Network 基础设施层                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌───────────┐ │
+│  │ Quote Engine│  │ Credit      │  │ Blockchain  │  │ Compliance│ │
+│  │ (报价订单簿) │  │ Ledger      │  │ Monitor     │  │ Center    │ │
+│  │             │  │ (信用账本)   │  │ (链上监控)   │  │ (合规中心) │ │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └───────────┘ │
+│                              │                                      │
+│                              ▼                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │              全球 Payout Provider 网络（含 BAXS）              │   │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐         │   │
+│  │  │ BAXS    │ │ 菲律宾  │ │ 墨西哥  │ │ 印度    │ ...     │   │
+│  │  │(EUR/USD │ │ Provider│ │ Provider│ │ Provider│         │   │
+│  │  │ /CNH)   │ │         │ │         │ │         │         │   │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘         │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+</pre>
+
+<h2 id="sec3-2">3.2 BAXS 内部模块改造</h2>
+
+<h3>3.2.1 T-0 适配层（T-0 Adapter Service）</h3>
+
+<p><strong>职责</strong>：将 T-0 Network 的 gRPC 协议转换为 BAXS 内部微服务可消费的格式，同时向下游客户暴露 REST API。</p>
+
+<table>
+    <thead>
+        <tr><th>组件</th><th>功能</th><th>技术栈</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><strong>Quote Proxy</strong></td><td>缓存 T-0 报价，响应 BAXS AI 枢纽的查询</td><td>Go + Redis</td></tr>
+        <tr><td><strong>Payment Gateway</strong></td><td>封装 CreatePayment / UpdatePayment</td><td>Go + gRPC</td></tr>
+        <tr><td><strong>Credit Manager</strong></td><td>同步 BAXS 在 T-0 Network 的信用额度，预警不足</td><td>Rust + PostgreSQL</td></tr>
+        <tr><td><strong>Travel Rule Assembler</strong></td><td>将 BAXS KYC 数据自动组装为 IVMS101 格式</td><td>Python</td></tr>
+        <tr><td><strong>Blockchain Settlement</strong></td><td>管理 BAXS 白名单钱包的 USDT 转账</td><td>Rust + Web3</td></tr>
+        <tr><td><strong>Status Sync</strong></td><td>接收 T-0 回调，同步至 BAXS 核心账本</td><td>Go + Kafka</td></tr>
+    </tbody>
+</table>
+
+<h3>3.2.2 BAXS AI 交易枢纽增强</h3>
+
+<p>在现有 AI 驱动交易枢纽基础上，增加 <strong>T-0 Network 智能路由模块</strong>：</p>
+
+<pre>
+输入：客户付款请求（币种、金额、时效要求、成本敏感度）
+    │
+    ▼
+┌─────────────────┐
+│ 路由决策引擎     │
+│ 1. 检查 BAXS 自有通道是否覆盖目标币种/地区 │
+│ 2. 若覆盖：对比 BAXS 自有成本 vs T-0 Network 报价 │
+│ 3. 若不覆盖：查询 T-0 Network 最优 Provider │
+│ 4. 综合评估：成本、时效、成功率、合规风险 │
+│ 5. 输出最优路由方案 │
+└─────────────────┘
+    │
+    ▼
+执行：BAXS 自有通道 或 T-0 Network 通道
+</pre>
+
+<p><strong>决策示例</strong>：</p>
+<ul>
+    <li>客户付 EUR → 德国：BAXS 自有 SEPA Instant 通道（秒级、成本低）</li>
+    <li>客户付 PHP → 菲律宾：T-0 Network 路由（BAXS 无本地 PHP 兑付能力）</li>
+    <li>客户付 USD → 美国：BAXS 自有 ACH 与 T-0 Provider 竞价，选更优者</li>
+</ul>
+
+<!-- ==================== SECTION 4 ==================== -->
+<h1 id="sec4" class="page-break">四、核心流程重构（以 BAXS 为中心）</h1>
+
+<h2 id="sec4-1">4.1 场景：BAXS 客户向菲律宾供应商付款（PHP）</h2>
+
+<p><strong>参与者</strong>：BAXS 客户（中国跨境电商）→ BAXS 系统 → T-0 Network → 菲律宾 Provider</p>
+
+<table>
+    <thead>
+        <tr><th>时序</th><th>动作方</th><th>动作</th><th>系统/接口</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>T+0</td><td>客户</td><td>通过 BAXS 平台提交付款指令：$10K → PHP</td><td>BAXS REST API</td></tr>
+        <tr><td>T+0s</td><td>BAXS AI 枢纽</td><td>判断：PHP 不在 BAXS 自有通道覆盖范围，路由至 T-0 Network</td><td>内部决策引擎</td></tr>
+        <tr><td>T+0s</td><td>BAXS</td><td>调用 T-0 GetQuote，获取 USD→PHP 最优报价</td><td>T-0 gRPC</td></tr>
+        <tr><td>T+0.05s</td><td>T-0 Network</td><td>返回报价：1 USD = 58.25 PHP，Provider 为菲律宾某银行</td><td>gRPC Response</td></tr>
+        <tr><td>T+0.1s</td><td>BAXS</td><td>向客户展示锁定汇率：$10K → ₱582,500，手续费 $50</td><td>BAXS 前端</td></tr>
+        <tr><td>T+0.5s</td><td>客户</td><td>确认付款，BAXS 从客户 USD 账户扣款 $10,050</td><td>BAXS 核心账本</td></tr>
+        <tr><td>T+1s</td><td>BAXS</td><td>从 BAXS Blockchain Wallet 向菲律宾 Provider 白名单地址转入 $10K USDT</td><td>ERC20 Transfer</td></tr>
+        <tr><td>T+1min</td><td>T-0 Network</td><td>监控到 12 区块确认，增加 BAXS 在该 Provider 的信用额度</td><td>Blockchain Monitor</td></tr>
+        <tr><td>T+2min</td><td>BAXS</td><td>调用 T-0 CreatePayment，携带完整 IVMS101 Travel Rule</td><td>T-0 gRPC</td></tr>
+        <tr><td>T+2min</td><td>T-0 Network</td><td>校验报价有效期 + 信用额度，受理付款，预留额度</td><td>Credit Ledger</td></tr>
+        <tr><td>T+2.5min</td><td>T-0 Network</td><td>向菲律宾 Provider 发送 PayOut 请求</td><td>gRPC</td></tr>
+        <tr><td>T+2.5min</td><td>菲律宾 Provider</td><td>30 秒内接受，承诺通过 PESONet 完成 ₱582,500 disbursement</td><td>本地支付网络</td></tr>
+        <tr><td>T+3min</td><td>菲律宾 Provider</td><td>完成本地转账，调用 FinalizePayout 回传成功</td><td>T-0 gRPC</td></tr>
+        <tr><td>T+3min</td><td>T-0 Network</td><td>通知 BAXS：付款 CONFIRMED，扣除信用额度</td><td>UpdatePayment 回调</td></tr>
+        <tr><td>T+3min</td><td>BAXS</td><td>更新客户仪表盘：付款完成，提供本地交易流水号</td><td>Webhook → 客户</td></tr>
+        <tr><td>T+3min</td><td>BAXS</td><td>生成统一对账单：USDT 哈希 + T-0 payment_id + 菲律宾银行流水</td><td>对账引擎</td></tr>
+    </tbody>
+</table>
+
+<p><strong>总耗时</strong>：~3 分钟（传统 SWIFT 电汇需 2-3 个工作日）</p>
+
+<h2 id="sec4-2">4.2 场景：T-0 Network 其他 OFI 向 BAXS 覆盖区付款（EUR SEPA）</h2>
+
+<p><strong>参与者</strong>：美国 Fintech（OFI）→ T-0 Network → BAXS（作为 Provider）</p>
+
+<table>
+    <thead>
+        <tr><th>时序</th><th>动作方</th><th>动作</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>T+0</td><td>美国 Fintech</td><td>通过 T-0 Network 发起 €5K 付款至德国供应商</td></tr>
+        <tr><td>T+0</td><td>T-0 Network</td><td>在订单簿中发现 BAXS 的 EUR 报价最优（1 USD = 0.9234 EUR）</td></tr>
+        <tr><td>T+0</td><td>T-0 Network</td><td>检查 BAXS 信用额度充足，路由至 BAXS</td></tr>
+        <tr><td>T+1min</td><td>美国 Fintech</td><td>USDT 预结算到账，BAXS 信用额度增加</td></tr>
+        <tr><td>T+2min</td><td>T-0 Network</td><td>向 BAXS 发送 PayOut 请求：€5K，SEPA 转账至德国账户</td></tr>
+        <tr><td>T+2.5min</td><td>BAXS</td><td>30 秒内接受，通过英国 EMI 合作的 SEPA Instant 通道发起转账</td></tr>
+        <tr><td>T+3min</td><td>BAXS</td><td>德国供应商账户收到 €5K（SEPA Instant 秒级到账）</td></tr>
+        <tr><td>T+3min</td><td>BAXS</td><td>调用 FinalizePayout 回传成功，提供 SEPA 交易 ID</td></tr>
+        <tr><td>T+3min</td><td>T-0 Network</td><td>通知美国 Fintech 付款完成，记录 BAXS 应收 Network 手续费</td></tr>
+    </tbody>
+</table>
+
+<!-- ==================== SECTION 5 ==================== -->
+<h1 id="sec5" class="page-break">五、商业模式与财务模型</h1>
+
+<h3>5.1 收入模型（BAXS 视角）</h3>
+
+<table>
+    <thead>
+        <tr><th>模式</th><th>收入来源</th><th>费率/金额</th><th>预估占比</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><strong>OFI 模式</strong></td><td>向客户收取跨境付款手续费</td><td>1.5% - 3% / 笔</td><td>40%</td></tr>
+        <tr><td><strong>OFI 模式</strong></td><td>FX 点差收益（BAXS 报价 vs T-0 报价）</td><td>20-100 bps</td><td>25%</td></tr>
+        <tr><td><strong>Provider 模式</strong></td><td>本地兑付 FX 点差（自主定价）</td><td>30-150 bps</td><td>20%</td></tr>
+        <tr><td><strong>Provider 模式</strong></td><td>T-0 Network 返佣</td><td>0.05% - 0.1% / 笔</td><td>5%</td></tr>
+        <tr><td><strong>白标模式</strong></td><td>向下游 Fintech 收取 API 订阅费</td><td>$500-$5,000/月</td><td>10%</td></tr>
+    </tbody>
+</table>
+
+<h3>5.2 成本模型</h3>
+
+<table>
+    <thead>
+        <tr><th>成本项</th><th>说明</th><th>优化策略</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><strong>T-0 Network 手续费</strong></td><td>0.1%-0.3% / 笔（USD 等值）</td><td>通过批量结算降低链上 Gas</td></tr>
+        <tr><td><strong>区块链 Gas 费</strong></td><td>ERC20 USDT 转账 $5-20/笔</td><td>优先使用 TRC20（~$1/笔）；批量结算</td></tr>
+        <tr><td><strong>合规成本</strong></td><td>Travel Rule 数据组装、制裁筛查</td><td>复用 BAXS 现有 KYC 数据，自动化组装</td></tr>
+        <tr><td><strong>技术集成</strong></td><td>T-0 适配层开发、维护</td><td>一次性投入，边际成本递减</td></tr>
+    </tbody>
+</table>
+
+<h3>5.3 财务测算（12 个月）</h3>
+
+<table>
+    <thead>
+        <tr><th>指标</th><th>保守估计</th><th>乐观估计</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>月均交易笔数</td><td>5,000</td><td>20,000</td></tr>
+        <tr><td>月均交易金额</td><td>$25M</td><td>$100M</td></tr>
+        <tr><td>平均单笔金额</td><td>$5,000</td><td>$5,000</td></tr>
+        <tr><td>综合费率收入</td><td>1.8%</td><td>1.8%</td></tr>
+        <tr><td>月收入</td><td>$450K</td><td>$1.8M</td></tr>
+        <tr><td>T-0 Network 成本</td><td>$75K</td><td>$300K</td></tr>
+        <tr><td>Gas 费成本</td><td>$25K</td><td>$80K</td></tr>
+        <tr><td><strong>月毛利</strong></td><td><strong>$350K</strong></td><td><strong>$1.42M</strong></td></tr>
+        <tr><td><strong>毛利率</strong></td><td><strong>78%</strong></td><td><strong>79%</strong></td></tr>
+    </tbody>
+</table>
+
+<!-- ==================== SECTION 6 ==================== -->
+<h1 id="sec6" class="page-break">六、合规与风险协同</h1>
+
+<h3>6.1 合规叠加优势</h3>
+
+<table>
+    <thead>
+        <tr><th>维度</th><th>BAXS 现有能力</th><th>T-0 Network 提供</th><th>协同效果</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>机构准入</strong></td>
+            <td>波兰 VASP、英国 EMI、美国 MSB、加拿大 MSB</td>
+            <td>网络层 KYB 审核</td>
+            <td>双重审核，降低对手方风险</td>
+        </tr>
+        <tr>
+            <td><strong>KYC</strong></td>
+            <td>BAXS 客户 KYC 数据库</td>
+            <td>-</td>
+            <td>BAXS KYC 数据直接复用，无需重复采集</td>
+        </tr>
+        <tr>
+            <td><strong>Travel Rule</strong></td>
+            <td>-</td>
+            <td>IVMS101 标准格式</td>
+            <td>BAXS 自动将客户数据映射为 IVMS101</td>
+        </tr>
+        <tr>
+            <td><strong>AML</strong></td>
+            <td>现有制裁筛查系统</td>
+            <td>Network 层 AML 规则</td>
+            <td>双层筛查，BAXS 先筛 + Network 再筛</td>
+        </tr>
+        <tr>
+            <td><strong>数据驻留</strong></td>
+            <td>多司法管辖区部署</td>
+            <td>-</td>
+            <td>BAXS 按客户属地要求存储 PII 数据</td>
+        </tr>
+        <tr>
+            <td><strong>审计追踪</strong></td>
+            <td>ISO 27001 + PCI DSS</td>
+            <td>区块链不可篡改记录</td>
+            <td>链上哈希 + 系统日志双重审计</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>6.2 风险矩阵（BAXS 专项）</h3>
+
+<table>
+    <thead>
+        <tr><th>风险</th><th>影响</th><th>缓解策略</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>T-0 Provider 违约</strong></td>
+            <td>接受 PayOut 后未兑付，客户资金损失</td>
+            <td>BAXS 设置 Provider 评级体系；大额交易拆分多 Provider；预留信用额度限制单笔敞口</td>
+        </tr>
+        <tr>
+            <td><strong>USDT 价格波动</strong></td>
+            <td>预结算到账至付款执行期间 USDT 脱锚</td>
+            <td>缩短预结算到付款的窗口至 &lt; 5 分钟；设置 USDT 价格异常熔断机制</td>
+        </tr>
+        <tr>
+            <td><strong>区块链拥堵</strong></td>
+            <td>USDT 转账确认延迟 &gt; 30min</td>
+            <td>BAXS 多链钱包（TRC20 优先）；Gas 费动态调整；拥堵时切换至 BAXS 自有通道</td>
+        </tr>
+        <tr>
+            <td><strong>监管突变</strong></td>
+            <td>某国禁止 USDT 或限制跨境稳定币支付</td>
+            <td>BAXS 多牌照架构快速切换至合规通道；法律团队实时跟踪政策；支持 USDC 备选</td>
+        </tr>
+        <tr>
+            <td><strong>技术故障</strong></td>
+            <td>T-0 Network 或 BAXS 适配层宕机</td>
+            <td>BAXS 适配层多活部署；故障时自动降级至 BAXS 自有通道；RTO &lt; 5min</td>
+        </tr>
+    </tbody>
+</table>
+
+
+<!-- ==================== SECTION 7 ==================== -->
+<h1 id="sec7" class="page-break">七、实施路线图</h1>
+
+<h3>Phase 1：基础设施对接（Week 1-4）</h3>
+
+<table>
+    <thead>
+        <tr><th>任务</th><th>负责方</th><th>交付物</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>T-0 Network 机构准入申请</td><td>BAXS 合规团队</td><td>KYB 材料提交、白名单钱包地址</td></trn        <tr><td>沙盒环境接入</td><td>BAXS 技术团队</td><td>API Key、测试钱包、沙盒 gRPC 联调</td></tr>
+        <tr><td>BAXS T-0 适配层开发</td><td>BAXS 技术团队</td><td>Quote Proxy、Payment Gateway、Credit Manager</td></tr>
+        <tr><td>BAXS Blockchain Wallet 白名单配置</td><td>BAXS 运维团队</td><td>ERC20 + TRC20 白名单地址</td></tr>
+    </tbody>
+</table>
+
+<h3>Phase 2：OFI 模式上线（Week 5-8）</h3>
+
+<table>
+    <thead>
+        <tr><th>任务</th><th>负责方</th><th>交付物</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>3条核心走廊测试（USD→PHP、USD→MXN、USD→INR）</td><td>BAXS + T-0</td><td>端到端测试通过</td></tr>
+        <tr><td>BAXS AI 枢纽 T-0 路由模块上线</td><td>BAXS 技术团队</td><td>智能路由决策引擎</td></tr>
+        <tr><td>客户灰度发布</td><td>BAXS 产品团队</td><td>100 笔/日 小流量验证</td></tr>
+        <tr><td>监控与对账系统联调</td><td>BAXS 技术团队</td><td>统一对账单格式</td></tr>
+    </tbody>
+</table>
+
+<h3>Phase 3：Provider 模式上线（Week 9-12）</h3>
+
+<table>
+    <thead>
+        <tr><th>任务</th><th>负责方</th><th>交付物</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>BAXS 报价流推送（EUR/USD/CNH/GBP/CAD）</td><td>BAXS 技术团队</td><td>UpdateQuote 流式服务</td></tr>
+        <tr><td>BAXS PayOut 接口实现</td><td>BAXS 技术团队</td><td>PayOut + FinalizePayout gRPC 服务</td></tr>
+        <tr><td>本地银行通道压力测试</td><td>BAXS 运维团队</td><td>SEPA Instant / ACH 并发测试</td></tr>
+        <tr><td>其他 OFI 路由测试</td><td>T-0 Network</td><td>端到端 Provider 测试</td></tr>
+    </tbody>
+</table>
+
+<h3>Phase 4：白标赋能与规模化（Month 4-6）</h3>
+
+<table>
+    <thead>
+        <tr><th>任务</th><th>负责方</th><th>交付物</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>BAXS 白标 API 发布</td><td>BAXS 产品团队</td><td>REST API v2.0（封装 T-0 能力）</td></tr>
+        <tr><td>下游 Fintech 客户接入</td><td>BAXS BD 团队</td><td>5-10 家 Fintech 客户上线</td></tr>
+        <tr><td>Net Settlement 轧差结算</td><td>BAXS + T-0</td><td>日终 USDT 净额结算</td></tr>
+        <tr><td>全量货币对开放</td><td>BAXS + T-0</td><td>1200+ 货币对全量上线</td></tr>
+    </tbody>
+</table>
+
+<!-- ==================== SECTION 8 ==================== -->
+<h1 id="sec8" class="page-break">八、关键成功指标（KPIs）</h1>
+
+<table>
+    <thead>
+        <tr><th>维度</th><th>指标</th><th>3 个月目标</th><th>6 个月目标</th><th>12 个月目标</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><strong>业务</strong></td><td>月均交易金额</td><td>$5M</td><td>$25M</td><td>$100M</td></tr>
+        <tr><td><strong>业务</strong></td><td>支持走廊数</td><td>5</td><td>15</td><td>50</td></tr>
+        <tr><td><strong>业务</strong></td><td>下游白标客户数</td><td>0</td><td>3</td><td>10</td></tr>
+        <tr><td><strong>技术</strong></td><td>端到端平均耗时</td><td>&lt; 10min</td><td>&lt; 5min</td><td>&lt; 3min</td></tr>
+        <tr><td><strong>技术</strong></td><td>系统可用性</td><td>99.9%</td><td>99.95%</td><td>99.99%</td></tr>
+        <tr><td><strong>技术</strong></td><td>付款成功率</td><td>&gt; 98%</td><td>&gt; 99%</td><td>&gt; 99.5%</td></tr>
+        <tr><td><strong>合规</strong></td><td>AML 筛查命中率</td><td>100%</td><td>100%</td><td>100%</td></tr>
+        <tr><td><strong>合规</strong></td><td>Travel Rule 合规率</td><td>100%</td><td>100%</td><td>100%</td></tr>
+        <tr><td><strong>财务</strong></td><td>月毛利</td><td>$50K</td><td>$350K</td><td>$1.42M</td></tr>
+    </tbody>
+</table>
+
+<!-- ==================== SECTION 9 ==================== -->
+<h1 id="sec9" class="page-break">九、附录：BAXS 与 T-0 Network 接口映射</h1>
+
+<h3>9.1 BAXS 内部 API → T-0 gRPC 映射</h3>
+
+<table>
+    <thead>
+        <tr><th>BAXS 客户接口</th><th>BAXS 适配层</th><th>T-0 Network 接口</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><code>POST /v1/quotes</code></td><td>QuoteProxy.getQuote()</td><td>GetQuote</td></tr>
+        <tr><td><code>POST /v1/payments</code></td><td>PaymentGateway.create()</td><td>CreatePayment</td></tr>
+        <tr><td><code>GET /v1/payments/{id}</code></td><td>StatusSync.query()</td><td>内部状态机 + T-0 回调</td></tr>
+        <tr><td><code>POST /v1/payouts/quote</code></td><td>QuoteProxy.streamUpdate()</td><td>UpdateQuote (Provider 模式)</td></tr>
+        <tr><td><code>POST /v1/payouts/execute</code></td><td>PaymentGateway.payout()</td><td>PayOut (Provider 模式)</td></tr>
+        <tr><td><code>POST /v1/payouts/finalize</code></td><td>PaymentGateway.finalize()</td><td>FinalizePayout (Provider 模式)</td></tr>
+    </tbody>
+</table>
+
+<h3>9.2 BAXS KYC 数据 → IVMS101 映射</h3>
+
+<table>
+    <thead>
+        <tr><th>BAXS 客户数据</th><th>IVMS101 字段</th><th>自动填充逻辑</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>客户注册姓名</td><td>Originator.Name</td><td>直接映射</td></tr>
+        <tr><td>客户地址</td><td>Originator.Address</td><td>BAXS 地址库</td></tr>
+        <tr><td>BAXS 账户号</td><td>Originator.AccountNumber</td><td>前缀 + BAXS ID</td></tr>
+        <tr><td>客户国籍</td><td>Originator.NationalId</td><td>KYC 证件信息</td></tr>
+        <tr><td>收款人姓名</td><td>Beneficiary.Name</td><td>客户输入</td></tr>
+        <tr><td>收款人银行账号</td><td>Beneficiary.AccountNumber</td><td>客户输入</td></tr>
+        <tr><td>收款人银行 BIC</td><td>Beneficiary.FinancialInstitution.Bic</td><td>银行数据库查询</td></tr>
+    </tbody>
+</table>
+
+<hr />
+
+<blockquote>
+    <p><strong>结语</strong>：本方案将 BAXS 的现有牌照、账户体系、稳定币钱包、API 平台与 T-0 Network 的 1200+ 货币对、USDT 实时结算、P2P 净额结算能力深度耦合，使 BAXS 从"单一支付服务商"升级为"全球跨境支付编排平台"，同时为下游 Fintech 客户提供零感知 T-0 Network 能力的白标服务。</p>
+</blockquote>
+
+<hr />
+
+<p><em>文档编制：BAXS 产品与战略团队</em><br />
+<em>审核：BAXS 合规与技术委员会</em><br />
+<em>生效日期：2026-06-30</em></p>
+
+</body>
+</html>

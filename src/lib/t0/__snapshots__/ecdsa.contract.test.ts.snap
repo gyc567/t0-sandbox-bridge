@@ -1,3 +1,5 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ecdsa / contract: signRequest output > toCurl produces a stable snapshot (signatures masked) > ecdsa.toCurl shape 1`] = `"curl -X POST 'https://api.example.com/x' -H '<masked>: 0x18c4c6170d8bab2c0c40ec3df578e0a7cd317c4583dbf4ff6d36b9a9e3f8d48440e207155f59220cb0f3d14b8d4c34fe65b051e6bd4b1ab4e0d683144df849db' -H '<masked>: 0x031b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f' -H '<masked>: 1700000000000' -d '{"test":"data","n":1}'"`;
+
+exports[`ecdsa / contract: signRequest output toCurl produces a stable snapshot (signatures masked): ecdsa.toCurl shape 1`] = `"curl -X POST 'https://api.example.com/x' -H '<masked>: 0x18c4c6170d8bab2c0c40ec3df578e0a7cd317c4583dbf4ff6d36b9a9e3f8d48440e207155f59220cb0f3d14b8d4c34fe65b051e6bd4b1ab4e0d683144df849db' -H '<masked>: 0x031b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f' -H '<masked>: 1700000000000' -d '{"test":"data","n":1}'"`;

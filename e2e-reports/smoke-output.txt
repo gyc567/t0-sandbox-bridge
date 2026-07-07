@@ -1,0 +1,13 @@
+[setup] Testing http://127.0.0.1:4173
+[setup] Report dir: /Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports
+
+=== E2E SMOKE TEST REPORT ===
+Base URL: http://127.0.0.1:4173
+Overall:  PASS
+  PASS | landing      | 1110ms | 0 console issues
+  PASS | playground   | 1061ms | 0 console issues
+  PASS | playground-auto-play-progress | 5000ms | 0 console issues
+  PASS | sandbox      | 1006ms | 0 console issues
+  PASS | docs         | 1059ms | 0 console issues
+
+Report JSON: /Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/report.json

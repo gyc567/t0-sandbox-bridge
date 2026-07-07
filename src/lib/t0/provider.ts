@@ -141,6 +141,43 @@ export class PayoutProviderService {
     };
   }
 
+  /**
+   * Re-key a payment from an internal auto-generated id to a client-supplied
+   * idempotency key (the OFI's `paymentClientId`). Idempotent: if the new id
+   * already exists and differs, the original is kept (defensive — duplicate
+   * keys should never collide in practice because the OFI surfaces one
+   * paymentClientId per CreatePayment call). Updates the payment object in
+   * place so callers holding a reference see the new id.
+   */
+  rekeyPayment(oldId: string, newId: string): void {
+    if (oldId === newId) return;
+    const payment = this.payments.get(oldId);
+    if (!payment) throw new Error(`unknown payment: ${oldId}`);
+    if (this.payments.has(newId)) {
+      // Defensive: never overwrite an existing entry. In practice the OFI
+      // CreatePayment idempotency check prevents this branch.
+      return;
+    }
+    payment.id = newId;
+    this.payments.delete(oldId);
+    this.payments.set(newId, payment);
+  }
+
+  /**
+   * Re-key a quote to a wire-friendly id (used by the provider RPC handlers
+   * to align internal quote ids with the numeric ids the network emits on
+   * the wire). Mutates the stored quote's `id` and re-keys the map.
+   */
+  rekeyQuote(oldId: string, newId: string): void {
+    if (oldId === newId) return;
+    const quote = this.quotes.get(oldId);
+    if (!quote) throw new Error(`unknown quote: ${oldId}`);
+    if (this.quotes.has(newId)) return;
+    quote.id = newId;
+    this.quotes.delete(oldId);
+    this.quotes.set(newId, quote);
+  }
+
   // ── Manual AML / Last Look (Phase 8) ──────────────────────────
   /**
    * Complete a manual AML check. Idempotent on paymentId.

@@ -1,0 +1,1949 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>BAXS × T-0 Network 机构换币产品解决方案</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Reset and base */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: "Noto Serif SC", Georgia, serif; 
+            font-size: 11pt; 
+            line-height: 1.7; 
+            color: #333;
+            text-align: justify;
+            text-align-last: left;
+        }
+        
+        /* Page setup */
+        @page { 
+            size: A4; 
+            margin: 2.5cm 2cm; 
+            @top-center { content: string(doctitle); font-size: 9pt; color: #666; }
+            @bottom-center { content: counter(page); font-size: 9pt; }
+        }
+        @page :first { margin: 0; @top-center { content: none; } @bottom-center { content: none; } }
+        @page cover { @top-center { content: none; } @bottom-center { content: none; } }
+        @page toc { @top-center { content: none; } @bottom-center { content: none; } }
+        
+        body { string-set: doctitle ""; }
+        h1 { string-set: doctitle content(); }
+        
+        /* Cover - Swiss Style */
+        .cover {
+            width: 210mm;
+            height: 297mm;
+            margin: 0;
+            position: relative;
+            overflow: hidden;
+            page: cover;
+            page-break-after: always;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+        .cover::before {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 45%;
+            height: 100%;
+            background: linear-gradient(180deg, #1a5276 0%, #2874a6 100%);
+            clip-path: polygon(30% 0, 100% 0, 100% 100%, 0% 100%);
+        }
+        .cover::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 100%;
+            height: 8px;
+            background: #1a5276;
+        }
+        .cover-accent {
+            position: absolute;
+            top: 60px; left: 50px;
+            width: 80px;
+            height: 6px;
+            background: #1a5276;
+        }
+        .cover-content {
+            position: absolute;
+            top: 50%; left: 8%;
+            transform: translateY(-50%);
+            width: 55%;
+            z-index: 10;
+        }
+        .cover-label {
+            font-size: 11pt;
+            color: #2874a6;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .cover-title {
+            font-size: 28pt;
+            font-weight: 700;
+            color: #1a5276;
+            margin-bottom: 15px;
+            line-height: 1.3;
+        }
+        .cover-subtitle {
+            font-size: 14pt;
+            color: #5d6d7e;
+            margin-bottom: 50px;
+            font-weight: 400;
+        }
+        .cover-meta {
+            font-size: 11pt;
+            color: #333;
+            line-height: 2;
+        }
+        .cover-meta strong { color: #1a5276; }
+        .cover-logo-area {
+            position: absolute;
+            bottom: 80px; right: 8%;
+            text-align: right;
+            z-index: 10;
+        }
+        .cover-logo-area .logo-text {
+            font-size: 24pt;
+            font-weight: 700;
+            color: white;
+            letter-spacing: 2px;
+        }
+        .cover-logo-area .logo-sub {
+            font-size: 10pt;
+            color: rgba(255,255,255,0.8);
+            margin-top: 5px;
+        }
+        .cover-date {
+            position: absolute;
+            bottom: 80px; left: 8%;
+            font-size: 10pt;
+            color: #666;
+            z-index: 10;
+        }
+        
+        /* TOC */
+        .toc-page { page: toc; page-break-after: always; }
+        .toc-title { font-size: 20pt; font-weight: 700; color: #1a5276; margin-bottom: 30px; text-align: center; }
+        .toc { list-style: none; padding: 0; }
+        .toc li { margin-bottom: 8px; }
+        .toc a { text-decoration: none; color: #333; display: block; }
+        .toc a::after { content: leader('.') target-counter(attr(href url), page); }
+        .toc-l1 { font-weight: 600; font-size: 11pt; }
+        .toc-l2 { padding-left: 1.5em; font-size: 10.5pt; }
+        .toc-l3 { padding-left: 3em; font-size: 10pt; color: #555; }
+        
+        /* Headings */
+        h1 { font-size: 20pt; font-weight: 700; color: #1a5276; margin: 30px 0 15px; page-break-after: avoid; }
+        h2 { font-size: 14pt; font-weight: 700; color: #2874a6; margin: 25px 0 12px; page-break-after: avoid; }
+        h3 { font-size: 12pt; font-weight: 600; color: #333; margin: 18px 0 10px; page-break-after: avoid; }
+        
+        /* Content elements */
+        p { margin-bottom: 10px; }
+        
+        /* Tables - three-line style */
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 15px 0; 
+            font-size: 10pt;
+            max-width: 100%;
+        }
+        thead { border-top: 2px solid #333; border-bottom: 1px solid #333; }
+        tbody { border-bottom: 2px solid #333; }
+        th { padding: 8px 10px; text-align: left; font-weight: 600; background: #f8f9fa; }
+        td { padding: 8px 10px; text-align: left; vertical-align: top; }
+        tr { page-break-inside: avoid; }
+        caption { font-weight: 600; margin-bottom: 8px; text-align: left; }
+        caption::before { content: attr(data-label) "  "; font-weight: bold; }
+        
+        /* Figures */
+        figure { margin: 20px 0; text-align: center; page-break-inside: avoid; }
+        figure img { max-width: 100%; height: auto; }
+        figcaption { font-size: 10pt; color: #666; margin-top: 8px; }
+        figcaption::before { content: attr(data-label) "  "; font-weight: bold; color: #333; }
+        
+        /* Code blocks */
+        pre { 
+            background: #f5f5f5; 
+            padding: 12px 15px; 
+            border-left: 3px solid #1a5276;
+            margin: 12px 0;
+            font-size: 9pt;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-width: 100%;
+        }
+        code { font-family: "Courier New", monospace; font-size: 9pt; word-break: break-word; }
+        
+        /* Lists */
+        ul, ol { margin: 10px 0 10px 1.5em; }
+        li { margin-bottom: 5px; }
+        
+        /* Highlight boxes */
+        .highlight-box {
+            border-left: 4px solid #1a5276;
+            background: #f0f4f8;
+            padding: 12px 15px;
+            margin: 15px 0;
+        }
+        .highlight-box-title { font-weight: 700; color: #1a5276; margin-bottom: 5px; }
+        
+        .warning-box {
+            border-left: 4px solid #e67e22;
+            background: #fef5e7;
+            padding: 12px 15px;
+            margin: 15px 0;
+        }
+        
+        /* API endpoint styling */
+        .api-endpoint {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px 12px;
+            margin: 8px 0;
+            font-family: "Courier New", monospace;
+            font-size: 9.5pt;
+        }
+        .api-method { 
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 8pt;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .method-post { background: #27ae60; color: white; }
+        .method-get { background: #3498db; color: white; }
+        .method-put { background: #f39c12; color: white; }
+        .method-delete { background: #e74c3c; color: white; }
+        
+        /* Phase labels */
+        .phase-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #1a5276;
+            color: white;
+            padding: 4px 12px;
+            font-size: 9pt;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        /* Page breaks */
+        .page-break { page-break-before: always; }
+        
+        /* Prevent overflow */
+        pre, table, figure, img, svg, blockquote { max-width: 100%; box-sizing: border-box; }
+        a { word-break: break-all; color: #2874a6; }
+        
+        /* Summary cards - simple style for PDF */
+        .summary-grid {
+            display: table;
+            width: 100%;
+            margin: 15px 0;
+        }
+        .summary-row { display: table-row; }
+        .summary-cell {
+            display: table-cell;
+            width: 50%;
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            vertical-align: top;
+        }
+        .summary-cell-title { font-weight: 700; color: #1a5276; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<!-- ==================== COVER ==================== -->
+<div class="cover">
+    <div class="cover-accent"></div>
+    <div class="cover-content">
+        <div class="cover-label">Product Solution</div>
+        <div class="cover-title">BAXS × T-0 Network<br>机构换币产品解决方案</div>
+        <div class="cover-subtitle">基于 USDT 稳定币清结算网络的机构级跨境换币平台</div>
+        <div class="cover-meta">
+            <p><strong>发起方</strong> | BAXS (baxs.ca)</p>
+            <p><strong>合作方</strong> | T-0 Network (t-0.network)</p>
+            <p><strong>文档版本</strong> | v1.0</p>
+            <p><strong>文档日期</strong> | 2026年6月</p>
+            <p><strong>保密级别</strong> | 商业机密</p>
+        </div>
+    </div>
+    <div class="cover-logo-area">
+        <div class="logo-text">BAXS</div>
+        <div class="logo-sub">驱动数字金融未来</div>
+    </div>
+    <div class="cover-date">CONFIDENTIAL | June 2026</div>
+</div>
+
+<!-- ==================== TOC ==================== -->
+<div class="toc-page">
+    <div class="toc-title">目 录</div>
+    <ul class="toc">
+        <li class="toc-l1"><a href="#sec1">1. 项目概述与背景</a></li>
+        <li class="toc-l2"><a href="#sec1-1">1.1 合作双方介绍</a></li>
+        <li class="toc-l2"><a href="#sec1-2">1.2 合作背景与价值主张</a></li>
+        <li class="toc-l2"><a href="#sec1-3">1.3 目标市场与机构客户画像</a></li>
+        <li class="toc-l1"><a href="#sec2">2. 产品功能方案</a></li>
+        <li class="toc-l2"><a href="#sec2-1">2.1 机构开户与KYC模块</a></li>
+        <li class="toc-l2"><a href="#sec2-2">2.2 银行账户管理模块</a></li>
+        <li class="toc-l2"><a href="#sec2-3">2.3 USDT钱包管理模块</a></li>
+        <li class="toc-l2"><a href="#sec2-4">2.4 报价与询价模块</a></li>
+        <li class="toc-l2"><a href="#sec2-5">2.5 换币交易模块</a></li>
+        <li class="toc-l2"><a href="#sec2-6">2.6 清结算与对账模块</a></li>
+        <li class="toc-l1"><a href="#sec3">3. 系统架构设计</a></li>
+        <li class="toc-l2"><a href="#sec3-1">3.1 总体架构</a></li>
+        <li class="toc-l2"><a href="#sec3-2">3.2 核心系统模块</a></li>
+        <li class="toc-l2"><a href="#sec3-3">3.3 数据流设计</a></li>
+        <li class="toc-l1"><a href="#sec4">4. API接口设计</a></li>
+        <li class="toc-l2"><a href="#sec4-1">4.1 认证与授权接口</a></li>
+        <li class="toc-l2"><a href="#sec4-2">4.2 KYC管理接口</a></li>
+        <li class="toc-l2"><a href="#sec4-3">4.3 账户管理接口</a></li>
+        <li class="toc-l2"><a href="#sec4-4">4.4 报价接口</a></li>
+        <li class="toc-l2"><a href="#sec4-5">4.5 换币交易接口</a></li>
+        <li class="toc-l2"><a href="#sec4-6">4.6 清结算接口</a></li>
+        <li class="toc-l1"><a href="#sec5">5. 交易流程设计</a></li>
+        <li class="toc-l2"><a href="#sec5-1">5.1 完整交易流程</a></li>
+        <li class="toc-l2"><a href="#sec5-2">5.2 异常处理流程</a></li>
+        <li class="toc-l1"><a href="#sec6">6. 安全与合规设计</a></li>
+        <li class="toc-l2"><a href="#sec6-1">6.1 KYC/AML合规</a></li>
+        <li class="toc-l2"><a href="#sec6-2">6.2 数据安全</a></li>
+        <li class="toc-l2"><a href="#sec6-3">6.3 资金安全</a></li>
+        <li class="toc-l1"><a href="#sec7">7. 实施路线图</a></li>
+        <li class="toc-l2"><a href="#sec7-1">7.1 里程碑规划</a></li>
+        <li class="toc-l2"><a href="#sec7-2">7.2 资源需求</a></li>
+        <li class="toc-l1"><a href="#sec8">8. 风险分析与应对</a></li>
+        <li class="toc-l1"><a href="#sec9">9. 附录</a></li>
+    </ul>
+</div>
+
+<!-- ==================== SECTION 1 ==================== -->
+<h1 id="sec1">1. 项目概述与背景</h1>
+
+<h2 id="sec1-1">1.1 合作双方介绍</h2>
+
+<h3>BAXS (baxs.ca)</h3>
+<p>BAXS是一家持有加拿大金融牌照、专注于数字金融基础设施的金融科技公司，总部位于加拿大。凭借加拿大合规牌照优势，BAXS已构建覆盖北美、亚太等主要金融中心的全球银行网络，致力于为全球机构客户提供无缝衔接的数字资产与多币种法币兑换服务。核心业务包括：</p>
+<ul>
+    <li><strong>数币钱包与多币种账户</strong>：支持主流稳定币（USDT/USDC）与多法币（CAD/USD/HKD/SGD等）的灵活调配</li>
+    <li><strong>全球收款方案</strong>：依托加拿大、香港、新加坡、美国等地银行账户网络，支持多地区法币与主流稳定币收款</li>
+    <li><strong>全球付款服务</strong>：一键向全球供应商/个人支付，数币法币智能路由，覆盖主要金融中心本地支付轨道</li>
+    <li><strong>金融科技赋能</strong>：为金融科技公司提供底层系统能力支持与全球清结算通道</li>
+</ul>
+
+<h3>T-0 Network (t-0.network)</h3>
+<p>T-0 Network是由Tether战略支持的机构级稳定币清结算网络，旨在通过USDT实现跨境支付的即时结算。核心能力包括：</p>
+<ul>
+    <li><strong>全球覆盖</strong>：连接50+国家的持牌金融机构，支持1200+支付通道与外汇对</li>
+    <li><strong>即时结算</strong>：基于USDT的near-instant结算，替代传统T+2~T+5的跨境清算</li>
+    <li><strong>成本优势</strong>：以基点(basis points)而非百分比收费，大幅降低FX成本</li>
+    <li><strong>合规架构</strong>：支持Travel Rule数据交换，满足FATF监管要求</li>
+    <li><strong>智能报价</strong>：实时报价流，20-50毫秒延迟的报价响应</li>
+</ul>
+
+<h2 id="sec1-2">1.2 合作背景与价值主张</h2>
+
+<div class="highlight-box">
+    <div class="highlight-box-title">合作愿景</div>
+    <p>通过将BAXS的加拿大持牌机构优势与全球多地区银行网络，和T-0 Network的全球清结算网络深度整合，构建一个面向全球机构客户的USDT-多法币（CAD/USD/HKD/SGD）换币平台，实现跨境换币的分钟级完成。BAXS作为加拿大持牌机构，为全球客户提供合规、安全的多币种资金通道。</p>
+</div>
+
+<p><strong>核心价值主张：</strong></p>
+<table>
+    <caption data-label="表1-1">合作价值矩阵</caption>
+    <thead>
+        <tr><th>维度</th><th>传统方案</th><th>BAXS × T-0方案</th><th>提升幅度</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>结算速度</td><td>T+2 ~ T+5 工作日</td><td>T+0 (分钟级)</td><td>99%+</td></tr>
+        <tr><td>FX成本</td><td>1%~3% 手续费</td><td>10~50 bps</td><td>80%~95%</td></tr>
+        <tr><td>法币覆盖</td><td>单一币种</td><td>CAD / USD / HKD / SGD 全球多币种</td><td>4+ 法币</td></tr>
+        <tr><td>操作时间</td><td>银行工作时间</td><td>7×24 全天候</td><td>全天候</td></tr>
+        <tr><td>透明度</td><td>中间环节不透明</td><td>区块链可追溯</td><td>完全透明</td></tr>
+        <tr><td>合规保障</td><td>各管一段</td><td>端到端Travel Rule</td><td>全链路合规</td></tr>
+    </tbody>
+</table>
+
+<h2 id="sec1-3">1.3 目标市场与机构客户画像</h2>
+
+<p><strong>目标客户群体：</strong></p>
+<ul>
+    <li><strong>跨境贸易企业</strong>：需要频繁进行USDT与CAD/USD/HKD/SGD等多币种兑换的进出口企业</li>
+    <li><strong>加密货币矿场</strong>：需要将USDT收益兑换为全球主要法币的矿业公司</li>
+    <li><strong>投资机构</strong>：进行跨境资产配置的基金与家族办公室，需多币种出入金通道</li>
+    <li><strong>支付服务商</strong>：需要覆盖加拿大、香港、新加坡、美国等多地区即时结算的汇款与支付公司</li>
+    <li><strong>跨境电商</strong>：接收USDT付款但需要CAD/USD/HKD/SGD等多币种结算的电商平台</li>
+    <li><strong>出海企业</strong>：中国及亚洲企业出海北美，需要多币种资金调配方案</li>
+</ul>
+
+<p><strong>客户需求痛点：</strong></p>
+<ol>
+    <li>传统银行跨境汇款速度慢、成本高、不透明，多地区银行账户管理复杂</li>
+    <li>加密货币与法币兑换渠道有限，KYC流程繁琐，缺乏持牌机构背书</li>
+    <li>缺乏合规的 institutional-grade 换币基础设施，尤其覆盖亚太-北美的通道</li>
+    <li>需要同时管理多链USDT钱包与多地区银行账户（加拿大、香港、新加坡、美国）</li>
+    <li>对交易对手风险与资金安全性要求高，需要受监管机构的资金保障</li>
+</ol>
+
+<!-- ==================== SECTION 2 ==================== -->
+<h1 id="sec2" class="page-break">2. 产品功能方案</h1>
+
+<div class="phase-label">功能全景</div>
+<p>BAXS × T-0 Network机构换币平台包含六大核心功能模块，覆盖从开户、钱包管理、报价询价、换币交易到清结算的全生命周期。</p>
+
+<table>
+    <caption data-label="表2-1">功能模块总览</caption>
+    <thead>
+        <tr><th>模块</th><th>核心功能</th><th>对接系统</th><th>优先级</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>机构开户与KYC</td><td>企业注册、资质审核、Travel Rule数据</td><td>T-0 Identity API</td><td>P0</td></tr>
+        <tr><td>银行账户管理</td><td>全球多地区账户绑定(CA/US/HK/SG)、验证、多币种出入金</td><td>加拿大/美国/香港/新加坡银行系统</td><td>P0</td></tr>
+        <tr><td>USDT钱包管理</td><td>多链钱包创建/导入、地址白名单</td><td>区块链节点</td><td>P0</td></tr>
+        <tr><td>报价与询价</td><td>实时报价流、询价锁定、汇率比较</td><td>T-0 Quote API</td><td>P0</td></tr>
+        <tr><td>换币交易</td><td>USDT→CAD下单、区块链转账、状态追踪</td><td>T-0 Payment API</td><td>P0</td></tr>
+        <tr><td>清结算与对账</td><td>信用额度管理、交易对账、费用结算</td><td>T-0 Settlement API</td><td>P1</td></tr>
+    </tbody>
+</table>
+
+<h2 id="sec2-1">2.1 机构开户与KYC模块</h2>
+
+<h3>功能描述</h3>
+<p>为机构客户提供完整的企业级开户流程，包括企业资质认证、受益所有人(UBO)识别、以及符合FATF Travel Rule要求的KYC数据收集。</p>
+
+<h3>核心功能点</h3>
+<table>
+    <caption data-label="表2-2">KYC模块功能清单</caption>
+    <thead>
+        <tr><th>功能点</th><th>说明</th><th>数据字段</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>企业基本信息</td>
+            <td>公司名称、注册号、注册地址、营业地址</td>
+            <td>legal_name, registration_number, incorporation_date</td>
+        </tr>
+        <tr>
+            <td>企业资质文件</td>
+            <td>营业执照、公司章程、财务报表</td>
+            <td>document_type, document_url, verified_at</td>
+        </tr>
+        <tr>
+            <td>受益所有人(UBO)</td>
+            <td>持股>25%的自然人，身份信息与地址证明</td>
+            <td>ubo_name, ownership_pct, id_document</td>
+        </tr>
+        <tr>
+            <td>授权操作人</td>
+            <td>被授权进行换币操作的人员</td>
+            <td>authorized_person, role, contact_info</td>
+        </tr>
+        <tr>
+            <td>Travel Rule数据</td>
+            <td>符合IVMS101标准的发送方/接收方信息</td>
+            <td>originator, beneficiary, geographic_address</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>KYC流程设计</h3>
+<pre><code>流程: 机构开户
+1. 机构提交注册申请 (企业名称、邮箱、联系电话)
+2. BAXS发送验证邮件，机构激活账户
+3. 机构完善KYC资料 (企业资质、UBO、授权人)
+4. BAXS进行自动审核 + 人工复核
+5. 审核通过后，机构状态更新为 "VERIFIED"
+6. 同步KYC数据至T-0 Network (通过Identity API)
+7. T-0 Network返回机构DID (去中心化身份标识)
+8. 机构可开始使用报价、换币等功能
+
+状态机: PENDING → SUBMITTED → UNDER_REVIEW → VERIFIED | REJECTED</code></pre>
+
+<h2 id="sec2-2">2.2 银行账户管理模块（全球多地区银行网络）</h2>
+
+<h3>功能描述</h3>
+<p>BAXS持有加拿大金融牌照，基于合规优势已建立覆盖加拿大、香港、新加坡、美国等主要金融中心的全球银行合作网络。本模块支持机构客户在全球多个司法管辖区绑定和管理银行账户，实现多币种法币（CAD/USD/HKD/SGD）的出入金操作。机构可根据业务需求灵活选择目标地区的银行账户接收换币资金。</p>
+
+<div class="highlight-box">
+    <div class="highlight-box-title">全球银行网络覆盖</div>
+    <p>BAXS依托加拿大持牌优势，与全球主要金融中心的持牌银行建立合作，为机构客户提供合规的多地区法币通道：</p>
+    <ul>
+        <li><strong>加拿大</strong>：本地银行账户，支持CAD出入金（Interac/EFT）</li>
+        <li><strong>美国</strong>：美国银行账户，支持USD出入金（Wire/ACH）</li>
+        <li><strong>香港</strong>：香港银行账户，支持HKD/USD出入金（RTGS/CHATS）</li>
+        <li><strong>新加坡</strong>：新加坡银行账户，支持SGD/USD出入金（MEPS/FAST）</li>
+    </ul>
+</div>
+
+<h3>核心功能点</h3>
+<ul>
+    <li><strong>多地区账户绑定</strong>：机构可提交加拿大、美国、香港、新加坡等地的银行账户信息</li>
+    <li><strong>地区路由选择</strong>：换币时可指定目标地区与币种，系统自动匹配最优银行通道</li>
+    <li><strong>账户验证</strong>：通过小额转账(micro-deposit)验证账户归属权</li>
+    <li><strong>账户状态管理</strong>：PENDING → VERIFIED → ACTIVE → FROZEN</li>
+    <li><strong>多币种出入金</strong>：支持CAD/USD/HKD/SGD的入金与出金记录</li>
+    <li><strong>账户限额</strong>：按地区/币种配置单日/单笔交易限额</li>
+    <li><strong>本地支付轨道</strong>：自动对接各地区的本地支付清算系统</li>
+</ul>
+
+<h3>支持的银行网络与支付轨道</h3>
+<table>
+    <caption data-label="表2-2a">全球银行网络与支付轨道</caption>
+    <thead>
+        <tr><th>地区</th><th>支持币种</th><th>本地支付轨道</th><th>到账时效</th><th>账户格式</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>加拿大</td><td>CAD</td><td>Interac e-Transfer / EFT</td><td>即时~1工作日</td><td>Institution + Transit + Account</td></tr>
+        <tr><td>美国</td><td>USD</td><td>Wire / ACH</td><td>即时~1~3工作日</td><td>Account Number + Routing Number</td></tr>
+        <tr><td>香港</td><td>HKD / USD</td><td>RTGS (CHATS) / FPS</td><td>即时~1工作日</td><td>Bank Code + Branch Code + Account</td></tr>
+        <tr><td>新加坡</td><td>SGD / USD</td><td>MEPS / FAST / GIRO</td><td>即时~1工作日</td><td>Bank Code + Branch Code + Account</td></tr>
+    </tbody>
+</table>
+
+<h3>数据模型</h3>
+<pre><code>BankAccount {
+  id: UUID
+  institution_id: UUID          // 所属机构
+  account_holder_name: String   // 账户持有人名称
+  region: CA | US | HK | SG     // 银行所在地区
+  // 加拿大格式
+  institution_number: String    // 加拿大金融机构号 (3位)
+  transit_number: String        // 分行号 (5位)
+  // 美国格式
+  routing_number: String        // 美国路由号码 (9位)
+  // 香港/新加坡格式
+  bank_code: String             // 银行代码
+  branch_code: String           // 分行代码
+  account_number: String        // 账号
+  account_type: CHEQUING | SAVING | CURRENT
+  currency: CAD | USD | HKD | SGD
+  status: PENDING | VERIFIED | ACTIVE | FROZEN
+  daily_limit: Decimal          // 单日限额
+  single_limit: Decimal         // 单笔限额
+  verified_at: Timestamp
+  created_at: Timestamp
+}</code></pre>
+
+<h3>地区路由逻辑</h3>
+<pre><code>换币目标选择:
+  1. 机构在创建换币订单时指定目标 region + currency
+     例: region="HK", currency="HKD"
+  
+  2. 系统根据 region 查询已绑定的银行账户列表
+     - 必须: account.status == ACTIVE
+     - 必须: account.currency == 目标币种
+     - 检查: 交易金额 <= account.single_limit
+     
+  3. 如机构未指定 region，系统提供智能路由建议
+     - 基于汇率优势
+     - 基于到账时效
+     - 基于历史使用偏好
+     
+  4. T-0 Network路由至对应地区的 Payout Provider
+     - HK → 香港Provider (RTGS/CHATS出金)
+     - SG → 新加坡Provider (FAST/MEPS出金)
+     - CA → 加拿大Provider (Interac/EFT出金)
+     - US → 美国Provider (Wire/ACH出金)</code></pre>
+
+<h2 id="sec2-3">2.3 USDT钱包管理模块</h2>
+
+<h3>功能描述</h3>
+<p>支持多链USDT钱包的创建、导入与管理，包括ETH(ERC-20)、Tron(TRC-20)、BSC(BEP-20)三条主流公链。</p>
+
+<h3>核心功能点</h3>
+<table>
+    <caption data-label="表2-3">USDT钱包管理功能</caption>
+    <thead>
+        <tr><th>功能</th><th>说明</th><th>技术实现</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>钱包创建</td>
+            <td>为机构生成新的多链钱包地址</td>
+            <td>HSM安全模块生成私钥，机构备份助记词</td>
+        </tr>
+        <tr>
+            <td>钱包导入</td>
+            <td>导入机构已有钱包地址</td>
+            <td>只读监控模式，验证地址所有权</td>
+        </tr>
+        <tr>
+            <td>地址白名单</td>
+            <td>管理T-0 Network的白名单地址</td>
+            <td>通过T-0 API注册whitelisted地址</td>
+        </tr>
+        <tr>
+            <td>余额监控</td>
+            <td>实时查询各链USDT余额</td>
+            <td>区块链节点 + 区块浏览器API</td>
+        </tr>
+        <tr>
+            <td>交易历史</td>
+            <td>查询USDT转账记录</td>
+            <td>链上事件监听与索引</td>
+        </tr>
+        <tr>
+            <td>多签管理</td>
+            <td>机构多签钱包配置</td>
+            <td>Gnosis Safe / 自定义多签合约</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>支持的区块链网络</h3>
+<pre><code>Ethereum (ERC-20 USDT)
+  - 合约地址: 0xdAC17F958D2ee523a2206206994597C13D831ec7
+  - 确认数: 12 blocks (~3 minutes)
+  - Gas Token: ETH
+
+Tron (TRC-20 USDT)  
+  - 合约地址: TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
+  - 确认数: 19 blocks (~1 minute)
+  - 资源模型: Bandwidth + Energy
+
+BSC (BEP-20 USDT)
+  - 合约地址: 0x55d398326f99059fF775485246999027B3197955
+  - 确认数: 15 blocks (~1.5 minutes)
+  - Gas Token: BNB</code></pre>
+
+<h2 id="sec2-4">2.4 报价与询价模块</h2>
+
+<h3>功能描述</h3>
+<p>集成T-0 Network的实时报价流，为机构客户提供USDT/CAD汇率的实时查询、锁定与比较功能。</p>
+
+<h3>核心功能点</h3>
+<ul>
+    <li><strong>实时报价流</strong>：T-0 Payout Provider持续推送USDT→CAD汇率，覆盖标准交易量档($1K, $5K, $10K, $25K, $250K, $1M)</li>
+    <li><strong>询价请求</strong>：机构指定金额获取精确报价，20-50ms响应</li>
+    <li><strong>报价锁定</strong>：获取的报价在有效期内(通常30秒~5分钟)可锁定</li>
+    <li><strong>历史汇率</strong>：汇率走势查询与分析</li>
+    <li><strong>最优路由</strong>：系统自动选择汇率最优、信用额度充足的Payout Provider</li>
+</ul>
+
+<h3>报价流程</h3>
+<pre><code>1. T-0 Payout Provider 推送实时报价流 (UpdateQuote RPC)
+   - 汇率档: $1K / $5K / $10K / $25K / $250K / $1M
+   - 有效期: 30秒 ~ 5分钟 (Provider设定)
+   
+2. BAXS机构客户发起询价 (GetQuote API)
+   Request: {
+     "amount": 50000,
+     "amount_currency": "USD",     // 或 "CAD"
+     "target_currency": "CAD"
+   }
+   
+3. T-0 Network返回最优报价 (Quote Response)
+   Response: {
+     "quote_id": "quote_abc123",
+     "payout_amount": 67500.00,     // CAD金额
+     "settlement_amount": 50000.00, // USDT金额
+     "rate": 1.3500,                // USDT/CAD汇率
+     "provider_id": "provider_xyz",
+     "expires_at": "2026-06-30T12:05:00Z",
+     "latency_ms": 35
+   }</code></pre>
+
+<h2 id="sec2-5">2.5 换币交易模块</h2>
+
+<h3>功能描述</h3>
+<p>核心交易模块，支持机构客户将USDT兑换为CAD法币。涵盖下单、区块链转账、状态追踪、到账通知的全流程。</p>
+
+<h3>交易类型</h3>
+<table>
+    <caption data-label="表2-4">交易类型定义</caption>
+    <thead>
+        <tr><th>类型</th><th>说明</th><th>资金流向</th><th>适用场景</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>即时换币</td>
+            <td>基于锁定报价的一次性兑换</td>
+            <td>USDT钱包 → T-0托管 → CAD银行账户</td>
+            <td>单笔大额换币</td>
+        </tr>
+        <tr>
+            <td>批量换币</td>
+            <td>多笔支付合并单次结算</td>
+            <td>多笔USDT合并 → 批量清算 → 多笔CAD付款</td>
+            <td>批量薪资/供应商付款</td>
+        </tr>
+        <tr>
+            <td>预约换币</td>
+            <td>设定目标汇率，达到后自动执行</td>
+            <td>条件触发后按即时换币流程</td>
+            <td>汇率敏感型客户</td>
+        </tr>
+        <tr>
+            <td>定期换币</td>
+            <td>按固定周期自动换币</td>
+            <td>定时触发后按即时换币流程</td>
+            <td>定期结算需求</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>交易状态机</h3>
+<pre><code>CREATED → QUOTED → SETTLING → SETTLED → PAYOUT_PENDING → PAYOUT_SENT → COMPLETED
+            ↓           ↓            ↓
+         EXPIRED   FAILED       REJECTED
+
+CREATED:      交易已创建，等待获取报价
+QUOTED:       已获取报价，等待USDT转账
+SETTLING:     USDT已发出，等待区块链确认
+SETTLED:      区块链确认完成，T-0已确认到账
+PAYOUT_PENDING: T-0正在处理CAD付款
+PAYOUT_SENT:  CAD已发出，等待银行清算
+COMPLETED:    CAD已到账，交易完成</code></pre>
+
+<h2 id="sec2-6">2.6 清结算与对账模块</h2>
+
+<h3>功能描述</h3>
+<p>通过T-0 Network的清结算网络完成USDT与CAD的最终清算，包括信用额度管理、交易对账、费用结算等功能。</p>
+
+<h3>核心功能点</h3>
+<ul>
+    <li><strong>预结算</strong>：机构提前将USDT转入T-0托管地址，获取信用额度</li>
+    <li><strong>信用额度管理</strong>：实时监控可用信用额度，防止超额交易</li>
+    <li><strong>实时对账</strong>：通过Credit Usage Notification实时同步交易与结算记录</li>
+    <li><strong>费用结算</strong>：自动计算并扣除交易手续费</li>
+    <li><strong>报表导出</strong>：支持交易明细、结算汇总、合规报告的导出</li>
+</ul>
+
+<h3>清结算流程</h3>
+<pre><code>1. 预结算 (Pre-Settlement)
+   - 机构将USDT从白名单钱包转入T-0 Payout Provider钱包
+   - 区块链确认后，信用额度自动增加
+   
+2. 交易扣减
+   - 每笔换币交易完成后，信用额度相应扣减
+   - 实时通知OFI和Payout Provider
+   
+3. 定期结算
+   - 系统定期自动生成对账单
+   - 费用从信用额度中扣除或单独结算
+   
+4. 合规报告
+   - 自动生成Travel Rule合规报告
+   - 支持监管机构审计要求</code></pre>
+
+
+
+<!-- ==================== SECTION 3 ==================== -->
+<h1 id="sec3" class="page-break">3. 系统架构设计</h1>
+
+<h2 id="sec3-1">3.1 总体架构</h2>
+
+<p>BAXS × T-0 Network机构换币平台采用分层架构设计，从客户端到清结算网络共划分为四个核心层，确保系统的可扩展性、安全性与可维护性。</p>
+
+<figure id="fig-1">
+    <img src="baxs_t0_architecture.png" alt="系统架构图">
+    <figcaption data-label="图3-1">BAXS × T-0 Network 机构换币系统架构图</figcaption>
+</figure>
+
+<h3>架构分层说明</h3>
+<table>
+    <caption data-label="表3-1">架构分层定义</caption>
+    <thead>
+        <tr><th>层级</th><th>组件</th><th>职责</th><th>技术栈</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>客户端层</td>
+            <td>Web Portal, Mobile App, API SDK</td>
+            <td>机构用户交互界面</td>
+            <td>React, React Native, REST API</td>
+        </tr>
+        <tr>
+            <td>BAXS核心层</td>
+            <td>用户管理, 钱包系统, 报价引擎, 订单系统</td>
+            <td>业务逻辑处理与数据管理</td>
+            <td>Go/Rust, PostgreSQL, Redis</td>
+        </tr>
+        <tr>
+            <td>T-0集成层</td>
+            <td>API网关, 认证模块, 协议适配器</td>
+            <td>T-0 Network协议对接与数据转换</td>
+            <td>gRPC, Protocol Buffers, REST</td>
+        </tr>
+        <tr>
+            <td>清结算层</td>
+            <td>T-0 Network, 区块链节点, 全球银行系统(CA/US/HK/SG)</td>
+            <td>最终清结算与多地区资金交割</td>
+            <td>Ethereum/Tron/BSC Nodes, Global Banking APIs</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="sec3-2">3.2 核心系统模块</h2>
+
+<h3>3.2.1 用户管理系统 (UMS)</h3>
+<p>负责机构客户的全生命周期管理，包括注册、KYC、权限控制与审计日志。</p>
+<pre><code>模块: UserManagementService
+职责:
+  - 机构注册与身份验证
+  - KYC资料收集与审核工作流
+  - UBO(受益所有人)识别与验证
+  - 角色权限管理 (RBAC)
+  - 操作审计日志
+
+数据模型:
+  Institution { id, legal_name, status, kyc_level, risk_rating, created_at }
+  User { id, institution_id, email, role, mfa_enabled, status }
+  KYCProfile { institution_id, document_type, document_url, verified_at }
+  AuditLog { user_id, action, resource, timestamp, ip_address }</code></pre>
+
+<h3>3.2.2 钱包管理系统 (WMS)</h3>
+<p>管理多链USDT钱包，支持地址生成、余额查询、交易监控与白名单管理。</p>
+<pre><code>模块: WalletManagementService
+职责:
+  - 多链钱包地址生成 (ETH/Tron/BSC)
+  - 私钥安全存储 (HSM/KMS)
+  - 余额实时监控
+  - 交易事件监听与索引
+  - T-0地址白名单同步
+
+技术架构:
+  - 私钥管理: AWS KMS / Azure Key Vault / Thales HSM
+  - 节点连接: 自建全节点 + 第三方RPC (Infura/QuickNode)
+  - 事件监听: WebSocket订阅 + 轮询备用
+  - 交易索引: PostgreSQL + 区块高度游标</code></pre>
+
+<h3>3.2.3 报价引擎 (QE)</h3>
+<p>集成T-0 Network的报价流，为机构客户提供实时、准确的汇率信息。</p>
+<pre><code>模块: QuoteEngineService
+职责:
+  - T-0报价流订阅与缓存
+  - 询价请求路由与响应
+  - 报价有效期管理
+  - 汇率历史存储与分析
+
+数据流:
+  T-0 Network → gRPC Stream → Quote Cache → REST API → Client
+                           ↓
+                    Historical DB (时序数据)</code></pre>
+
+<h3>3.2.4 订单管理系统 (OMS)</h3>
+<p>核心交易引擎，管理换币订单的全生命周期，与T-0 Network深度集成。</p>
+<pre><code>模块: OrderManagementService
+职责:
+  - 换币订单创建与验证
+  - 交易状态机管理
+  - 区块链交易监听与确认
+  - T-0 Payment API调用
+  - 异常处理与重试机制
+
+关键设计:
+  - 幂等性: 所有操作基于uuidempotent key
+  - 分布式锁: 防止并发修改同一订单
+  - 事务补偿: Sagas模式处理长事务
+  - 死信队列: 失败操作自动重试与告警</code></pre>
+
+<h3>3.2.5 清结算系统 (SS)</h3>
+<p>对接T-0 Network的清结算网络，管理信用额度、对账与费用结算。</p>
+<pre><code>模块: SettlementService
+职责:
+  - 信用额度实时监控
+  - T-0 Credit Usage Notification处理
+  - 交易对账与差异处理
+  - 费用计算与结算
+  - 合规报告生成
+
+对账流程:
+  1. 定时拉取T-0交易流水
+  2. 与本地交易记录逐笔比对
+  3. 标记差异项并触发人工复核
+  4. 生成对账报告并归档</code></pre>
+
+<h2 id="sec3-3">3.3 数据流设计</h2>
+
+<h3>核心数据流</h3>
+<p>系统涉及四个核心数据流：报价流、交易流、清算流和通知流。</p>
+
+<table>
+    <caption data-label="表3-2">数据流定义</caption>
+    <thead>
+        <tr><th>数据流</th><th>方向</th><th>协议</th><th>频率</th><th>延迟要求</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>报价流</td><td>T-0 → BAXS</td><td>gRPC Streaming</td><td>持续</td><td>&lt; 100ms</td></tr>
+        <tr><td>交易流</td><td>BAXS → T-0</td><td>gRPC Unary</td><td>实时</td><td>&lt; 200ms</td></tr>
+        <tr><td>清算流</td><td>T-0 ↔ BAXS</td><td>gRPC Bidirectional</td><td>事件驱动</td><td>&lt; 500ms</td></tr>
+        <tr><td>通知流</td><td>T-0 → BAXS</td><td>Webhook + gRPC</td><td>事件驱动</td><td>&lt; 1s</td></tr>
+        <tr><td>区块链事件</td><td>链 → BAXS</td><td>WebSocket</td><td>事件驱动</td><td>1-2分钟(确认)</td></tr>
+    </tbody>
+</table>
+
+<h3>事件驱动架构</h3>
+<p>系统采用事件驱动架构(EDA)确保各模块间的松耦合与异步处理。</p>
+<pre><code>事件总线: Apache Kafka / AWS EventBridge
+
+核心事件:
+  - InstitutionRegistered    // 机构注册完成
+  - KYCVerified              // KYC审核通过
+  - WalletCreated            // 钱包创建完成
+  - QuoteReceived            // 新报价到达
+  - OrderCreated             // 订单创建
+  - SettlementConfirmed      // 结算确认
+  - PayoutCompleted          // 付款完成
+  - CreditUpdated            // 信用额度更新
+
+消费者组:
+  - notification-service     // 发送邮件/短信通知
+  - audit-service            // 记录审计日志
+  - analytics-service        // 更新分析数据
+  - compliance-service       // 合规检查与报告</code></pre>
+
+<!-- ==================== SECTION 4 ==================== -->
+<h1 id="sec4" class="page-break">4. API接口设计</h1>
+
+<p>本节定义BAXS平台对外暴露的RESTful API接口，供机构客户集成。同时包含与T-0 Network的内部gRPC接口映射。</p>
+
+<h2 id="sec4-1">4.1 认证与授权接口</h2>
+
+<h3>获取访问令牌</h3>
+<div class="api-endpoint">
+    <span class="api-method method-post">POST</span> /v1/auth/token
+</div>
+<pre><code>Request:
+{
+  "grant_type": "client_credentials",
+  "client_id": "{institution_client_id}",
+  "client_secret": "{institution_client_secret}"
+}
+
+Response:
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIs...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "quotes:read orders:write settlements:read"
+}</code></pre>
+
+<h3>刷新令牌</h3>
+<div class="api-endpoint">
+    <span class="api-method method-post">POST</span> /v1/auth/refresh
+</div>
+
+<h2 id="sec4-2">4.2 KYC管理接口</h2>
+
+<h3>提交KYC资料</h3>
+<div class="api-endpoint">
+    <span class="api-method method-post">POST</span> /v1/institutions/{id}/kyc
+</div>
+<pre><code>Request:
+{
+  "legal_name": "ABC Trading Corp",
+  "registration_number": "BC1234567",
+  "incorporation_date": "2020-01-15",
+  "legal_address": {
+    "street": "123 Main St",
+    "city": "Vancouver",
+    "province": "BC",
+    "postal_code": "V6B 1A1",
+    "country": "CA"
+  },
+  "business_type": "CRYPTO_EXCHANGE",
+  "ubo": [
+    {
+      "full_name": "John Smith",
+      "ownership_percentage": 51,
+      "id_document": {
+        "type": "PASSPORT",
+        "number": "AB123456",
+        "expiry_date": "2030-05-20"
+      }
+    }
+  ],
+  "authorized_persons": [
+    {
+      "full_name": "Jane Doe",
+      "title": "CFO",
+      "email": "jane@abctrading.ca",
+      "phone": "+1-604-555-0123"
+    }
+  ]
+}
+
+Response:
+{
+  "kyc_id": "kyc_abc123",
+  "status": "SUBMITTED",
+  "submitted_at": "2026-06-30T10:00:00Z",
+  "estimated_review_time": "24-48 hours"
+}</code></pre>
+
+<h3>查询KYC状态</h3>
+<div class="api-endpoint">
+    <span class="api-method method-get">GET</span> /v1/institutions/{id}/kyc/status
+</div>
+<pre><code>Response:
+{
+  "kyc_id": "kyc_abc123",
+  "status": "VERIFIED",  // PENDING | SUBMITTED | UNDER_REVIEW | VERIFIED | REJECTED
+  "verified_at": "2026-07-01T14:30:00Z",
+  "kyc_level": "ENHANCED",
+  "t0_did": "did:t0:inst_abc123xyz",
+  "daily_limit": 1000000,
+  "single_limit": 500000
+}</code></pre>
+
+<h2 id="sec4-3">4.3 账户管理接口</h2>
+
+<h3>绑定银行账户（全球多地区）</h3>
+<div class="api-endpoint">
+    <span class="api-method method-post">POST</span> /v1/institutions/{id}/bank-accounts
+</div>
+<pre><code>Request:
+{
+  "account_holder_name": "ABC Trading Corp",
+  "region": "CA",                    // CA | US | HK | SG
+  "currency": "CAD",                 // CAD | USD | HKD | SGD
+  // 加拿大格式
+  "institution_number": "001",       // Bank of Montreal
+  "transit_number": "00001",
+  // 或美国格式
+  "routing_number": "021000021",
+  // 或香港/新加坡格式
+  "bank_code": "004",
+  "branch_code": "001",
+  "account_number": "1234567890",
+  "account_type": "CHEQUING"
+}
+
+Response:
+{
+  "account_id": "ba_xyz789",
+  "region": "CA",
+  "currency": "CAD",
+  "status": "PENDING_VERIFICATION",
+  "verification_method": "MICRO_DEPOSIT",
+  "micro_deposit_sent": true,
+  "verification_deadline": "2026-07-07T10:00:00Z"
+}</code></pre>
+
+<h3>查询支持地区与币种</h3>
+<div class="api-endpoint">
+    <span class="api-method method-get">GET</span> /v1/banking/regions
+</div>
+<pre><code>Response:
+{
+  "regions": [
+    {
+      "code": "CA",
+      "name": "Canada",
+      "country_code": "CA",
+      "currencies": ["CAD"],
+      "payment_rails": ["INTERAC", "EFT"],
+      "daily_limit": 1000000,
+      "settlement_time": "instant~1day"
+    },
+    {
+      "code": "US",
+      "name": "United States",
+      "country_code": "US",
+      "currencies": ["USD"],
+      "payment_rails": ["WIRE", "ACH"],
+      "daily_limit": 1000000,
+      "settlement_time": "instant~3days"
+    },
+    {
+      "code": "HK",
+      "name": "Hong Kong",
+      "country_code": "HK",
+      "currencies": ["HKD", "USD"],
+      "payment_rails": ["RTGS", "CHATS", "FPS"],
+      "daily_limit": 5000000,
+      "settlement_time": "instant~1day"
+    },
+    {
+      "code": "SG",
+      "name": "Singapore",
+      "country_code": "SG",
+      "currencies": ["SGD", "USD"],
+      "payment_rails": ["FAST", "MEPS", "GIRO"],
+      "daily_limit": 5000000,
+      "settlement_time": "instant~1day"
+    }
+  ]
+}</code></pre>
+
+<h3>管理USDT钱包</h3>
+<div class="api-endpoint">
+    <span class="api-method method-post">POST</span> /v1/institutions/{id}/wallets
+</div>
+<pre><code>Request:
+{
+  "blockchain": "ETHEREUM",  // ETHEREUM | TRON | BSC
+  "wallet_type": "DEPOSIT",  // DEPOSIT | WITHDRAWAL
+  "label": "Main ETH Wallet"
+}
+
+Response:
+{
+  "wallet_id": "wallet_def456",
+  "blockchain": "ETHEREUM",
+  "address": "0x742d35Cc6634C0532925a3b8D4C9db96590f6C7E",
+  "status": "ACTIVE",
+  "whitelist_status": "PENDING",  // 等待T-0 Network审核
+  "created_at": "2026-06-30T10:00:00Z"
+}</code></pre>
+
+<h3>查询钱包余额</h3>
+<div class="api-endpoint">
+    <span class="api-method method-get">GET</span> /v1/institutions/{id}/wallets/{wallet_id}/balance
+</div>
+<pre><code>Response:
+{
+  "wallet_id": "wallet_def456",
+  "address": "0x742d35Cc6634C0532925a3b8D4C9db96590f6C7E",
+  "balances": [
+    {
+      "token": "USDT",
+      "balance": "150000.00",
+      "balance_raw": "150000000000",
+      "decimals": 6
+    }
+  ],
+  "updated_at": "2026-06-30T12:00:00Z"
+}</code></pre>
+
+<h2 id="sec4-4">4.4 报价接口</h2>
+
+<h3>获取实时报价</h3>
+<div class="api-endpoint">
+    <span class="api-method method-post">POST</span> /v1/quotes
+</div>
+<pre><code>Request:
+{
+  "from_currency": "USDT",
+  "to_currency": "CAD",
+  "amount": 50000,
+  "amount_type": "FIXED_INPUT",  // FIXED_INPUT | FIXED_OUTPUT
+  "preferred_provider": null      // 可选：指定Payout Provider
+}
+
+Response:
+{
+  "quote_id": "quote_ghi789",
+  "from": {
+    "currency": "USDT",
+    "amount": "50000.00"
+  },
+  "to": {
+    "currency": "CAD", 
+    "amount": "67500.00"
+  },
+  "rate": 1.3500,
+  "provider": {
+    "id": "provider_canada_xyz",
+    "name": "Canadian Payout Provider Ltd"
+  },
+  "expires_at": "2026-06-30T12:05:00Z",
+  "valid_for_seconds": 300,
+  "fee": {
+    "amount": "25.00",
+    "currency": "CAD"
+  },
+  "settlement_blockchain": "ETHEREUM"
+}</code></pre>
+
+<h3>锁定报价</h3>
+<div class="api-endpoint">
+    <span class="api-method method-post">POST</span> /v1/quotes/{quote_id}/lock
+</div>
+<pre><code>Response:
+{
+  "quote_id": "quote_ghi789",
+  "status": "LOCKED",
+  "locked_at": "2026-06-30T12:00:30Z",
+  "locked_until": "2026-06-30T12:05:00Z"
+}</code></pre>
+
+<h2 id="sec4-5">4.5 换币交易接口</h2>
+
+<h3>创建换币订单</h3>
+<div class="api-endpoint">
+    <span class="api-method method-post">POST</span> /v1/orders
+</div>
+<pre><code>Request:
+{
+  "quote_id": "quote_ghi789",
+  "from_wallet_id": "wallet_def456",    // USDT来源钱包
+  "to_bank_account_id": "ba_xyz789",     // 目标银行账户
+  "target_region": "HK",                 // 可选: CA | US | HK | SG，默认从账户推导
+  "target_currency": "HKD",              // 可选: CAD | USD | HKD | SGD
+  "travel_rule_data": {
+    "originator": {
+      "name": "ABC Trading Corp",
+      "account_number": "wallet_def456",
+      "geographic_address": {
+        "country": "CA",
+        "city": "Vancouver"
+      }
+    },
+    "beneficiary": {
+      "name": "ABC Trading Corp",
+      "account_number": "ba_xyz789",
+      "geographic_address": {
+        "country": "HK",
+        "city": "Hong Kong"
+      }
+    }
+  },
+  "reference": "Invoice-2026-06-001",
+  "webhook_url": "https://api.abctrading.ca/webhooks/baxs"
+}
+
+Response:
+{
+  "order_id": "order_jkl012",
+  "status": "CREATED",
+  "quote": {
+    "from_amount": "50000.00",
+    "to_amount": "390000.00",           // HKD金额
+    "rate": 7.8000                       // USDT/HKD汇率
+  },
+  "settlement_address": "0xT0ProviderAddress...",
+  "blockchain": "ETHEREUM",
+  "target_region": "HK",
+  "target_currency": "HKD",
+  "payout_provider": "provider_hongkong_xyz",
+  "created_at": "2026-06-30T12:00:45Z",
+  "estimated_completion": "2026-06-30T12:05:00Z"
+}</code></pre>
+
+<h3>查询订单状态</h3>
+<div class="api-endpoint">
+    <span class="api-method method-get">GET</span> /v1/orders/{order_id}
+</div>
+<pre><code>Response:
+{
+  "order_id": "order_jkl012",
+  "status": "SETTLING",
+  "timeline": [
+    { "status": "CREATED", "timestamp": "2026-06-30T12:00:45Z" },
+    { "status": "QUOTED", "timestamp": "2026-06-30T12:00:46Z" },
+    { "status": "SETTLING", "timestamp": "2026-06-30T12:01:15Z" }
+  ],
+  "blockchain_tx": {
+    "tx_hash": "0xabc123...",
+    "confirmations": 3,
+    "required_confirmations": 12
+  },
+  "payout": {
+    "status": "PENDING",
+    "provider": "provider_canada_xyz"
+  }
+}</code></pre>
+
+<h3>获取订单列表</h3>
+<div class="api-endpoint">
+    <span class="api-method method-get">GET</span> /v1/institutions/{id}/orders?status=&from_date=&to_date=
+</div>
+
+<h2 id="sec4-6">4.6 清结算接口</h2>
+
+<h3>查询信用额度</h3>
+<div class="api-endpoint">
+    <span class="api-method method-get">GET</span> /v1/institutions/{id}/credit-limit
+</div>
+<pre><code>Response:
+{
+  "provider_id": "provider_canada_xyz",
+  "total_credit": "500000.00",
+  "used_credit": "150000.00",
+  "available_credit": "350000.00",
+  "currency": "USDT",
+  "updated_at": "2026-06-30T12:00:00Z"
+}</code></pre>
+
+<h3>预结算 - 充值USDT</h3>
+<div class="api-endpoint">
+    <span class="api-method method-post">POST</span> /v1/institutions/{id}/pre-settlement
+</div>
+<pre><code>Request:
+{
+  "amount": "100000.00",
+  "from_wallet_id": "wallet_def456",
+  "provider_id": "provider_canada_xyz"
+}
+
+Response:
+{
+  "settlement_id": "set_mno345",
+  "status": "PENDING_TRANSFER",
+  "to_address": "0xT0ProviderWhitelistAddress...",
+  "blockchain": "ETHEREUM",
+  "expires_at": "2026-06-30T13:00:00Z"
+  // 机构需要将USDT转账至指定地址
+}</code></pre>
+
+<h3>获取对账单</h3>
+<div class="api-endpoint">
+    <span class="api-method method-get">GET</span> /v1/institutions/{id}/statements?from_date=&to_date=
+</div>
+<pre><code>Response:
+{
+  "statement_id": "stmt_pqr678",
+  "period": { "from": "2026-06-01", "to": "2026-06-30" },
+  "opening_balance": "200000.00",
+  "closing_balance": "350000.00",
+  "transactions": [
+    {
+      "date": "2026-06-15",
+      "type": "SETTLEMENT",
+      "description": "USDT Pre-settlement",
+      "amount": "+100000.00",
+      "balance": "300000.00"
+    },
+    {
+      "date": "2026-06-20",
+      "type": "PAYOUT",
+      "description": "Order order_jkl012",
+      "amount": "-50000.00",
+      "balance": "250000.00"
+    }
+  ],
+  "fees": {
+    "total_fees": "125.00",
+    "fee_breakdown": [
+      { "type": "TRANSACTION_FEE", "amount": "100.00" },
+      { "type": "SETTLEMENT_FEE", "amount": "25.00" }
+    ]
+  }
+}</code></pre>
+
+<h3>Webhook通知</h3>
+<p>BAXS平台通过Webhook向机构客户推送实时事件通知。</p>
+<pre><code>Webhook事件类型:
+
+1. order.status_updated
+{
+  "event": "order.status_updated",
+  "timestamp": "2026-06-30T12:01:15Z",
+  "data": {
+    "order_id": "order_jkl012",
+    "old_status": "QUOTED",
+    "new_status": "SETTLING",
+    "blockchain_tx": { "tx_hash": "0xabc123...", "confirmations": 0 }
+  }
+}
+
+2. credit.updated
+{
+  "event": "credit.updated",
+  "timestamp": "2026-06-30T12:01:15Z",
+  "data": {
+    "provider_id": "provider_canada_xyz",
+    "change_amount": "+50000.00",
+    "new_available": "400000.00",
+    "reason": "SETTLEMENT_CONFIRMED"
+  }
+}</code></pre>
+
+
+
+<!-- ==================== SECTION 5 ==================== -->
+<h1 id="sec5" class="page-break">5. 交易流程设计</h1>
+
+<h2 id="sec5-1">5.1 完整交易流程</h2>
+
+<p>机构换币交易流程分为四个阶段：开户与KYC、报价与询价、换币交易、清结算。以下为完整的业务流程图。</p>
+
+<figure id="fig-2">
+    <img src="baxs_t0_flow.png" alt="交易流程图">
+    <figcaption data-label="图5-1">BAXS × T-0 Network 机构换币交易流程图</figcaption>
+</figure>
+
+<h3>阶段一：开户与KYC (T+0)</h3>
+
+<table>
+    <caption data-label="表5-1">开户流程步骤</caption>
+    <thead>
+        <tr><th>步骤</th><th>操作方</th><th>动作</th><th>系统处理</th><th>耗时</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>1</td><td>机构</td><td>提交注册申请</td><td>创建机构账户，发送验证邮件</td><td>实时</td></tr>
+        <tr><td>2</td><td>机构</td><td>验证邮箱，设置密码</td><td>激活账户状态</td><td>实时</td></tr>
+        <tr><td>3</td><td>机构</td><td>提交KYC资料</td><td>存储资料，启动审核流程（加拿大持牌审核）</td><td>5-15分钟</td></tr>
+        <tr><td>4</td><td>BAXS</td><td>自动+人工审核</td><td>验证企业资质、UBO身份</td><td>24-48小时</td></tr>
+        <tr><td>5</td><td>BAXS</td><td>同步T-0 Network</td><td>通过Identity API注册机构</td><td>&lt; 1分钟</td></tr>
+        <tr><td>6</td><td>T-0</td><td>返回机构DID</td><td>存储去中心化身份标识</td><td>实时</td></tr>
+        <tr><td>7</td><td>机构</td><td>绑定全球银行账户</td><td>支持CA/US/HK/SG多地区账户，小额验证</td><td>1-3工作日</td></tr>
+        <tr><td>8</td><td>机构</td><td>绑定USDT钱包</td><td>地址验证、白名单注册</td><td>实时</td></tr>
+    </tbody>
+</table>
+
+<h3>阶段二：报价与询价 (T+0, &lt; 1分钟)</h3>
+
+<table>
+    <caption data-label="表5-2">报价流程步骤</caption>
+    <thead>
+        <tr><th>步骤</th><th>操作方</th><th>动作</th><th>技术细节</th><th>耗时</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>1</td><td>T-0 Provider</td><td>推送实时报价</td><td>gRPC Streaming, UpdateQuote RPC</td><td>持续</td></tr>
+        <tr><td>2</td><td>机构</td><td>发起询价请求</td><td>GET /v1/quotes</td><td>&lt; 50ms</td></tr>
+        <tr><td>3</td><td>BAXS</td><td>路由至T-0</td><td>GetQuote RPC调用</td><td>&lt; 50ms</td></tr>
+        <tr><td>4</td><td>T-0</td><td>最优报价匹配</td><td>考虑汇率+信用额度</td><td>&lt; 50ms</td></tr>
+        <tr><td>5</td><td>T-0</td><td>返回报价</td><td>包含quote_id, rate, expiry</td><td>&lt; 50ms</td></tr>
+        <tr><td>6</td><td>机构</td><td>确认/拒绝报价</td><td>接受后锁定报价</td><td>用户决策</td></tr>
+    </tbody>
+</table>
+
+<h3>阶段三：换币交易 (T+0 ~ T+2分钟)</h3>
+
+<table>
+    <caption data-label="表5-3">交易流程步骤</caption>
+    <thead>
+        <tr><th>步骤</th><th>操作方</th><th>动作</th><th>技术细节</th><th>耗时</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>1</td><td>机构</td><td>创建换币订单</td><td>POST /v1/orders, 含Travel Rule数据</td><td>实时</td></tr>
+        <tr><td>2</td><td>BAXS</td><td>验证订单</td><td>检查报价有效性、信用额度</td><td>&lt; 100ms</td></tr>
+        <tr><td>3</td><td>BAXS</td><td>发起USDT转账</td><td>调用钱包系统签名并广播交易</td><td>&lt; 30s</td></tr>
+        <tr><td>4</td><td>区块链</td><td>交易确认</td><td>ETH: 12确认, Tron: 19确认</td><td>1-2分钟</td></tr>
+        <tr><td>5</td><td>T-0</td><td>监测到到账</td><td>白名单地址间转账自动识别</td><td>实时</td></tr>
+        <tr><td>6</td><td>T-0</td><td>更新信用额度</td><td>Credit Usage Notification</td><td>实时</td></tr>
+        <tr><td>7</td><td>T-0</td><td>下发付款指令</td><td>PayOut RPC调用对应地区Provider</td><td>&lt; 30s</td></tr>
+        <tr><td>8</td><td>Provider</td><td>执行本地付款</td><td>通过目标地区银行系统(CA:Interac/US:Wire/HK:RTGS/SG:FAST)</td><td>即时~1天</td></tr>
+        <tr><td>9</td><td>BAXS</td><td>通知机构到账</td><td>Webhook + 邮件通知（含到账币种与地区）</td><td>实时</td></tr>
+    </tbody>
+</table>
+
+<h3>阶段四：清结算 (T+0)</h3>
+
+<table>
+    <caption data-label="表5-4">清结算流程步骤</caption>
+    <thead>
+        <tr><th>步骤</th><th>操作方</th><th>动作</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>1</td><td>T-0</td><td>记账更新</td><td>内部账本记录交易</td></tr>
+        <tr><td>2</td><td>T-0</td><td>信用额度扣减</td><td>OFI可用额度减少</td></tr>
+        <tr><td>3</td><td>T-0</td><td>费用计算</td><td>按交易金额比例收取手续费</td></tr>
+        <tr><td>4</td><td>BAXS</td><td>同步交易状态</td><td>接收Credit Usage Notification</td></tr>
+        <tr><td>5</td><td>BAXS</td><td>更新本地订单状态</td><td>状态机推进至COMPLETED</td></tr>
+        <tr><td>6</td><td>BAXS</td><td>生成合规报告</td><td>Travel Rule数据归档</td></tr>
+    </tbody>
+</table>
+
+<h2 id="sec5-2">5.2 异常处理流程</h2>
+
+<h3>异常场景定义</h3>
+<table>
+    <caption data-label="表5-5">异常场景与处理方案</caption>
+    <thead>
+        <tr><th>异常场景</th><th>触发条件</th><th>处理方案</th><th>通知方式</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>报价过期</td>
+            <td>订单创建时报价已失效</td>
+            <td>自动重新询价，新报价需用户确认</td>
+            <td>实时通知 + 邮件</td>
+        </tr>
+        <tr>
+            <td>区块链交易失败</td>
+            <td>Gas不足或交易被回滚</td>
+            <td>自动重试(最多3次)，失败后人工介入</td>
+            <td>实时告警 + 工单</td>
+        </tr>
+        <tr>
+            <td>确认超时</td>
+            <td>超过30分钟未获足够确认</td>
+            <td>标记为异常，启动链上核查</td>
+            <td>告警 + 人工处理</td>
+        </tr>
+        <tr>
+            <td>Provider拒绝付款</td>
+            <td>AML规则触发或账户异常</td>
+            <td>释放信用额度，退款或重新路由</td>
+            <td>实时通知 + 电话</td>
+        </tr>
+        <tr>
+            <td>银行账户异常</td>
+            <td>账户冻结或信息变更</td>
+            <td>暂停相关交易，通知更新账户</td>
+            <td>邮件 + 短信</td>
+        </tr>
+        <tr>
+            <td>信用额度不足</td>
+            <td>交易金额超可用额度</td>
+            <td>拒绝交易，提示预结算充值</td>
+            <td>实时通知</td>
+        </tr>
+        <tr>
+            <td>系统超时</td>
+            <td>T-0 API响应超时</td>
+            <td>自动降级，使用缓存报价</td>
+            <td>监控告警</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>退款流程</h3>
+<pre><code>触发条件:
+  - 机构主动取消交易(SETTLING之前)
+  - Provider拒绝执行付款
+  - 系统异常导致交易无法完成
+
+流程:
+  1. 系统将交易标记为 FAILED/REFUNDING
+  2. 释放已锁定的信用额度
+  3. 如USDT已到账，发起退款转账
+  4. 退款确认后标记为 REFUNDED
+  5. 通知机构退款完成
+
+时效:
+  - 未发起USDT转账: 即时退款
+  - USDT已到账: 1-2个工作日
+  - CAD已发出: 按银行退款流程，3-5个工作日</code></pre>
+
+<!-- ==================== SECTION 6 ==================== -->
+<h1 id="sec6" class="page-break">6. 安全与合规设计</h1>
+
+<h2 id="sec6-1">6.1 KYC/AML合规</h2>
+
+<h3>FATF Travel Rule合规</h3>
+<p>平台严格遵循FATF Recommendation 16 (Travel Rule)，对每笔超过1000 USD/EUR的虚拟资产转账收集、验证并共享交易双方信息。</p>
+
+<div class="highlight-box">
+    <div class="highlight-box-title">Travel Rule数据要求 (IVMS101标准)</div>
+    <ul>
+        <li><strong>发送方信息(Originator)</strong>：姓名、账号、地址、国家</li>
+        <li><strong>接收方信息(Beneficiary)</strong>：姓名、账号</li>
+        <li><strong>交易信息</strong>：金额、币种、时间戳</li>
+        <li><strong>额外字段</strong>：交易参考号、合规备注</li>
+    </ul>
+</div>
+
+<h3>KYC分级体系</h3>
+<table>
+    <caption data-label="表6-1">KYC分级与权限</caption>
+    <thead>
+        <tr><th>等级</th><th>要求</th><th>日限额</th><th>单笔限额</th><th>功能</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>BASIC</td><td>企业基本信息</td><td>$10,000</td><td>$5,000</td><td>询价、小额测试交易</td></tr>
+        <tr><td>STANDARD</td><td>+ 资质文件审核</td><td>$100,000</td><td>$50,000</td><td>完整换币功能</td></tr>
+        <tr><td>ENHANCED</td><td>+ UBO审核 + 现场尽调</td><td>$1,000,000</td><td>$500,000</td><td>大额交易 + 优先服务</td></tr>
+        <tr><td>INSTITUTIONAL</td><td>+ 持续监控 + 年度审计</td><td>无上限</td><td>$5,000,000</td><td>全部功能 + API直连</td></tr>
+    </tbody>
+</table>
+
+<h3>AML监控规则</h3>
+<pre><code>实时监控:
+  - 交易金额异常 (超过历史平均10倍)
+  - 交易频率异常 (1小时内超过10笔)
+  - 高风险国家/地区交易
+  - 与制裁名单地址的交互
+  - 快进快出模式 (USDT到账后5分钟内发起CAD付款)
+
+定期审查:
+  - 月度交易模式分析
+  - 年度KYC信息更新
+  - 风险评级重新评估
+
+报告义务:
+  - 可疑交易报告(STR) → FINTRAC
+  - 大额现金交易报告(LCTR) → 超过$10,000
+  - 电子资金转账报告(EFTR) → 跨境转账</code></pre>
+
+<h2 id="sec6-2">6.2 数据安全</h2>
+
+<h3>传输安全</h3>
+<ul>
+    <li><strong>TLS 1.3</strong>：所有API通信强制使用TLS 1.3加密</li>
+    <li><strong>mTLS</strong>：BAXS与T-0 Network间使用双向TLS认证</li>
+    <li><strong>证书固定</strong>：移动端实施证书固定(Certificate Pinning)防止中间人攻击</li>
+</ul>
+
+<h3>存储安全</h3>
+<table>
+    <caption data-label="表6-2">数据分类与保护</caption>
+    <thead>
+        <tr><th>数据类型</th><th>分类</th><th>存储方式</th><th>加密</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>私钥/助记词</td><td>极度敏感</td><td>HSM硬件安全模块</td><td>AES-256-GCM</td></tr>
+        <tr><td>KYC证件</td><td>敏感</td><td>加密对象存储</td><td>AES-256</td></tr>
+        <tr><td>银行账户</td><td>敏感</td><td>加密数据库字段</td><td>AES-256</td></tr>
+        <tr><td>交易记录</td><td>内部</td><td>数据库 + 审计日志</td><td>TLS传输加密</td></tr>
+        <tr><td>报价数据</td><td>公开</td><td>缓存 + 数据库</td><td>TLS传输加密</td></tr>
+    </tbody>
+</table>
+
+<h3>访问控制</h3>
+<pre><code>RBAC权限模型:
+  - Super Admin: 系统管理、机构审核
+  - Institution Admin: 机构设置、用户管理
+  - Trader: 发起交易、查看报价
+  - Viewer: 只读权限、报表查看
+  - API Key: 程序化访问，细粒度权限控制
+
+安全措施:
+  - 强制MFA (TOTP/SMS)
+  - 登录失败锁定 (5次失败后锁定30分钟)
+  - 会话超时 (2小时无操作自动登出)
+  - IP白名单 (API访问限制指定IP)
+  - 操作审计 (所有敏感操作记录完整日志)</code></pre>
+
+<h2 id="sec6-3">6.3 资金安全</h2>
+
+<h3>钱包安全架构</h3>
+<pre><code>私钥管理:
+  - 生成: HSM内生成，私钥永不离开安全模块
+  - 备份: Shamir Secret Sharing (3-of-5) 分片备份
+  - 恢复: 需多方授权才能重组私钥
+  - 轮换: 定期轮换地址，旧地址监控6个月
+
+交易签名:
+  - 热钱包: 自动签名，限额管理
+  - 温钱包: 多签授权，2-of-3签名
+  - 冷钱包: 离线签名，人工审批
+
+风控规则:
+  - 单笔限额: 根据KYC等级设定
+  - 日累计限额: 24小时滚动窗口
+  - 地址白名单: 只允许向T-0白名单地址转账
+  - 异常告警: 大额交易实时人工审核</code></pre>
+
+<h3>资金隔离</h3>
+<p>客户资金与公司运营资金完全隔离，USDT存储在独立的多签钱包中，CAD存放在 segregated bank account。</p>
+
+<!-- ==================== SECTION 7 ==================== -->
+<h1 id="sec7" class="page-break">7. 实施路线图</h1>
+
+<h2 id="sec7-1">7.1 里程碑规划</h2>
+
+<table>
+    <caption data-label="表7-1">项目实施路线图</caption>
+    <thead>
+        <tr><th>阶段</th><th>时间</th><th>目标</th><th>交付物</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>M1: 基础架构</strong></td>
+            <td>第1-4周</td>
+            <td>完成技术选型、环境搭建、T-0 API对接</td>
+            <td>技术架构文档、开发环境、API SDK</td>
+        </tr>
+        <tr>
+            <td><strong>M2: 核心功能</strong></td>
+            <td>第5-10周</td>
+            <td>实现开户、KYC、钱包管理、报价功能</td>
+            <td>用户系统、钱包系统、报价引擎</td>
+        </tr>
+        <tr>
+            <td><strong>M3: 交易功能</strong></td>
+            <td>第11-14周</td>
+            <td>实现换币交易、区块链集成、状态追踪</td>
+            <td>订单系统、区块链监听器、通知系统</td>
+        </tr>
+        <tr>
+            <td><strong>M4: 清结算</strong></td>
+            <td>第15-18周</td>
+            <td>实现清结算对接、对账、报告功能</td>
+            <td>结算系统、对账模块、报表系统</td>
+        </tr>
+        <tr>
+            <td><strong>M5: 安全合规</strong></td>
+            <td>第19-22周</td>
+            <td>完成安全审计、合规审查、渗透测试</td>
+            <td>安全审计报告、合规认证</td>
+        </tr>
+        <tr>
+            <td><strong>M6: 试运行</strong></td>
+            <td>第23-26周</td>
+            <td>内测、邀请客户试用、反馈迭代</td>
+            <td>测试报告、问题修复、性能优化</td>
+        </tr>
+        <tr>
+            <td><strong>M7: 正式上线</strong></td>
+            <td>第27-28周</td>
+            <td>生产环境部署、客户 onboarding</td>
+            <td>生产系统、运维监控、用户手册</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>详细迭代计划</h3>
+
+<pre><code>Sprint 1-2: 基础设施
+  - 开发环境搭建 (AWS/Azure)
+  - CI/CD流水线配置
+  - 数据库设计与迁移
+  - T-0 Network API接入准备
+
+Sprint 3-4: 用户系统
+  - 机构注册与认证
+  - KYC资料收集表单
+  - 基础RBAC权限
+  - 审计日志框架
+
+Sprint 5-6: KYC与合规
+  - KYC工作流引擎
+  - 文档上传与存储
+  - UBO收集界面
+  - Travel Rule数据结构
+
+Sprint 7-8: 钱包系统
+  - 多链钱包生成 (ETH/Tron/BSC)
+  - HSM集成
+  - 余额查询API
+  - 地址白名单管理
+
+Sprint 9-10: 报价引擎
+  - T-0 Quote API对接
+  - 报价缓存与分发
+  - 询价接口
+  - 汇率历史存储
+
+Sprint 11-12: 交易核心
+  - 订单创建与状态机
+  - USDT转账签名与广播
+  - 区块链交易监听
+  - Webhook通知系统
+
+Sprint 13-14: 交易完善
+  - 批量交易支持
+  - 预约/定期换币
+  - 交易历史与查询
+  - 异常处理与退款
+
+Sprint 15-16: 清结算
+  - T-0 Settlement API对接
+  - 信用额度管理
+  - 对账引擎
+  - 费用计算
+
+Sprint 17-18: 报表与分析
+  - 交易报表导出
+  - 合规报告生成
+  - 管理后台仪表盘
+  - API使用量统计
+
+Sprint 19-20: 安全加固
+  - 渗透测试
+  - 代码审计
+  - 安全监控部署
+  - 灾备方案实施
+
+Sprint 21-22: 合规审查
+  - FINTRAC合规审查
+  - 法律顾问审核
+  - 隐私政策更新
+  - 用户协议制定
+
+Sprint 23-24: 测试
+  - 集成测试
+  - 性能测试 (目标: 100 TPS)
+  - 用户验收测试
+  - 安全测试
+
+Sprint 25-26: 优化
+  - 性能调优
+  - Bug修复
+  - 文档完善
+  - 培训材料准备
+
+Sprint 27-28: 上线
+  - 生产环境部署
+  - 监控告警配置
+  - 客户 onboarding
+  - 运营手册交付</code></pre>
+
+<h2 id="sec7-2">7.2 资源需求</h2>
+
+<h3>团队配置</h3>
+<table>
+    <caption data-label="表7-2">团队配置建议</caption>
+    <thead>
+        <tr><th>角色</th><th>人数</th><th>职责</th><th>周期</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>项目经理</td><td>1</td><td>项目统筹、进度管理、客户沟通</td><td>全程</td></tr>
+        <tr><td>产品经理</td><td>1</td><td>需求分析、原型设计、验收标准</td><td>全程</td></tr>
+        <tr><td>后端工程师(Go/Rust)</td><td>3</td><td>核心服务开发、API实现</td><td>M1-M6</td></tr>
+        <tr><td>区块链工程师</td><td>1</td><td>钱包集成、链上交互、智能合约</td><td>M2-M5</td></tr>
+        <tr><td>前端工程师</td><td>2</td><td>Web Portal、管理后台开发</td><td>M2-M6</td></tr>
+        <tr><td>DevOps工程师</td><td>1</td><td>基础设施、CI/CD、监控</td><td>M1-M7</td></tr>
+        <tr><td>安全工程师</td><td>1</td><td>安全架构、渗透测试、审计</td><td>M3-M5</td></tr>
+        <tr><td>合规专员</td><td>1</td><td>KYC/AML流程、监管沟通</td><td>M2-M5</td></tr>
+        <tr><td>QA工程师</td><td>1</td><td>测试用例、自动化测试、UAT</td><td>M4-M6</td></tr>
+    </tbody>
+</table>
+
+<h3>技术栈</h3>
+<table>
+    <caption data-label="表7-3">技术栈选型</caption>
+    <thead>
+        <tr><th>层级</th><th>技术选型</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>后端语言</td><td>Go 1.22+</td><td>高性能、强类型、并发友好</td></tr>
+        <tr><td>区块链</td><td>Rust + ethers-rs/web3</td><td>安全、高性能链上交互</td></tr>
+        <tr><td>数据库</td><td>PostgreSQL 16 + Redis 7</td><td>关系型数据 + 缓存</td></tr>
+        <tr><td>消息队列</td><td>Apache Kafka</td><td>事件驱动架构</td></tr>
+        <tr><td>API协议</td><td>REST (外部) + gRPC (内部)</td><td>标准、高效</td></tr>
+        <tr><td>前端</td><td>React 18 + TypeScript</td><td>组件化、类型安全</td></tr>
+        <tr><td>基础设施</td><td>AWS EKS + Terraform</td><td>云原生、基础设施即代码</td></tr>
+        <tr><td>监控</td><td>Prometheus + Grafana</td><td>指标收集与可视化</td></tr>
+        <tr><td>日志</td><td>ELK Stack</td><td>集中式日志管理</td></tr>
+        <tr><td>HSM</td><td>AWS CloudHSM / Thales Luna 7</td><td>硬件级私钥保护</td></tr>
+    </tbody>
+</table>
+
+<!-- ==================== SECTION 8 ==================== -->
+<h1 id="sec8" class="page-break">8. 风险分析与应对</h1>
+
+<table>
+    <caption data-label="表8-1">风险登记册</caption>
+    <thead>
+        <tr><th>风险</th><th>类别</th><th>概率</th><th>影响</th><th>应对方案</th><th>责任人</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>监管政策变化</td>
+            <td>合规</td>
+            <td>中</td>
+            <td>高</td>
+            <td>密切跟踪OSFI/FINTRAC政策，预留合规调整时间</td>
+            <td>合规专员</td>
+        </tr>
+        <tr>
+            <td>T-0 API变更</td>
+            <td>技术</td>
+            <td>中</td>
+            <td>中</td>
+            <td>API版本管理，适配层设计，定期同步</td>
+            <td>技术负责人</td>
+        </tr>
+        <tr>
+            <td>智能合约漏洞</td>
+            <td>技术</td>
+            <td>低</td>
+            <td>极高</td>
+            <td>使用成熟合约，第三方审计，多签保护</td>
+            <td>安全工程师</td>
+        </tr>
+        <tr>
+            <td>私钥泄露</td>
+            <td>安全</td>
+            <td>低</td>
+            <td>极高</td>
+            <td>HSM存储，Shamir分片，定期轮换</td>
+            <td>安全工程师</td>
+        </tr>
+        <tr>
+            <td>汇率大幅波动</td>
+            <td>市场</td>
+            <td>高</td>
+            <td>中</td>
+            <td>报价有效期控制，汇率波动告警，风险准备金</td>
+            <td>产品经理</td>
+        </tr>
+        <tr>
+            <td>银行合作中断</td>
+            <td>运营</td>
+            <td>低</td>
+            <td>高</td>
+            <td>多银行备份方案，应急资金池</td>
+            <td>运营负责人</td>
+        </tr>
+        <tr>
+            <td>系统性能瓶颈</td>
+            <td>技术</td>
+            <td>中</td>
+            <td>中</td>
+            <td>容量规划，负载测试，自动扩缩容</td>
+            <td>DevOps</td>
+        </tr>
+        <tr>
+            <td>客户获取不及预期</td>
+            <td>商业</td>
+            <td>中</td>
+            <td>高</td>
+            <td>分阶段推广，种子客户计划，产品迭代</td>
+            <td>商务负责人</td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- ==================== SECTION 9 ==================== -->
+<h1 id="sec9" class="page-break">9. 附录</h1>
+
+<h2>附录A：术语表</h2>
+<table>
+    <thead>
+        <tr><th>术语</th><th>英文</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>始发金融机构</td><td>Originating Financial Institution (OFI)</td><td>发起支付/换币请求的金融机构</td></tr>
+        <tr><td>付款提供商</td><td>Payout Provider</td><td>在目标国家执行本地付款的金融机构</td></tr>
+        <tr><td>旅行规则</td><td>Travel Rule</td><td>FATF建议16，要求VASP共享交易双方信息</td></tr>
+        <tr><td>受益所有人</td><td>Ultimate Beneficial Owner (UBO)</td><td>直接或间接持有超过25%权益的自然人</td></tr>
+        <tr><td>预结算</td><td>Pre-Settlement</td><td>交易前将USDT转入托管地址获取信用额度</td></tr>
+        <tr><td>信用额度</td><td>Credit Limit</td><td>机构在Payout Provider处的可用USDT额度</td></tr>
+        <tr><td>基点</td><td>Basis Point (bps)</td><td>0.01%，用于表示FX费率</td></tr>
+        <tr><td>去中心化身份</td><td>Decentralized Identifier (DID)</td><td>T-0 Network中的机构唯一标识</td></tr>
+    </tbody>
+</table>
+
+<h2>附录B：API错误码</h2>
+<table>
+    <thead>
+        <tr><th>错误码</th><th>说明</th><th>HTTP状态</th><th>处理建议</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>AUTH_001</td><td>认证失败</td><td>401</td><td>检查client_id和client_secret</td></tr>
+        <tr><td>AUTH_002</td><td>令牌过期</td><td>401</td><td>调用刷新令牌接口</td></tr>
+        <tr><td>AUTH_003</td><td>权限不足</td><td>403</td><td>联系管理员申请权限</td></tr>
+        <tr><td>KYC_001</td><td>KYC未通过</td><td>403</td><td>完善KYC资料后重试</td></tr>
+        <tr><td>KYC_002</td><td>KYC等级不足</td><td>403</td><td>升级KYC等级</td></tr>
+        <tr><td>QUOTE_001</td><td>报价已过期</td><td>400</td><td>重新获取报价</td></tr>
+        <tr><td>QUOTE_002</td><td>金额超出限额</td><td>400</td><td>减少金额或提升KYC等级</td></tr>
+        <tr><td>ORDER_001</td><td>订单不存在</td><td>404</td><td>检查订单ID</td></tr>
+        <tr><td>ORDER_002</td><td>订单状态不允许操作</td><td>400</td><td>检查订单当前状态</td></tr>
+        <tr><td>WALLET_001</td><td>余额不足</td><td>400</td><td>充值USDT或减少金额</td></tr>
+        <tr><td>WALLET_002</td><td>地址未白名单</td><td>400</td><td>将地址加入白名单</td></tr>
+        <tr><td>SETTLE_001</td><td>信用额度不足</td><td>400</td><td>进行预结算充值</td></tr>
+        <tr><td>SYSTEM_001</td><td>系统内部错误</td><td>500</td><td>稍后重试或联系客服</td></tr>
+        <tr><td>SYSTEM_002</td><td>服务暂时不可用</td><td>503</td><td>服务降级中，稍后重试</td></tr>
+    </tbody>
+</table>
+
+<h2>附录C：参考资料</h2>
+<ol>
+    <li>T-0 Network官方文档: https://t-0.network/docs</li>
+    <li>T-0 Network API参考: https://t-0.network/api-reference</li>
+    <li>FATF Travel Rule指南: https://www.fatf-gafi.org/virtualassets.html</li>
+    <li>IVMS101数据标准: https://intervasp.org/</li>
+    <li>FINTRAC合规指南: https://www.fintrac-canafe.gc.ca/</li>
+    <li>OSFI加密资产风险指引: https://www.osfi-bsif.gc.ca/</li>
+    <li>BAXS官方网站: https://www.baxs.ca</li>
+    <li>USDT白皮书: https://tether.to/transparency/</li>
+    <li>ERC-20标准: https://eips.ethereum.org/EIPS/eip-20</li>
+    <li>TRC-20标准: https://developers.tron.network/</li>
+</ol>
+
+<div class="warning-box">
+    <strong>文档控制信息</strong><br>
+    文档版本: v1.0 | 最后更新: 2026年6月30日 | 下次审查: 2026年9月30日<br>
+    文档所有者: BAXS产品团队 | 审批状态: 待审批<br>
+    本文件包含商业机密信息，未经授权不得分发。
+</div>
+
+</body>
+</html>
