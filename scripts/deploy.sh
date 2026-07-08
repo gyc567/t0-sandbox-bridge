@@ -214,7 +214,13 @@ check_endpoint "/" "首页"
 check_endpoint "/sandbox" "Sandbox 页面" "sandbox\|Sandbox"
 
 # 静态资源探测
-ASSET_URL=$(curl -sL "${DEPLOY_URL}/" 2>/dev/null | grep -oE '"/assets/[^"]+\.(js|css)"' | head -1 | tr -d '"')
+# Note: 现代 Vercel SSR 输出的 HTML 中 <link href="/assets/...css"> 通常不带引号，
+# 而早期版本会有 'src="/assets/...js"' 等多种形态。两种都接受；找不到时静默跳过
+# （不要因空匹配触发 set -e + pipefail，让脚本继续跑后续检查）。
+ASSET_URL=$(curl -sL "${DEPLOY_URL}/" 2>/dev/null \
+  | grep -oE '"/assets/[^"]+\.(js|css)"|/assets/[^" ]+\.(js|css)' \
+  | head -1 \
+  | tr -d '"' || true)
 if [ -n "$ASSET_URL" ]; then
     check_endpoint "$ASSET_URL" "静态资源" "" >/dev/null 2>&1 || true
     ASSET_CODE=$(curl -sL -o /dev/null -w "%{http_code}" --max-time 10 "${DEPLOY_URL}${ASSET_URL}" 2>/dev/null)
