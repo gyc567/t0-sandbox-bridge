@@ -23,7 +23,7 @@ describe("MockT0Client", () => {
 });
 
 describe("HttpT0Client", () => {
-  it("POSTs quotes and events with auth header", async () => {
+  it("POSTs pay-out quotes and events with auth + idempotency headers", async () => {
     const fetchImpl = vi.fn(
       async () => new Response("{}", { status: 200 }),
     ) as unknown as typeof fetch;
@@ -31,9 +31,26 @@ describe("HttpT0Client", () => {
     await c.updateQuote(quote);
     await c.emit({ type: "PayoutSuccess", payoutId: "p", at: 0 });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    const [url, init] = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(url).toBe("https://api.test/v1/quotes");
-    expect((init as RequestInit).headers).toMatchObject({ authorization: "Bearer key123" });
+
+    // updateQuote → /api/v1/quotes/pay-out with groups body
+    const [url1, init1] = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url1).toBe("https://api.test/api/v1/quotes/pay-out");
+    const body1 = JSON.parse((init1 as RequestInit).body as string);
+    expect(body1).toHaveProperty("groups");
+    expect(body1.groups[0]).toMatchObject({
+      currency: quote.currency,
+      payment_method: "SEPA",
+      bands: [{ client_quote_id: quote.id, max_amount_usd: String(quote.band), rate: String(quote.rate) }],
+    });
+    expect((init1 as RequestInit).headers).toMatchObject({
+      authorization: "Bearer key123",
+    });
+    expect((init1 as RequestInit).headers).toHaveProperty("idempotency-key");
+
+    // emit → /v1/events
+    const [url2, init2] = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(url2).toBe("https://api.test/v1/events");
+    expect((init2 as RequestInit).headers).toMatchObject({ authorization: "Bearer key123" });
   });
 
   it("throws on non-2xx response", async () => {

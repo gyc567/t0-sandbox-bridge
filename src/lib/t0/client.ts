@@ -23,7 +23,23 @@ export class MockT0Client implements T0Client {
   }
 }
 
-/** Real sandbox client — POSTs to https://app-sandbox.t-0.network. Kept thin. */
+/** Maps internal Quote to the ngrok REST API shape. */
+function quoteToPayOutGroup(quote: Quote) {
+  return {
+    currency: quote.currency,
+    payment_method: "SEPA", // default; can be made configurable later
+    expiration_seconds: Math.max(1, Math.floor((quote.expiresAt - Date.now()) / 1000)),
+    bands: [
+      {
+        client_quote_id: quote.id,
+        max_amount_usd: String(quote.band),
+        rate: String(quote.rate),
+      },
+    ],
+  };
+}
+
+/** Real sandbox client — POSTs to the configured ngrok / REST endpoint. */
 export class HttpT0Client implements T0Client {
   constructor(
     private readonly baseUrl: string,
@@ -31,18 +47,31 @@ export class HttpT0Client implements T0Client {
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}
 
-  private async post(path: string, body: unknown) {
+  private async post(path: string, body: unknown, opts?: { idempotencyKey?: string }) {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      authorization: `Bearer ${this.apiKey}`,
+    };
+    if (opts?.idempotencyKey) {
+      headers["idempotency-key"] = opts.idempotencyKey;
+    }
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
+      headers,
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`T0 ${path} failed: ${res.status}`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`T0 ${path} failed: ${res.status} ${text}`);
+    }
     return { ok: true as const };
   }
 
   updateQuote(quote: Quote) {
-    return this.post("/v1/quotes", quote);
+    const body = { groups: [quoteToPayOutGroup(quote)] };
+    return this.post("/api/v1/quotes/pay-out", body, {
+      idempotencyKey: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
+    });
   }
 
   emit(event: NetworkEvent) {

@@ -1,9 +1,15 @@
-import { MockT0Client } from "./client";
+import { HttpT0Client, MockT0Client } from "./client";
 import { PayoutProviderService } from "./provider";
 import { SandboxNetwork } from "./network";
 
-// Sandbox-mode singleton (in-memory).
-export const t0Client = new MockT0Client();
+// Switch to real HTTP client when T0_NGROK_URL is configured; otherwise mock.
+const ngrokUrl = process.env.T0_NGROK_URL;
+const apiKey = process.env.T0_API_KEY;
+
+export const t0Client = ngrokUrl && apiKey
+  ? new HttpT0Client(ngrokUrl, apiKey)
+  : new MockT0Client();
+
 export const providerService = new PayoutProviderService(t0Client);
 export const sandboxNetwork = new SandboxNetwork(providerService);
 
