@@ -2,7 +2,9 @@
 //
 // This is the inbound side of the SDK integration: when the T-0 Network
 // calls our provider (e.g. "process this payout"), the request lands
-// here and is delegated to the existing PayoutProviderService.
+// here and is delegated through `SandboxNetwork` (the orchestrator).
+// The orchestrator owns state-mutation semantics; this file is a pure
+// translation layer (proto ↔ internal).
 //
 // Strict boundary: this file is the ONLY place that translates between
 // proto types and our internal domain types. Business logic stays
@@ -11,7 +13,6 @@
 import {
   PayoutResponseSchema,
   PayoutResponse_AcceptedSchema,
-  PayoutResponse_ManualAmlCheckSchema,
   PayoutResponse_FailedSchema,
   PayoutResponse_Failed_Reason,
   UpdatePaymentResponseSchema,
@@ -33,7 +34,7 @@ import {
   type HandlerContext,
 } from "@t-0/provider-sdk";
 import { create } from "@bufbuild/protobuf";
-import type { PayoutProviderService } from "./provider";
+import type { SandboxNetwork } from "./network";
 
 /**
  * Convert a proto bigint paymentId into the internal string id.
@@ -49,12 +50,12 @@ function paymentIdFromProto(id: bigint): string {
 export async function payOut(
   req: PayoutRequest,
   _ctx: HandlerContext,
-  svc: PayoutProviderService,
+  network: SandboxNetwork,
 ): Promise<PayoutResponse> {
   const paymentId = paymentIdFromProto(req.paymentId);
   try {
-    const payout = await svc.processPayout(paymentId);
-    void payout; // log if needed; the response below signals success
+    const payout = await network.handleNetworkPayout(paymentId);
+    void payout;
     return create(PayoutResponseSchema, {
       result: { case: "accepted", value: create(PayoutResponse_AcceptedSchema, {}) },
     });
@@ -72,39 +73,31 @@ export async function payOut(
 export async function updatePayment(
   req: UpdatePaymentRequest,
   _ctx: HandlerContext,
-  svc: PayoutProviderService,
+  network: SandboxNetwork,
 ): Promise<UpdatePaymentResponse> {
   const paymentId = paymentIdFromProto(req.paymentId);
-  // The result oneof tells us what the network is telling us about the payment.
-  // We translate each case to the corresponding internal action:
-  //   "accepted"       → accept the payment (idempotent)
-  //   "manualAmlCheck" → put payment in manual_aml pending state
-  //   "failed"         → mark the payment as rejected
-  //   "confirmed"      → mark as confirmed
+  // We never want to throw from this RPC — the network interprets any
+  // raised error as a payment failure. Each case is a no-op when the
+  // referenced payment is unknown (idempotency rule).
   switch (req.result.case) {
     case "accepted":
       try {
-        await svc.acceptPayment({ quoteId: paymentId, beneficiaryRef: "" });
+        network.handleNetworkAccepted(paymentId, "");
       } catch {
-        // Idempotent: ignore "unknown quote" or "payment exists" errors.
+        // Sandbox: a payment may exist without a backing quote. Idempotent.
+      }
+      break;
+    case "manualAmlCheck":
+      try {
+        network.handleManualAmlCheck(paymentId);
+      } catch {
+        // Idempotent: unknown payment is a no-op here.
       }
       break;
     case "confirmed":
-      // No-op for the sandbox: processPayout already drives a payment
-      // to confirmed when the underlying flow succeeds. This branch exists
-      // for when the network explicitly confirms (e.g. settlement cleared).
-      break;
-    case "manualAmlCheck":
-      // Network wants us to perform a manual AML check. We translate to
-      // the internal "pending" state by calling the existing manual-aml
-      // entry point with `approved = false` and treating the response
-      // as "rejected for review" — the operator can then re-approve.
-      svc.completeManualAml(paymentId, false);
-      break;
     case "failed":
     case undefined:
-      // Failed or unset — no state change. The internal payment lifecycle
-      // drives failures; we don't override anything here.
+      // No state change required by the sandbox.
       break;
   }
   return create(UpdatePaymentResponseSchema, {});
@@ -114,11 +107,11 @@ export async function updatePayment(
 export async function updateLimit(
   _req: UpdateLimitRequest,
   _ctx: HandlerContext,
-  _svc: PayoutProviderService,
+  _network: SandboxNetwork,
 ): Promise<UpdateLimitResponse> {
   // The sandbox doesn't track persistent credit limits — the real
-  // implementation would persist `req.limits[]` and surface them to
-  // the OFI console. For now, accept-and-acknowledge.
+  // implementation would persist `req.limits[]` and surface them to the
+  // OFI console. For now, accept-and-acknowledge.
   return create(UpdateLimitResponseSchema, {});
 }
 
@@ -126,17 +119,16 @@ export async function updateLimit(
 export async function approvePaymentQuote(
   req: ApprovePaymentQuoteRequest,
   _ctx: HandlerContext,
-  svc: PayoutProviderService,
+  network: SandboxNetwork,
 ): Promise<ApprovePaymentQuoteResponse> {
   const paymentId = paymentIdFromProto(req.paymentId);
   const quoteId = req.payOutQuoteId.toString();
   try {
-    svc.approvePaymentQuote(paymentId, quoteId);
+    network.approvePaymentQuote(paymentId, quoteId);
     return create(ApprovePaymentQuoteResponseSchema, {
       result: { case: "accepted", value: create(ApprovePaymentQuoteResponse_AcceptedSchema, {}) },
     });
-  } catch (e) {
-    void e;
+  } catch {
     return create(ApprovePaymentQuoteResponseSchema, {
       result: {
         case: "rejected",
@@ -150,11 +142,11 @@ export async function approvePaymentQuote(
 export async function appendLedgerEntries(
   _req: AppendLedgerEntriesRequest,
   _ctx: HandlerContext,
-  _svc: PayoutProviderService,
+  _network: SandboxNetwork,
 ): Promise<AppendLedgerEntriesResponse> {
   // The sandbox doesn't persist a separate ledger — events are kept
-  // in-process by PayoutProviderService. Real implementation would
-  // mirror the entries into a durable store.
+  // in-process by the orchestrator. Real implementation would mirror
+  // the entries into a durable store.
   return create(AppendLedgerEntriesResponseSchema, {});
 }
 
@@ -164,18 +156,18 @@ export async function appendLedgerEntries(
  *
  *   registerRoutes(router => {
  *     router.service(ProviderService, {
- *       payOut: (req, ctx) => payOut(req, ctx, svc),
- *       updatePayment: (req, ctx) => updatePayment(req, ctx, svc),
+ *       payOut: (req, ctx) => payOut(req, ctx, network),
+ *       updatePayment: (req, ctx) => updatePayment(req, ctx, network),
  *       ...
  *     });
  *   });
  */
-export function createProviderServiceImpl(svc: PayoutProviderService) {
+export function createProviderServiceImpl(network: SandboxNetwork) {
   return {
-    payOut: (req: PayoutRequest, ctx: HandlerContext) => payOut(req, ctx, svc),
-    updatePayment: (req: UpdatePaymentRequest, ctx: HandlerContext) => updatePayment(req, ctx, svc),
-    updateLimit: (req: UpdateLimitRequest, ctx: HandlerContext) => updateLimit(req, ctx, svc),
-    approvePaymentQuote: (req: ApprovePaymentQuoteRequest, ctx: HandlerContext) => approvePaymentQuote(req, ctx, svc),
-    appendLedgerEntries: (req: AppendLedgerEntriesRequest, ctx: HandlerContext) => appendLedgerEntries(req, ctx, svc),
+    payOut: (req: PayoutRequest, ctx: HandlerContext) => payOut(req, ctx, network),
+    updatePayment: (req: UpdatePaymentRequest, ctx: HandlerContext) => updatePayment(req, ctx, network),
+    updateLimit: (req: UpdateLimitRequest, ctx: HandlerContext) => updateLimit(req, ctx, network),
+    approvePaymentQuote: (req: ApprovePaymentQuoteRequest, ctx: HandlerContext) => approvePaymentQuote(req, ctx, network),
+    appendLedgerEntries: (req: AppendLedgerEntriesRequest, ctx: HandlerContext) => appendLedgerEntries(req, ctx, network),
   };
 }
