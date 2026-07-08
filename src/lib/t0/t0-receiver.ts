@@ -16,7 +16,7 @@ import { Buffer } from "node:buffer";
 import { createConnectRouter } from "@connectrpc/connect";
 import { createFetchHandler, type UniversalHandlerFn } from "@connectrpc/connect/protocol";
 import { ProviderService } from "@t-0/provider-sdk";
-import { providerService } from "./index";
+import { sandboxNetwork } from "./index";
 import { createProviderServiceImpl } from "./provider-impl";
 
 // The T-0 Network's signature headers — must match the SDK's own values.
@@ -136,9 +136,9 @@ export async function verifyRequestSignature(
 export interface BuildReceiverOptions {
   /** Hex-encoded (0x-prefixed or not) compressed/uncompressed network public key. */
   networkPublicKey: string;
-  /** Override the PayoutProviderService used by the RPC handlers. Defaults
+  /** Override the SandboxNetwork used by the RPC handlers. Defaults
    *  to the module-level singleton from ./index. */
-  service?: typeof providerService;
+  network?: typeof sandboxNetwork;
 }
 
 /**
@@ -151,7 +151,7 @@ export interface BuildReceiverOptions {
 export function buildT0Receiver(opts: BuildReceiverOptions): (request: Request) => Promise<Response> {
   // Convert Uint8Array → Buffer so the SDK's `Buffer.compare` works.
   const networkPublicKey = Buffer.from(hexToBytes(opts.networkPublicKey));
-  const svc = opts.service ?? providerService;
+  const network = opts.network ?? sandboxNetwork;
 
   // Build the Connect handler once. The SDK's `createService` returns a
   // `ConnectRouterOptions` whose `.routes` callback registers our handlers
@@ -165,7 +165,7 @@ export function buildT0Receiver(opts: BuildReceiverOptions): (request: Request) 
   let cachedHandler: ((req: Request) => Promise<Response>) | null = null;
   function getHandler(): (req: Request) => Promise<Response> {
     if (cachedHandler !== null) return cachedHandler;
-    const impl = createProviderServiceImpl(svc);
+    const impl = createProviderServiceImpl(network);
     const router = createConnectRouter({});
     // `createConnectRouter` does not invoke our `routes` callback for us.
     router.service(ProviderService, impl as never);
@@ -240,5 +240,5 @@ export function buildT0Receiver(opts: BuildReceiverOptions): (request: Request) 
   };
 }
 
-// Re-export for callers that want the providerService singleton.
-export { providerService };
+// Re-export for callers that want the sandboxNetwork singleton.
+export { sandboxNetwork };

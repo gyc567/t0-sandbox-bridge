@@ -95,14 +95,18 @@ describe("SandboxNetwork.createPayment (idempotent on paymentClientId)", () => {
     }
   });
 
-  it("creates a payment against a live quote", async () => {
+  it("creates a payment against a live quote and routes the payout to the provider", async () => {
     const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
     const r = await ofi.createPayment({ paymentClientId: "baxs_001", quoteId: q.id, beneficiaryRef: "BEN-1", usdAmount: 1_000 });
     expect("success" in r).toBe(true);
     if ("success" in r) {
       expect(r.success.created).toBe(true);
       expect(r.success.payment.id).toBe("baxs_001");
-      expect(r.success.payment.status).toBe("accepted");
+      // Per the protocol the Network drives PayoutRequest synchronously in
+      // sandbox mode, so by the time CreatePayment returns the payout has
+      // already succeeded and the payment is "confirmed".
+      expect(r.success.payment.status).toBe("confirmed");
+      expect(r.success.payout.status).toBe("success");
     }
   });
 

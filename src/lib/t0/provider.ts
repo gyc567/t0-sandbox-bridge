@@ -1,9 +1,15 @@
 // Payout Provider service — single source of truth for the sandbox flow.
-// High cohesion: owns quotes, payments, payouts, and event log.
+// High cohesion: owns quotes, payouts, and provider-side event log.
 // Low coupling: talks to the network only via T0Client.
+//
+// Role note: the Sandbox orchestrator (SandboxNetwork) handles the OFI
+// orchestration (CreatePayment accept, manual AML, Last Look approval,
+// payment intent, confirmFunds, requestPayout routing). This class
+// exposes only the Provider-side state reads / writes and the payout
+// execution lifecycle in response to network-driven PayoutRequests.
 
 import type { T0Client } from "./client";
-import type { Currency, NetworkEvent, Payment, Payout, Quote, VolumeBand } from "./types";
+import type { Currency, NetworkEvent, Payment, PaymentStatus, Payout, Quote, VolumeBand } from "./types";
 
 let counter = 0;
 const nextId = (prefix: string) =>
@@ -14,11 +20,6 @@ export interface PublishQuoteInput {
   band: VolumeBand;
   rate: number;
   ttlMs?: number;
-}
-
-export interface IncomingPaymentInput {
-  quoteId: string;
-  beneficiaryRef: string;
 }
 
 export interface Snapshot {
@@ -68,30 +69,13 @@ export class PayoutProviderService {
     this.log({ type: "CreditUsageNotification", counterparty, used, at: this.now() });
   }
 
-  // ── 8/9/10. Create Payment → Accepted ─────────────────────────
-  async acceptPayment(input: IncomingPaymentInput): Promise<Payment> {
-    const quote = this.quotes.get(input.quoteId);
-    if (!quote) throw new Error("unknown quote");
-    if (quote.expiresAt < this.now()) throw new Error("quote expired");
-
-    const payment: Payment = {
-      id: nextId("pm"),
-      quoteId: quote.id,
-      currency: quote.currency,
-      usdAmount: quote.band,
-      localAmount: quote.band * quote.rate,
-      beneficiaryRef: input.beneficiaryRef,
-      status: "accepted",
-      createdAt: this.now(),
-    };
-    this.payments.set(payment.id, payment);
-    await this.client.emit({ type: "PaymentAccepted", paymentId: payment.id, at: this.now() });
-    this.log({ type: "PaymentAccepted", paymentId: payment.id, at: this.now() });
-    return payment;
-  }
-
-  // ── 11-16. Payout lifecycle ───────────────────────────────────
-  async processPayout(paymentId: string, opts: { fail?: boolean } = {}): Promise<Payout> {
+  // ── 11-16. Payout lifecycle (network-driven) ──────────────────
+  /**
+   * Execute a payout in response to a Network-routed PayoutRequest.
+   * The Provider reacts; the Network drives the call. Idempotent on
+   * paymentId (returns the existing payout if already processed).
+   */
+  async executePayout(paymentId: string, opts: { fail?: boolean } = {}): Promise<Payout> {
     // Idempotency: return existing payout if already processed
     for (const po of this.payouts.values()) {
       if (po.paymentId === paymentId) {
@@ -141,13 +125,58 @@ export class PayoutProviderService {
     };
   }
 
+  // ── Thin state helpers (network orchestrator writes here) ─────
+  /**
+   * Persist a Payment constructed by the Network orchestrator. Single
+   * write seam for CreatePayment, createPaymentIntent, and the inbound
+   * `UpdatePayment.accepted` RPC handler. Idempotent: if a payment with
+   * the same id already exists, returns it without mutation.
+   */
+  recordPayment(p: Payment): Payment {
+    const existing = this.payments.get(p.id);
+    if (existing) return existing;
+    this.payments.set(p.id, p);
+    return p;
+  }
+
+  /**
+   * Move a payment to a new status. Throws if the payment is unknown.
+   * Pure state-write — no event emission; the Network orchestrator owns
+   * event semantics so it can decide what to log per call site.
+   */
+  markPaymentStatus(paymentId: string, status: Payment["status"]): Payment {
+    const payment = this.payments.get(paymentId);
+    if (!payment) throw new Error("unknown payment");
+    payment.status = status;
+    return payment;
+  }
+
+  /**
+   * Lock the rate on a pending payment (transitions pending → accepted).
+   * Pure state-write; throws on unknown payment.
+   */
+  lockPaymentRate(paymentId: string): Payment {
+    return this.markPaymentStatus(paymentId, "accepted");
+  }
+
+  /**
+   * Refresh the TTL on a quote (Last Look approval). Throws on unknown quote.
+   */
+  refreshQuoteTtl(quoteId: string): Quote {
+    const quote = this.quotes.get(quoteId);
+    if (!quote) throw new Error("unknown quote");
+    quote.expiresAt = this.now() + 60_000;
+    return quote;
+  }
+
   /**
    * Re-key a payment from an internal auto-generated id to a client-supplied
    * idempotency key (the OFI's `paymentClientId`). Idempotent: if the new id
    * already exists and differs, the original is kept (defensive — duplicate
    * keys should never collide in practice because the OFI surfaces one
    * paymentClientId per CreatePayment call). Updates the payment object in
-   * place so callers holding a reference see the new id.
+   * place so callers holding a reference see the new id. Also re-keys any
+   * dependent payouts so future idempotency lookups find them.
    */
   rekeyPayment(oldId: string, newId: string): void {
     if (oldId === newId) return;
@@ -161,6 +190,10 @@ export class PayoutProviderService {
     payment.id = newId;
     this.payments.delete(oldId);
     this.payments.set(newId, payment);
+    // Keep dependent payouts in sync — same payment, same id reference.
+    for (const po of this.payouts.values()) {
+      if (po.paymentId === oldId) po.paymentId = newId;
+    }
   }
 
   /**
@@ -176,83 +209,6 @@ export class PayoutProviderService {
     quote.id = newId;
     this.quotes.delete(oldId);
     this.quotes.set(newId, quote);
-  }
-
-  // ── Manual AML / Last Look (Phase 8) ──────────────────────────
-  /**
-   * Complete a manual AML check. Idempotent on paymentId.
-   * Always returns the existing payment with status updated.
-   */
-  completeManualAml(paymentId: string, approved: boolean): Payment {
-    const payment = this.payments.get(paymentId);
-    if (!payment) throw new Error("unknown payment");
-    payment.status = approved ? "accepted" : "rejected";
-    this.log({
-      type: "PaymentConfirmed",
-      paymentId: payment.id,
-      at: this.now(),
-    });
-    return payment;
-  }
-
-  /**
-   * Approve / refresh a payment quote (Last Look). Idempotent on paymentId.
-   * Bumps the quote TTL via a fresh publishQuote-style call.
-   */
-  approvePaymentQuote(paymentId: string, quoteId: string): Quote {
-    const quote = this.quotes.get(quoteId);
-    if (!quote) throw new Error("unknown quote");
-    const payment = this.payments.get(paymentId);
-    if (!payment) throw new Error("unknown payment");
-    quote.expiresAt = this.now() + 60_000;
-    this.log({
-      type: "PaymentConfirmed",
-      paymentId: payment.id,
-      at: this.now(),
-    });
-    return quote;
-  }
-
-  // ── Payment Intent (Phase 8) ──────────────────────────────────
-  /**
-   * Create a payment intent (rate is indicative until funds are confirmed).
-   */
-  createPaymentIntent(input: { quoteId: string; beneficiaryRef: string }): Payment {
-    const quote = this.quotes.get(input.quoteId);
-    if (!quote) throw new Error("unknown quote");
-    const payment: Payment = {
-      id: nextId("pi"),
-      quoteId: quote.id,
-      currency: quote.currency,
-      usdAmount: quote.band,
-      localAmount: quote.band * quote.rate,
-      beneficiaryRef: input.beneficiaryRef,
-      status: "pending",
-      createdAt: this.now(),
-    };
-    this.payments.set(payment.id, payment);
-    this.log({
-      type: "PaymentAccepted",
-      paymentId: payment.id,
-      at: this.now(),
-    });
-    return payment;
-  }
-
-  /**
-   * Confirm funds received from the Pay-In Provider. Locks the rate and
-   * transitions the payment to "accepted".
-   */
-  confirmFunds(paymentId: string): Payment {
-    const payment = this.payments.get(paymentId);
-    if (!payment) throw new Error("unknown payment");
-    payment.status = "accepted";
-    this.log({
-      type: "PaymentAccepted",
-      paymentId: payment.id,
-      at: this.now(),
-    });
-    return payment;
   }
 
   private log(e: NetworkEvent) {

@@ -2,10 +2,9 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import React, { useState, useCallback } from "react";
 import {
-  acceptPaymentFn,
   notifyCreditFn,
   notifyUsdtFn,
-  processPayoutFn,
+  requestPayoutFn,
   publishQuoteFn,
   snapshotFn,
 } from "@/lib/t0/t0.functions";
@@ -61,8 +60,7 @@ function SandboxPage() {
   const refresh = () => router.invalidate();
 
   const publishQuote = useServerFn(publishQuoteFn);
-  const acceptPayment = useServerFn(acceptPaymentFn);
-  const processPayout = useServerFn(processPayoutFn);
+  const processPayout = useServerFn(requestPayoutFn);
   const notifyUsdt = useServerFn(notifyUsdtFn);
   const notifyCredit = useServerFn(notifyCreditFn);
 
@@ -196,6 +194,10 @@ function SandboxPage() {
         {/* Steps 3 & 4 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <PanelCard step="03" title={`Quotes · ${data.quotes.length}`}>
+            {/* Sandbox simulator view — the Accept button was removed in
+                the role-boundary refactor. In production the Network
+                drives CreatePayment accept; here we just list quotes for
+                the operator to see what is currently published. */}
             <List
               items={data.quotes}
               render={(q) => (
@@ -207,20 +209,9 @@ function SandboxPage() {
                     {q.id} · {q.currency} · ${q.band.toLocaleString()}{" "}
                     <span className="text-accent-cyan">@ {q.rate}</span>
                   </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() =>
-                      run(() =>
-                        acceptPayment({
-                          data: { quoteId: q.id, beneficiaryRef: `BEN-${Date.now()}` },
-                        }),
-                      )
-                    }
-                  >
-                    Accept
-                  </Button>
+                  <span className="font-mono text-caption text-muted-foreground">
+                    expires {new Date(q.expiresAt).toISOString().slice(11, 19)} UTC
+                  </span>
                 </div>
               )}
             />

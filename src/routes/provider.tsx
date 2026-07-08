@@ -5,8 +5,7 @@ import {
   publishQuoteFn,
   notifyUsdtFn,
   notifyCreditFn,
-  acceptPaymentFn,
-  processPayoutFn,
+  requestPayoutFn,
   snapshotFn,
 } from "@/lib/t0/t0.functions";
 import { logoutFn, getSessionFn } from "@/lib/auth/auth.functions";
@@ -65,8 +64,7 @@ function ProviderPage() {
   const router = useRouter();
 
   const publishQuote = useServerFn(publishQuoteFn);
-  const acceptPayment = useServerFn(acceptPaymentFn);
-  const processPayout = useServerFn(processPayoutFn);
+  const processPayout = useServerFn(requestPayoutFn);
   const notifyUsdt = useServerFn(notifyUsdtFn);
   const notifyCredit = useServerFn(notifyCreditFn);
   const snapshot = useServerFn(snapshotFn);
@@ -217,6 +215,9 @@ function ProviderPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <PanelCard step="03" title={`Quotes · ${data.quotes.length}`}>
+            {/* Sandbox simulator view — in production the Network drives
+                CreatePayment accept; here we just list quotes for the
+                operator to see what's published. */}
             <List
               items={data.quotes}
               testId="provider-quotes"
@@ -229,21 +230,9 @@ function ProviderPage() {
                     {q.id} · {q.currency} · ${q.band.toLocaleString()}{" "}
                     <span className="text-accent-cyan">@ {q.rate}</span>
                   </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() =>
-                      run(() =>
-                        acceptPayment({
-                          data: { quoteId: q.id, beneficiaryRef: `BEN-${Date.now()}` },
-                        }),
-                      )
-                    }
-                    data-testid={`accept-${q.id}`}
-                  >
-                    Accept
-                  </Button>
+                  <span className="font-mono text-caption text-muted-foreground">
+                    expires {new Date(q.expiresAt).toISOString().slice(11, 19)} UTC
+                  </span>
                 </div>
               )}
             />

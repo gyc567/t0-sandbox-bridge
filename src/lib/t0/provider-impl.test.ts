@@ -41,12 +41,23 @@ beforeEach(() => {
   network = new SandboxNetwork(svc);
 });
 
-// Helper: create a known payment in `accepted` state and map it to a
-// proto-friendly numeric id. Returns the numeric id as bigint.
+// Helper: create a known payment via the Network orchestrator (OFI →
+// CreatePayment), then map it to a proto-friendly numeric id. Returns
+// the numeric id as bigint.
 async function setupAcceptedPayment(): Promise<bigint> {
   const q = await svc.publishQuote({ currency: "EUR", band: 1000, rate: 0.9 });
-  const p = await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "BEN" });
-  const internalId = p.id;
+  const r = await network.createPayment(
+    {
+      paymentClientId: `n_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      quoteId: q.id,
+      beneficiaryRef: "BEN",
+      usdAmount: 1000,
+    },
+    clock, // use the test clock so the freshly published quote is still valid
+  );
+  if (!("success" in r)) throw new Error(`setup: createPayment failed: ${JSON.stringify(r)}`);
+  // Re-key to the predictable n_1 form for the proto tests.
+  const internalId = r.success.payment.id;
   svc.rekeyPayment(internalId, "n_1");
   return BigInt(1);
 }
@@ -59,7 +70,7 @@ describe("payOut", () => {
       currency: "EUR",
       clientQuoteId: "qt",
     });
-    const res = await payOut(req, ctx, svc);
+    const res = await payOut(req, ctx, network);
     expect(res.result.case).toBe("accepted");
   });
 
@@ -69,7 +80,7 @@ describe("payOut", () => {
       currency: "EUR",
       clientQuoteId: "qt",
     });
-    const res = await payOut(req, ctx, svc);
+    const res = await payOut(req, ctx, network);
     expect(res.result.case).toBe("failed");
     if (res.result.case === "failed") {
       expect(res.result.value.reason).toBe(PayoutResponse_Failed_Reason.UNSPECIFIED);
@@ -78,22 +89,20 @@ describe("payOut", () => {
 
   it("returns failed when payment is not in accepted state (manually confirmed)", async () => {
     const paymentId = await setupAcceptedPayment();
-    // Pre-flight: mark the payment as confirmed so processPayout rejects.
+    // Drive the payment to "confirmed" first via the success path.
     const internalId = svc.snapshot().payments[0]!.id;
     svc.rekeyPayment(internalId, `n_${paymentId.toString()}`);
-    // Force a payment to `confirmed` by calling processPayout via the
-    // happy path (the payout ends with payment.status = "confirmed").
     const okReq = create(PayoutRequestSchema, { paymentId, currency: "EUR", clientQuoteId: "qt" });
-    await payOut(okReq, ctx, svc);
-    // Now the internal payment is `confirmed`. A second payOut returns
-    // the existing payout (idempotent), so use a fresh unknown payment
-    // id to exercise the failure path.
+    await payOut(okReq, ctx, network);
+    // Now the internal payment is `confirmed`. A second payOut is
+    // idempotent (returns the same payout), so use a fresh unknown
+    // payment id to exercise the failure path.
     const req = create(PayoutRequestSchema, {
       paymentId: BigInt(999_999),
       currency: "EUR",
       clientQuoteId: "qt",
     });
-    const res = await payOut(req, ctx, svc);
+    const res = await payOut(req, ctx, network);
     expect(res.result.case).toBe("failed");
   });
 });
@@ -106,20 +115,22 @@ describe("updatePayment", () => {
       paymentClientId: paymentId.toString(),
       result: { case: "accepted", value: create(UpdatePaymentRequest_AcceptedSchema, {}) },
     });
-    const res = await updatePayment(req, ctx, svc);
+    const res = await updatePayment(req, ctx, network);
     expect(res.$typeName).toBe("tzero.v1.payment.UpdatePaymentResponse");
   });
 
-  it("handles a manualAmlCheck update by completing AML as rejected", async () => {
+  it("handles a manualAmlCheck update by marking the payment for review", async () => {
     const paymentId = await setupAcceptedPayment();
     const req = create(UpdatePaymentRequestSchema, {
       paymentId,
       paymentClientId: paymentId.toString(),
       result: { case: "manualAmlCheck", value: create(UpdatePaymentRequest_ManualAmlCheckSchema, {}) },
     });
-    const res = await updatePayment(req, ctx, svc);
+    const res = await updatePayment(req, ctx, network);
     expect(res.$typeName).toBe("tzero.v1.payment.UpdatePaymentResponse");
-    // The payment should now be rejected.
+    // After sandbox setup the payment is "confirmed" (createPayment runs
+    // the payout synchronously). handleManualAmlCheck then marks it
+    // "rejected" pending operator re-approval.
     const snapshot = svc.snapshot();
     const p = snapshot.payments.find((x) => x.id === `n_${paymentId.toString()}`);
     expect(p?.status).toBe("rejected");
@@ -131,7 +142,7 @@ describe("updatePayment", () => {
       paymentClientId: "x",
       result: { case: "failed", value: create(UpdatePaymentRequest_FailedSchema, { reason: 1 }) },
     });
-    const res = await updatePayment(req, ctx, svc);
+    const res = await updatePayment(req, ctx, network);
     expect(res.$typeName).toBe("tzero.v1.payment.UpdatePaymentResponse");
   });
 
@@ -142,7 +153,7 @@ describe("updatePayment", () => {
       paymentClientId: paymentId.toString(),
       result: { case: "confirmed", value: create(UpdatePaymentRequest_ConfirmedSchema, {}) },
     });
-    const res = await updatePayment(req, ctx, svc);
+    const res = await updatePayment(req, ctx, network);
     expect(res.$typeName).toBe("tzero.v1.payment.UpdatePaymentResponse");
   });
 
@@ -152,7 +163,7 @@ describe("updatePayment", () => {
       paymentClientId: "x",
       result: { case: "accepted", value: create(UpdatePaymentRequest_AcceptedSchema, {}) },
     });
-    const res = await updatePayment(req, ctx, svc);
+    const res = await updatePayment(req, ctx, network);
     expect(res.$typeName).toBe("tzero.v1.payment.UpdatePaymentResponse");
   });
 });
@@ -170,13 +181,13 @@ describe("updateLimit", () => {
         }),
       ],
     });
-    const res = await updateLimit(req, ctx, svc);
+    const res = await updateLimit(req, ctx, network);
     expect(res.$typeName).toBe("tzero.v1.payment.UpdateLimitResponse");
   });
 
   it("handles an empty limits array", async () => {
     const req = create(UpdateLimitRequestSchema, { limits: [] });
-    const res = await updateLimit(req, ctx, svc);
+    const res = await updateLimit(req, ctx, network);
     expect(res.$typeName).toBe("tzero.v1.payment.UpdateLimitResponse");
   });
 });
@@ -184,7 +195,16 @@ describe("updateLimit", () => {
 describe("approvePaymentQuote", () => {
   it("accepts when the payment and quote exist", async () => {
     const q = await svc.publishQuote({ currency: "EUR", band: 1000, rate: 0.9 });
-    await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "BEN" });
+    const r = await network.createPayment(
+      {
+        paymentClientId: `n_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        quoteId: q.id,
+        beneficiaryRef: "BEN",
+        usdAmount: 1000,
+      },
+      clock,
+    );
+    if (!("success" in r)) throw new Error("setup failed");
     // Map internal auto-generated ids to numeric proto-friendly ids.
     const internalPaymentId = svc.snapshot().payments[0]!.id;
     svc.rekeyPayment(internalPaymentId, "n_1");
@@ -193,7 +213,7 @@ describe("approvePaymentQuote", () => {
       paymentId: BigInt(1),
       payOutQuoteId: BigInt(1),
     });
-    const res = await approvePaymentQuote(req, ctx, svc);
+    const res = await approvePaymentQuote(req, ctx, network);
     expect(res.result.case).toBe("accepted");
   });
 
@@ -202,7 +222,7 @@ describe("approvePaymentQuote", () => {
       paymentId: BigInt(2),
       payOutQuoteId: BigInt(99_999),
     });
-    const res = await approvePaymentQuote(req, ctx, svc);
+    const res = await approvePaymentQuote(req, ctx, network);
     expect(res.result.case).toBe("rejected");
   });
 });
@@ -224,7 +244,7 @@ describe("appendLedgerEntries", () => {
         }),
       ],
     });
-    const res = await appendLedgerEntries(req, ctx, svc);
+    const res = await appendLedgerEntries(req, ctx, network);
     expect(res.$typeName).toBe("tzero.v1.payment.AppendLedgerEntriesResponse");
   });
 
@@ -233,14 +253,14 @@ describe("appendLedgerEntries", () => {
       transactions: [],
       ledgerEntries: [],
     });
-    const res = await appendLedgerEntries(req, ctx, svc);
+    const res = await appendLedgerEntries(req, ctx, network);
     expect(res.$typeName).toBe("tzero.v1.payment.AppendLedgerEntriesResponse");
   });
 });
 
 describe("createProviderServiceImpl", () => {
   it("returns a bound object with all 5 RPC methods", () => {
-    const impl = createProviderServiceImpl(svc);
+    const impl = createProviderServiceImpl(network);
     expect(typeof impl.payOut).toBe("function");
     expect(typeof impl.updatePayment).toBe("function");
     expect(typeof impl.updateLimit).toBe("function");
@@ -249,10 +269,19 @@ describe("createProviderServiceImpl", () => {
   });
 
   it("each method delegates to the matching handler (end-to-end through the adapter)", async () => {
-    const impl = createProviderServiceImpl(svc);
-    // Set up a known accepted payment.
+    const impl = createProviderServiceImpl(network);
+    // Set up a known accepted payment via the Network.
     const q = await svc.publishQuote({ currency: "EUR", band: 1000, rate: 0.9 });
-    await svc.acceptPayment({ quoteId: q.id, beneficiaryRef: "BEN" });
+    const r = await network.createPayment(
+      {
+        paymentClientId: `n_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        quoteId: q.id,
+        beneficiaryRef: "BEN",
+        usdAmount: 1000,
+      },
+      clock,
+    );
+    if (!("success" in r)) throw new Error("setup failed");
     const internalId = svc.snapshot().payments[0]!.id;
     svc.rekeyPayment(internalId, "n_1");
     svc.rekeyQuote(q.id, "1");
