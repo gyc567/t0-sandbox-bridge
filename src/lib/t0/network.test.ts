@@ -17,6 +17,7 @@ import { MockT0Client } from "./client";
 import { PayoutProviderService } from "./provider";
 import { SandboxNetwork } from "./network";
 import { OFIService } from "./ofi";
+import { MockOfiT0Client } from "./ofi-client";
 
 let clock = 1_700_000_000_000;
 const now = () => clock;
@@ -30,7 +31,14 @@ beforeEach(() => {
   clock = 1_700_000_000_000;
   client = new MockT0Client();
   svc = new PayoutProviderService(client, now);
-  network = new SandboxNetwork(svc);
+  // MockOfiT0Client with a "no quotes available" injector — the network-level
+  // getQuote tests live elsewhere (ofi.test.ts) and use a richer provider mock.
+  network = new SandboxNetwork(
+    svc,
+    new MockOfiT0Client({ pickBestQuote: () => null }),
+    "PAYMENT_METHOD_TYPE_SEPA",
+    now,
+  );
   ofi = new OFIService(network, now);
 });
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { MockT0Client } from "./client";
 import { PayoutProviderService } from "./provider";
 import { SandboxNetwork } from "./network";
+import { MockOfiT0Client } from "./ofi-client";
 
 let clock = 1_700_000_000_000;
 const now = () => clock;
@@ -14,7 +15,7 @@ beforeEach(() => {
   clock = 1_700_000_000_000;
   client = new MockT0Client();
   svc = new PayoutProviderService(client, now);
-  network = new SandboxNetwork(svc);
+  network = new SandboxNetwork(svc, new MockOfiT0Client({ pickBestQuote: () => null }));
 });
 
 describe("PayoutProviderService", () => {

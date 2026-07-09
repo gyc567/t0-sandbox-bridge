@@ -38,4 +38,30 @@ describe("formatQuoteFailure", () => {
     expect(m.title).toMatch(/expired/i);
     expect(m.detail).toMatch(/60/);
   });
+
+  // ── agtpay REST bridge errors ───────────────────────────────────
+
+  it("explains REASON_UPSTREAM_ERROR with an upstream-service hint", () => {
+    const m = formatQuoteFailure("REASON_UPSTREAM_ERROR");
+    expect(m.title).toMatch(/upstream/i);
+    expect(m.detail).toMatch(/agtpay/);
+  });
+
+  it("explains REASON_UNAUTHORIZED with a .env hint", () => {
+    const m = formatQuoteFailure("REASON_UNAUTHORIZED");
+    expect(m.title).toMatch(/api key/i);
+    expect(m.detail).toMatch(/T0_OFI_API_KEY/);
+  });
+
+  it("explains REASON_BAD_REQUEST with a validation hint", () => {
+    const m = formatQuoteFailure("REASON_BAD_REQUEST");
+    expect(m.title).toMatch(/invalid quote request/i);
+    expect(m.detail).toMatch(/currency/);
+  });
+
+  it("falls back to a generic message for unknown reasons", () => {
+    const m = formatQuoteFailure("REASON_FUTURE_THING" as never);
+    expect(m.title).toMatch(/quote lookup failed/i);
+    expect(m.detail).toMatch(/REASON_FUTURE_THING/);
+  });
 });

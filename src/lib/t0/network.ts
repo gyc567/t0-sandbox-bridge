@@ -5,15 +5,23 @@
 import { PayoutProviderService } from "./provider";
 import type { Currency, Payment, Payout, Quote } from "./types";
 import { isSupportedCurrency } from "./currencies";
+import type { OfiT0Client } from "./ofi-client";
+import { toGetQuoteResult } from "./quote-mapper";
 
 // Aligned with docs.t-0.network GetQuoteResponse.oneof (Failure reason enum).
+// Three new values (UPSTREAM_ERROR / UNAUTHORIZED / BAD_REQUEST) cover the
+// agtpay POST /api/v1/quotes/network HTTP-layer error cases introduced by
+// the OFI REST refactor. Existing six values are unchanged.
 export type QuoteFailureReason =
   | "REASON_NO_QUOTE_AVAILABLE"
   | "REASON_LIMIT_EXCEEDED"
   | "REASON_CURRENCY_NOT_SUPPORTED"
   | "REASON_INVALID_AMOUNT"
   | "REASON_INVALID_QUOTE_ID"
-  | "REASON_QUOTE_EXPIRED";
+  | "REASON_QUOTE_EXPIRED"
+  | "REASON_UPSTREAM_ERROR"
+  | "REASON_UNAUTHORIZED"
+  | "REASON_BAD_REQUEST";
 
 export type GetQuoteResult =
   | { success: { quote: Quote; payoutAmount: number; settlementAmount: number } }
@@ -31,34 +39,39 @@ const nextId = (prefix: string) =>
   `${prefix}_${Date.now().toString(36)}_${(++counter).toString(36)}`;
 
 export class SandboxNetwork {
-  constructor(public readonly provider: PayoutProviderService) {}
+  constructor(
+    public readonly provider: PayoutProviderService,
+    public readonly ofiClient: OfiT0Client,
+    private readonly paymentMethod: string = "PAYMENT_METHOD_TYPE_SEPA",
+    private readonly now: () => number = Date.now,
+  ) {}
 
-  /** GetQuote — pick the best (lowest local-amount = best rate) live quote for the request. */
-  getQuote(input: { usdAmount: number; currency: Currency; now?: number }): GetQuoteResult {
-    const now = input.now ?? Date.now();
+  /**
+   * GetQuote — delegates to the injected OfiT0Client (HTTP or Mock per env).
+   * Local validation only: invalid amount + unsupported currency short-circuit
+   * synchronously without hitting the client.
+   */
+  async getQuote(input: {
+    usdAmount: number;
+    currency: Currency;
+    now?: number;
+  }): Promise<GetQuoteResult> {
     if (input.usdAmount <= 0) {
       return { failure: { reason: "REASON_INVALID_AMOUNT" } };
     }
     if (!isSupportedCurrency(input.currency)) {
       return { failure: { reason: "REASON_CURRENCY_NOT_SUPPORTED" } };
     }
-    const candidates = this.provider
-      .snapshot()
-      .quotes.filter(
-        (q) => q.currency === input.currency && q.expiresAt > now && q.band >= input.usdAmount,
-      );
-    if (candidates.length === 0) {
-      return { failure: { reason: "REASON_NO_QUOTE_AVAILABLE" } };
-    }
-    // Best = lowest local-amount for the same USD input.
-    const best = candidates.reduce((a, b) => (a.rate <= b.rate ? a : b));
-    return {
-      success: {
-        quote: best,
-        payoutAmount: input.usdAmount * best.rate,
-        settlementAmount: input.usdAmount,
+    const now = input.now ?? this.now();
+    const res = await this.ofiClient.getQuote(
+      {
+        usdAmount: input.usdAmount,
+        currency: input.currency,
+        paymentMethod: this.paymentMethod,
       },
-    };
+      this.now,
+    );
+    return toGetQuoteResult(res, now, input.currency);
   }
 
   /** GetQuote by id — validates the specific quote. */

@@ -1,64 +1,98 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { MockT0Client } from "./client";
 import { PayoutProviderService } from "./provider";
 import { SandboxNetwork } from "./network";
 import { OFIService } from "./ofi";
+import { MockOfiT0Client, type OfiT0Client } from "./ofi-client";
 
 let clock = 1_700_000_000_000;
 const now = () => clock;
 
 let provider: PayoutProviderService;
+let mockOfiClient: OfiT0Client;
 let network: SandboxNetwork;
 let ofi: OFIService;
 
 beforeEach(() => {
   clock = 1_700_000_000_000;
   provider = new PayoutProviderService(new MockT0Client(), now);
-  network = new SandboxNetwork(provider);
+  // Build a "real best-pick" implementation by closing over provider.snapshot().
+  mockOfiClient = new MockOfiT0Client({
+    pickBestQuote: (usdAmount, currency, now) => {
+      const candidates = provider
+        .snapshot()
+        .quotes.filter(
+          (q) => q.currency === currency && q.expiresAt > now && q.band >= usdAmount,
+        );
+      if (candidates.length === 0) return null;
+      const best = candidates.reduce((a, b) => (a.rate <= b.rate ? a : b));
+      return {
+        rate: best.rate,
+        expiresAt: best.expiresAt,
+        createdAt: best.createdAt,
+        quoteId: best.id,
+      };
+    },
+  });
+  network = new SandboxNetwork(provider, mockOfiClient, "PAYMENT_METHOD_TYPE_SEPA", now);
   ofi = new OFIService(network, now);
 });
 
-describe("SandboxNetwork.getQuote (oneof semantics)", () => {
-  it("returns failure INVALID_AMOUNT on non-positive usd", () => {
-    const r = ofi.getQuote({ usdAmount: 0, currency: "EUR" });
+describe("SandboxNetwork.getQuote (delegates to OfiT0Client)", () => {
+  it("returns failure INVALID_AMOUNT on non-positive usd (local validation, no client call)", async () => {
+    const spy = vi.spyOn(mockOfiClient, "getQuote");
+    const r = await ofi.getQuote({ usdAmount: 0, currency: "EUR" });
     expect(r).toEqual({ failure: { reason: "REASON_INVALID_AMOUNT" } });
+    expect(spy).not.toHaveBeenCalled();
   });
 
-  it("returns failure CURRENCY_NOT_SUPPORTED for unknown currency", () => {
+  it("returns failure CURRENCY_NOT_SUPPORTED for unknown currency (local validation)", async () => {
+    const spy = vi.spyOn(mockOfiClient, "getQuote");
     // ZWL is not in the supported list — it must be rejected.
-    const r = ofi.getQuote({ usdAmount: 1000, currency: "ZWL" as never });
+    const r = await ofi.getQuote({ usdAmount: 1000, currency: "ZWL" as never });
     expect(r).toEqual({ failure: { reason: "REASON_CURRENCY_NOT_SUPPORTED" } });
+    expect(spy).not.toHaveBeenCalled();
   });
 
-  it("returns failure NO_QUOTE_AVAILABLE when no provider quotes exist", () => {
-    const r = ofi.getQuote({ usdAmount: 1000, currency: "EUR" });
+  it("returns failure NO_QUOTE_AVAILABLE when no provider quotes exist", async () => {
+    const r = await ofi.getQuote({ usdAmount: 1000, currency: "EUR" });
     expect(r).toEqual({ failure: { reason: "REASON_NO_QUOTE_AVAILABLE" } });
   });
 
   it("returns failure NO_QUOTE_AVAILABLE when no quote covers the amount", async () => {
     await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
-    const r = ofi.getQuote({ usdAmount: 5_000, currency: "EUR" });
+    const r = await ofi.getQuote({ usdAmount: 5_000, currency: "EUR" });
     expect(r).toEqual({ failure: { reason: "REASON_NO_QUOTE_AVAILABLE" } });
   });
 
   it("ignores expired quotes", async () => {
     await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9, ttlMs: 10 });
     clock += 11;
-    const r = ofi.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    const r = await ofi.getQuote({ usdAmount: 1_000, currency: "EUR" });
     expect(r).toEqual({ failure: { reason: "REASON_NO_QUOTE_AVAILABLE" } });
   });
 
-  it("picks the best (lowest local-amount) live quote", async () => {
+  it("picks the best (lowest local-amount) live quote via the mock client", async () => {
     await provider.publishQuote({ currency: "EUR", band: 5_000, rate: 0.95 });
     await provider.publishQuote({ currency: "EUR", band: 5_000, rate: 0.9 });
     await provider.publishQuote({ currency: "EUR", band: 5_000, rate: 0.92 });
-    const r = ofi.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    const r = await ofi.getQuote({ usdAmount: 1_000, currency: "EUR" });
     expect("success" in r).toBe(true);
     if ("success" in r) {
       expect(r.success.quote.rate).toBe(0.9);
       expect(r.success.payoutAmount).toBeCloseTo(900);
       expect(r.success.settlementAmount).toBe(1_000);
     }
+  });
+
+  it("forwards paymentMethod from the network to the client", async () => {
+    const spy = vi.spyOn(mockOfiClient, "getQuote");
+    await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    await ofi.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentMethod: "PAYMENT_METHOD_TYPE_SEPA" }),
+      expect.any(Function),
+    );
   });
 });
 

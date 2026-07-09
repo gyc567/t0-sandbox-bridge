@@ -41,6 +41,22 @@ const MESSAGES: Record<QuoteFailureReason, QuoteFailureMessage> = {
     detail:
       "Quotes are short-lived (default 60s). Run Get Quote again and create the payment before the new quote expires.",
   },
+  // ── agtpay REST bridge errors (added in OFI REST refactor) ────────
+  REASON_UPSTREAM_ERROR: {
+    title: "Upstream service error",
+    detail:
+      "agtpay /api/v1/quotes/network returned an unexpected error. Try again, or check the Provider console.",
+  },
+  REASON_UNAUTHORIZED: {
+    title: "API key rejected",
+    detail:
+      "T0_OFI_API_KEY is missing or invalid. Check your .env configuration.",
+  },
+  REASON_BAD_REQUEST: {
+    title: "Invalid quote request",
+    detail:
+      "The request to agtpay was malformed. Verify currency, amount, and payment method.",
+  },
 };
 
 /**
@@ -48,7 +64,15 @@ const MESSAGES: Record<QuoteFailureReason, QuoteFailureMessage> = {
  * short, human-readable title + a longer detail explaining the next step.
  * The detail line points the OFI operator to the Provider console when
  * the underlying cause is missing-publishes (the common demo path).
+ *
+ * Falls back to a generic message for unknown reasons (forward-compat with
+ * future enum values without crashing the UI).
  */
 export function formatQuoteFailure(reason: QuoteFailureReason): QuoteFailureMessage {
-  return MESSAGES[reason];
+  return (
+    MESSAGES[reason] ?? {
+      title: "Quote lookup failed",
+      detail: `Unknown failure reason: ${reason}`,
+    }
+  );
 }

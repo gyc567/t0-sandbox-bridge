@@ -7,6 +7,7 @@ import { PayoutProviderService } from "./provider";
 import { SandboxNetwork } from "./network";
 import { OFIService } from "./ofi";
 import { MockT0Client } from "./client";
+import { MockOfiT0Client } from "./ofi-client";
 
 describe("role boundary guards", () => {
   it("PayoutProviderService.prototype no longer exposes OFI / Network orchestrator methods", () => {
@@ -27,7 +28,7 @@ describe("role boundary guards", () => {
 
   it("SandboxNetwork.prototype exposes the orchestrator surface", () => {
     const svc = new PayoutProviderService(new MockT0Client());
-    const network = new SandboxNetwork(svc);
+    const network = new SandboxNetwork(svc, new MockOfiT0Client({ pickBestQuote: () => null }));
     const proto = Object.getPrototypeOf(network);
     expect(proto.createPayment).toBeTypeOf("function");
     expect(proto.completeManualAml).toBeTypeOf("function");
@@ -45,7 +46,7 @@ describe("role boundary guards", () => {
 
   it("OFIService routes createPayment through SandboxNetwork (not directly to Provider)", async () => {
     const svc = new PayoutProviderService(new MockT0Client());
-    const network = new SandboxNetwork(svc);
+    const network = new SandboxNetwork(svc, new MockOfiT0Client({ pickBestQuote: () => null }));
     const ofi = new OFIService(network);
     const spy = vi.spyOn(network, "createPayment");
     expect(spy).toBeTypeOf("function");

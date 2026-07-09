@@ -63,7 +63,7 @@ export const ofiSnapshotFn = createServerFn({ method: "GET" }).handler(async () 
 
 export const ofiGetQuoteFn = createServerFn({ method: "POST" })
   .validator((d: { usdAmount: number; currency: Currency }) => d)
-  .handler(async ({ data }) => sandboxNetwork.getQuote(data));
+  .handler(async ({ data }) => await sandboxNetwork.getQuote(data));
 
 export const ofiCreatePaymentFn = createServerFn({ method: "POST" })
   .validator((d: CreatePaymentInput) => d)

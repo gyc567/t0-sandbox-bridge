@@ -19,6 +19,7 @@ import {
 import { MockT0Client } from "./client";
 import { PayoutProviderService } from "./provider";
 import { SandboxNetwork } from "./network";
+import { MockOfiT0Client } from "./ofi-client";
 import {
   payOut,
   updatePayment,
@@ -38,7 +39,7 @@ const ctx = {} as HandlerContext;
 beforeEach(() => {
   clock = 1_700_000_000_000;
   svc = new PayoutProviderService(new MockT0Client(), now);
-  network = new SandboxNetwork(svc);
+  network = new SandboxNetwork(svc, new MockOfiT0Client({ pickBestQuote: () => null }));
 });
 
 // Helper: create a known payment via the Network orchestrator (OFI →

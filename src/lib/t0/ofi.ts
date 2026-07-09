@@ -22,8 +22,12 @@ export interface GetQuoteInput {
 export class OFIService {
   constructor(private readonly network: SandboxNetwork, private readonly now: () => number = Date.now) {}
 
-  getQuote(input: GetQuoteInput): GetQuoteResult {
-    return this.network.getQuote({ ...input, now: this.now() });
+  getQuote(input: GetQuoteInput): Promise<GetQuoteResult> {
+    return this.network.getQuote({
+      usdAmount: input.usdAmount,
+      currency: input.currency,
+      now: this.now(),
+    });
   }
 
   getQuoteById(quoteId: string): GetQuoteResult {
