@@ -33,3 +33,8 @@ coverage/
 *.sw?
 .gstack/
 .vercel
+
+# Local environment files (secrets — never commit)
+.env
+.env.local
+.env.*.local
