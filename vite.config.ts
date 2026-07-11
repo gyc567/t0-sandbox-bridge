@@ -22,12 +22,11 @@ export default defineConfig({
     preset: "vercel",
   },
   vite: {
-    resolve: {
-      alias: {
-        // Prevent node:async_hooks from leaking into client bundle (TanStack Start + React 19 bug)
-        "node:async_hooks": "/src/lib/polyfills/async_hooks.ts",
-        "async_hooks": "/src/lib/polyfills/async_hooks.ts",
-      },
-    },
+    // No resolve.alias override here on purpose:
+    // src/lib/polyfills/async_hooks.ts is environment-aware and exports the
+    // real Node.js AsyncLocalStorage in SSR / the browser shim in the client
+    // bundle, so we don't need to redirect `node:async_hooks` (the previous
+    // alias replaced it on both sides, which broke getStartContext() server-
+    // side and turned every SSR loader / server fn into a 500).
   },
 });
