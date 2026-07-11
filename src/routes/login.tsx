@@ -1,75 +1,84 @@
-import { createFileRoute, redirect, useRouter, useSearch } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+// /login — Role picker (no auth).
+//
+// Audit (2026-07-10): the previous credentialed form hit `/api/login`, which
+// set a session cookie guarded by `requireRole` on every route. That coupling
+// made a single bad credential (or a Vite SSR middleware hiccup) block every
+// downstream page. Per the operator, the demo controls are open: the user
+// picks OFI or Provider and lands on the matching console. No password, no
+// cookie, no gate.
+
+import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { logoutFn, getSessionFn } from "@/lib/auth/auth.functions";
-import { KeyRound, LogOut } from "lucide-react";
+import { KeyRound, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({
-    meta: [
-      { title: "Sign In — T-0 Sandbox Bridge" },
-      { name: "description", content: "Sign in as OFI or Provider to enter the BAXS T-0 sandbox." },
-    ],
-  }),
   validateSearch: (search: Record<string, unknown>) => ({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
   }),
-  beforeLoad: async () => {
-    const { session } = await getSessionFn();
-    if (session) throw redirect({ to: routeFromRole(session.role) as "/" });
-    return {};
-  },
   component: LoginPage,
 });
 
-function routeFromRole(role: "ofi" | "provider"): string {
-  return role === "ofi" ? "/ofi" : "/provider";
+interface DemoAccount {
+  /** Where the picker sends the user. */
+  to: "/ofi" | "/provider";
+  role: "OFI" | "Provider";
+  email: string;
+  note: string;
 }
 
-const DEMO_ACCOUNTS = [
-  { email: "ofi@baxs.demo", password: "demo-ofi-2026", role: "OFI", note: "Originates payments" },
+export const DEMO_ACCOUNTS: ReadonlyArray<DemoAccount> = [
+  { to: "/ofi", role: "OFI", email: "ofi@baxs.demo", note: "Originates payments" },
   {
-    email: "provider@baxs.demo",
-    password: "demo-provider-2026",
+    to: "/provider",
     role: "Provider",
+    email: "provider@baxs.demo",
     note: "Publishes quotes & executes payouts",
   },
 ];
 
+/**
+ * Validate the optional `?redirect=` search param. Mirrors the policy used
+ * inside the picker: same-origin paths only, no leading `//` (which the
+ * browser would treat as an external URL).
+ *
+ * Exported as a pure helper so we can unit-test the policy without
+ * rendering React. Returns null for unsafe or missing values.
+ */
+export function safeRedirectPath(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.length === 0) return null;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  return raw;
+}
+
+/**
+ * Pick the route to navigate to after the operator chooses a role.
+ * Honours a safe `?redirect=` param when it matches a known demo
+ * destination; otherwise falls back to the role's console.
+ */
+export function pickEntryTarget(
+  account: DemoAccount,
+  safeRedirect: string | null,
+): DemoAccount["to"] | string {
+  if (safeRedirect && DEMO_ACCOUNTS.some((a) => a.to === safeRedirect)) {
+    return safeRedirect;
+  }
+  return account.to;
+}
+
 function LoginPage() {
-  const search = useSearch({ from: "/login" });
-  const redirectTo = search.redirect;
+  const search = Route.useSearch();
   const router = useRouter();
-  const logout = useServerFn(logoutFn);
-
-  const [email, setEmail] = useState("ofi@baxs.demo");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  // The form is a native HTML POST to /api/login — works without React
-  // hydration. The URL query ?error=…&redirect=… is set on bad credentials.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const err = params.get("error");
-    if (err) setError(messageForCode(err));
-  }, []);
-
-  const fill = (acct: { email: string; password: string }) => {
-    setEmail(acct.email);
-    setPassword(acct.password);
-    setError(null);
-  };
-
-  const onLogout = async () => {
-    await logout({});
-    await router.invalidate();
-    router.navigate({ to: "/login" });
+  const safeRedirect = safeRedirectPath(search.redirect);
+  // Track which card the operator last hovered so the CTA can target it.
+  const [pending, setPending] = useState<DemoAccount["to"] | null>(null);
+  const enter = (account: DemoAccount) => {
+    const target = pickEntryTarget(account, safeRedirect);
+    // The literal values are narrow: we know they're "/ofi" or "/provider"
+    // because pickEntryTarget only returns one of the demo destinations.
+    router.navigate({ to: target as "/ofi" | "/provider" });
   };
 
   return (
@@ -79,10 +88,10 @@ function LoginPage() {
           <header className="space-y-2 text-center border-b border-hairline pb-6">
             <p className="eyebrow">ACCESS · SANDBOX</p>
             <h1 className="text-display-md font-semibold tracking-tight text-foreground">
-              Sign in to your console
+              Pick your console
             </h1>
             <p className="font-mono text-muted-foreground" style={{ fontSize: "12px" }}>
-              Two roles, two flows — pick yours
+              Two roles, two flows — open access for demo & inspection
             </p>
           </header>
 
@@ -94,120 +103,70 @@ function LoginPage() {
                   className="font-mono uppercase text-foreground"
                   style={{ fontSize: "12px", letterSpacing: "0.08em" }}
                 >
-                  Credentials
+                  Choose role
                 </CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="p-5">
-              <form
-                action="/api/login"
-                method="post"
-                className="space-y-4"
-                data-testid="login-form"
-              >
-                {/* hidden redirect target so the server can send us back where we came from */}
-                {redirectTo && <input type="hidden" name="redirect" value={redirectTo} />}
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="username"
-                    className="font-mono text-caption"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                    Password
-                  </Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                    className="font-mono text-caption"
-                  />
-                </div>
-                {error && (
-                  <p
-                    className="font-mono text-[#ff453a]"
-                    style={{ fontSize: "12px" }}
-                    data-testid="login-error"
-                  >
-                    {error}
-                  </p>
-                )}
-                <Button type="submit" className="btn-glow w-full">
-                  Sign In
-                </Button>
-              </form>
-
-              <div className="mt-4 flex justify-end">
-                <Button variant="ghost" size="sm" onClick={onLogout} data-testid="logout-btn">
-                  <LogOut className="w-4 h-4" />
-                  Clear session
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-hairline bg-glass backdrop-blur-xl">
-            <CardHeader className="border-b border-hairline">
-              <CardTitle
-                className="font-mono uppercase text-foreground"
-                style={{ fontSize: "12px", letterSpacing: "0.08em" }}
-              >
-                Demo accounts (sandbox)
-              </CardTitle>
-            </CardHeader>
             <CardContent className="p-5 space-y-3">
               {DEMO_ACCOUNTS.map((a) => (
-                <button
-                  key={a.email}
-                  type="button"
-                  onClick={() => fill(a)}
-                  className="w-full rounded-md border border-hairline bg-background/40 px-3 py-2 text-left transition-colors hover:border-accent-cyan"
-                  data-testid={`fill-${a.role}`}
+                <div
+                  key={a.to}
+                  role="group"
+                  aria-label={`Enter ${a.role} console`}
+                  data-testid={`enter-${a.role}`}
+                  onMouseEnter={() => setPending(a.to)}
+                  onFocus={() => setPending(a.to)}
+                  className="rounded-md border border-hairline bg-background/40 transition-colors hover:border-accent-cyan"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-foreground" style={{ fontSize: "13px" }}>
-                      {a.role}
-                    </span>
-                    <span className="font-mono text-muted-canvas" style={{ fontSize: "10px" }}>
-                      click to fill
-                    </span>
+                  <div className="flex items-center justify-between gap-3 px-3 py-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-foreground" style={{ fontSize: "13px" }}>
+                          {a.role}
+                        </span>
+                        <span className="font-mono text-muted-canvas" style={{ fontSize: "10px" }}>
+                          click to enter
+                        </span>
+                      </div>
+                      <div className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                        {a.email}
+                      </div>
+                      <div className="font-mono text-muted-canvas" style={{ fontSize: "10px" }}>
+                        {a.note}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="btn-glow"
+                      onClick={() => enter(a)}
+                      data-testid={`enter-${a.role}-btn`}
+                      aria-label={`Enter ${a.role} console`}
+                    >
+                      Enter
+                      <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                    </Button>
                   </div>
-                  <div className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                    {a.email}
-                  </div>
-                  <div className="font-mono text-muted-canvas" style={{ fontSize: "10px" }}>
-                    {a.note}
-                  </div>
-                </button>
+                </div>
               ))}
+              {/* pending/aria plumbing so tests can locate the focused card */}
+              <span data-testid="login-pending" hidden>
+                {pending ?? ""}
+              </span>
             </CardContent>
           </Card>
+
+          {safeRedirect && (
+            <p className="font-mono text-muted-canvas text-center" style={{ fontSize: "11px" }}>
+              After picking a role you will land on{" "}
+              <code className="text-foreground">{safeRedirect}</code>.
+            </p>
+          )}
         </div>
       </div>
     </SiteLayout>
   );
 }
 
-function messageForCode(code: string): string {
-  switch (code) {
-    case "UserNotFound":
-      return "No account with that email.";
-    case "InvalidCredentials":
-      return "Wrong password.";
-    case "SessionExpired":
-      return "Session expired — please sign in again.";
-    default:
-      return `Sign-in failed (${code}).`;
-  }
-}
+// re-export so KISS module shape stays explicit (no unused redirect helpers)
+void redirect;

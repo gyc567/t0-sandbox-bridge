@@ -1,77 +1,36 @@
-// Native HTML form POST handler for the login page.
-// Works without React hydration: the form's default submit goes here,
-// and we set the session cookie + redirect to the role's console.
+// /api/login — kept as a stable POST target for any legacy callers.
 //
-// This exists as a fallback for when client-side React hydration has not
-// completed (the production TanStack Start build sometimes omits the
-// client bootstrap script in its SSR output). The same flow is also
-// available via the `loginFn` server function when JS is loaded.
+// Auth was removed (2026-07-10 audit): the OFI/Provider consoles are open in
+// the sandbox. The picker page at /login issues a client-side navigation
+// directly, so this route is essentially dead weight. We still resolve POST
+// to a 303 → /login so any straggling form (curl, integration script, old
+// browser tab) can't surprise the operator with a 404.
+//
+// The handler factories are exported as plain functions so unit tests can
+// exercise them without spinning up a router.
 
 import { createFileRoute } from "@tanstack/react-router";
-import { AuthError } from "@/lib/auth";
-import { authService } from "@/lib/auth/singleton";
-import { setCookie, deleteCookie } from "@tanstack/start-server-core/request-response";
 
-const SESSION_COOKIE = "t0sb_session";
-const SESSION_COOKIE_MAX_AGE = 8 * 60 * 60; // seconds
-
-// Re-use the shared singleton so this route + loginFn / getSessionFn
-// / beforeLoad all see the same in-memory session map.
-const auth = authService;
-
-function redirectTo(to: string): Response {
+/** POST → 303 redirect to the picker page. */
+export function postHandler(): Response {
   return new Response(null, {
-    status: 303, // See Other: form POST -> GET
-    headers: { location: to },
+    status: 303,
+    headers: { location: "/login" },
   });
 }
 
-async function handle(request: Request): Promise<Response> {
-  if (request.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
-  }
-
-  const form = await request.formData();
-  const email = String(form.get("email") ?? "").trim().toLowerCase();
-  const password = String(form.get("password") ?? "");
-  const redirectRaw = String(form.get("redirect") ?? "");
-  const safeRedirect = redirectRaw.startsWith("/") && !redirectRaw.startsWith("//") ? redirectRaw : "";
-
-  let session: Awaited<ReturnType<typeof auth.login>>;
-  try {
-    session = await auth.login(email, password);
-  } catch (e) {
-    if (e instanceof AuthError) {
-      const params = new URLSearchParams({ error: e.code });
-      if (safeRedirect) params.set("redirect", safeRedirect);
-      return new Response(null, {
-        status: 303,
-        headers: { location: `/login?${params.toString()}` },
-      });
-    }
-    throw e;
-  }
-
-  setCookie(SESSION_COOKIE, session.token, {
-    maxAge: SESSION_COOKIE_MAX_AGE,
-    path: "/",
-    httpOnly: false,
-    sameSite: "lax",
+/** GET → a friendly 200 notice (no more credential flow). */
+export function getHandler(): Response {
+  return new Response("Auth removed — sandbox is open access. Visit /login to pick a role.", {
+    status: 200,
   });
-
-  const fallback = session.role === "ofi" ? "/ofi" : "/provider";
-  return redirectTo(safeRedirect || fallback);
 }
 
 export const Route = createFileRoute("/api/login")({
   server: {
     handlers: {
-      POST: ({ request }) => handle(request),
-      GET: () => new Response("Method not allowed", { status: 405 }),
+      POST: () => postHandler(),
+      GET: () => getHandler(),
     },
   },
 });
-
-// Suppress unused-export warning for `deleteCookie` if the framework
-// re-exports route internals.
-void deleteCookie;
