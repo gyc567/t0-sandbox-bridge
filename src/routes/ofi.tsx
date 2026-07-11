@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { LogOut, Wallet, Send, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { QuoteManagementTabs } from "@/components/ofi/QuoteManagementTabs";
 
 type OfiSnapshot = {
   payments: Payment[];
@@ -208,15 +209,10 @@ function OfiPage() {
             data-testid="ofi-error"
           >
             <p className="text-[#ff453a] font-semibold">{errorTitle ?? error}</p>
-            {errorTitle && (
-              <p className="text-[#ff453a]/90">{errorDetail ?? error}</p>
-            )}
+            {errorTitle && <p className="text-[#ff453a]/90">{errorDetail ?? error}</p>}
             {errorActionHref && (
               <p>
-                <a
-                  href={errorActionHref}
-                  className="text-[#00d4ff] underline underline-offset-2"
-                >
+                <a href={errorActionHref} className="text-[#00d4ff] underline underline-offset-2">
                   {errorActionLabel ?? "Open Provider console"}
                 </a>
               </p>
@@ -224,99 +220,104 @@ function OfiPage() {
           </div>
         )}
 
-        <PanelCard step="01" title="Get Quote">
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                USD amount
-              </Label>
-              <Input
-                type="number"
-                value={usdAmount}
-                onChange={(e) => setUsdAmount(Number(e.target.value))}
-                className="w-32 font-mono"
-              />
-            </div>
-            <div>
-              <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                Target currency
-              </Label>
-              <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
-                <SelectTrigger className="w-40 font-mono" data-testid="currency-trigger">
-                  <SelectValue aria-label={currency}>
-                    {`${currency} · ${getCurrencyLabel(currency)}`}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {currencies.map((c) => (
-                    <SelectItem key={c} value={c} data-testid={`currency-option-${c}`}>
-                      {`${c} · ${getCurrencyLabel(c)}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button size="sm" className="btn-glow" disabled={busy} onClick={onGetQuote} data-testid="btn-quote">
-              <Wallet className="w-4 h-4" />
-              Get Quote
-            </Button>
-          </div>
-          {quoteSummary && (
-            <div
-              className="mono-block mt-4 space-y-3 border border-hairline rounded p-3"
-              data-testid="quote-display"
-            >
-              {quoteDisplay && (
-                <div className="grid gap-3 md:grid-cols-3 font-mono text-caption">
-                  {/* Pair + rate — the headline of the row. */}
-                  <div className="space-y-1">
-                    <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
-                      Pair
-                    </p>
-                    <p className="text-foreground font-semibold">{quoteDisplay.pair}</p>
-                    <p className="text-muted-foreground">
-                      Rate&nbsp;
-                      <span className="tabular text-foreground">{quoteDisplay.rate}</span>
-                    </p>
-                  </div>
-                  {/* Payout + settlement — what the OFI's customer actually receives. */}
-                  <div className="space-y-1">
-                    <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
-                      Payout · Settlement
-                    </p>
-                    <p className="text-foreground">
-                      <span className="tabular">{quoteDisplay.payout}</span>
-                      <span className="text-muted-foreground"> · </span>
-                      <span className="tabular">{quoteDisplay.settlement}</span>
-                    </p>
-                  </div>
-                  {/* Expiration — static read-out, no live timer (KISS). */}
-                  <div className="space-y-1">
-                    <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
-                      Expires in
-                    </p>
-                    <p className="text-foreground">
-                      <span className="tabular">{quoteDisplay.expiresInSeconds}s</span>
-                      <span className="text-muted-foreground">
-                        {" "}
-                        (at {new Date(quoteDisplay.expiresAt).toISOString().slice(11, 19)} UTC)
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              )}
-              <p className="text-muted-foreground font-mono" style={{ fontSize: "10px" }}>
-                Raw payload (support tickets):
-              </p>
-              <pre
-                className="font-mono text-caption overflow-auto"
-                data-testid="quote-summary"
+        <QuoteManagementTabs>
+          <PanelCard step="01" title="Get Quote">
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                  USD amount
+                </Label>
+                <Input
+                  type="number"
+                  value={usdAmount}
+                  onChange={(e) => setUsdAmount(Number(e.target.value))}
+                  className="w-32 font-mono"
+                />
+              </div>
+              <div>
+                <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                  Target currency
+                </Label>
+                <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
+                  <SelectTrigger className="w-40 font-mono" data-testid="currency-trigger">
+                    <SelectValue aria-label={currency}>
+                      {`${currency} · ${getCurrencyLabel(currency)}`}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currencies.map((c) => (
+                      <SelectItem key={c} value={c} data-testid={`currency-option-${c}`}>
+                        {`${c} · ${getCurrencyLabel(c)}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                size="sm"
+                className="btn-glow"
+                disabled={busy}
+                onClick={onGetQuote}
+                data-testid="btn-quote"
               >
-                {JSON.stringify(quoteSummary, null, 2)}
-              </pre>
+                <Wallet className="w-4 h-4" />
+                Get Quote
+              </Button>
             </div>
-          )}
-        </PanelCard>
+            {quoteSummary && (
+              <div
+                className="mono-block mt-4 space-y-3 border border-hairline rounded p-3"
+                data-testid="quote-display"
+              >
+                {quoteDisplay && (
+                  <div className="grid gap-3 md:grid-cols-3 font-mono text-caption">
+                    {/* Pair + rate — the headline of the row. */}
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Pair
+                      </p>
+                      <p className="text-foreground font-semibold">{quoteDisplay.pair}</p>
+                      <p className="text-muted-foreground">
+                        Rate&nbsp;
+                        <span className="tabular text-foreground">{quoteDisplay.rate}</span>
+                      </p>
+                    </div>
+                    {/* Payout + settlement — what the OFI's customer actually receives. */}
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Payout · Settlement
+                      </p>
+                      <p className="text-foreground">
+                        <span className="tabular">{quoteDisplay.payout}</span>
+                        <span className="text-muted-foreground"> · </span>
+                        <span className="tabular">{quoteDisplay.settlement}</span>
+                      </p>
+                    </div>
+                    {/* Expiration — static read-out, no live timer (KISS). */}
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Expires in
+                      </p>
+                      <p className="text-foreground">
+                        <span className="tabular">{quoteDisplay.expiresInSeconds}s</span>
+                        <span className="text-muted-foreground">
+                          {" "}
+                          (at {new Date(quoteDisplay.expiresAt).toISOString().slice(11, 19)} UTC)
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <p className="text-muted-foreground font-mono" style={{ fontSize: "10px" }}>
+                  Raw payload (support tickets):
+                </p>
+                <pre className="font-mono text-caption overflow-auto" data-testid="quote-summary">
+                  {JSON.stringify(quoteSummary, null, 2)}
+                </pre>
+              </div>
+            )}
+          </PanelCard>
+        </QuoteManagementTabs>
 
         <PanelCard step="02" title="Create Payment">
           <div className="grid gap-3 md:grid-cols-2">

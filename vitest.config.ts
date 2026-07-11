@@ -14,6 +14,7 @@ export default defineConfig({
       "src/shared/**/*.test.ts",
       "src/shared/**/*.contract.test.ts",
       "src/test/**/*.test.ts",
+      "src/components/ofi/**/*.test.tsx",
     ],
     exclude: ["**/node_modules/**", "**/dist/**", "**/.output/**", "**/.vercel/**"],
     environment: "happy-dom",
@@ -33,6 +34,7 @@ export default defineConfig({
         "src/lib/theme/**/*.ts",
         "src/lib/playground/playback.ts",
         "src/shared/contracts/**/*.ts",
+        "src/components/ofi/**/*.tsx",
       ],
       exclude: [
         "**/*.test.ts",
