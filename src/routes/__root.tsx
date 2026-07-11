@@ -126,6 +126,11 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en" className="dark">
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){if(typeof globalThis!=='undefined'&&!globalThis.AsyncLocalStorage){globalThis.AsyncLocalStorage=function(){this.store=void 0};globalThis.AsyncLocalStorage.prototype.getStore=function(){return this.store};globalThis.AsyncLocalStorage.prototype.run=function(s,fn,...a){this.store=s;try{return fn(...a)}finally{this.store=void 0}};globalThis.AsyncLocalStorage.prototype.enterWith=function(s){this.store=s};globalThis.AsyncLocalStorage.prototype.disable=function(){this.store=void 0};}})();`,
+          }}
+        />
       </head>
       <body>
         <ThemeBootstrap />

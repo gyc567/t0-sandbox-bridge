@@ -143,41 +143,39 @@ async function main() {
   ]);
   const publicOk = smoke.find((s) => s.path === "/").status === 200;
   const loginOk = smoke.find((s) => s.path === "/login").status === 200;
-  const provRedirectOk = smoke.find((s) => s.path === "/provider").status === 307;
-  const ofiRedirectOk = smoke.find((s) => s.path === "/ofi").status === 307;
-  if (publicOk && loginOk && provRedirectOk && ofiRedirectOk) {
+  // 2026-07-10 audit: /ofi and /provider are now open access (no auth gate).
+  // They used to redirect to /login with 307; now they render 200 directly.
+  const provOpen = smoke.find((s) => s.path === "/provider").status === 200;
+  const ofiOpen = smoke.find((s) => s.path === "/ofi").status === 200;
+  if (publicOk && loginOk && provOpen && ofiOpen) {
     pass("01-http-smoke-anon", { smoke });
   } else {
-    fail("01-http-smoke-anon", "expected 200/200/307/307", { smoke });
+    fail("01-http-smoke-anon", "expected /, /login, /provider, /ofi all 200", { smoke });
   }
 
-  // ── Phase 3: Login as Provider via real /api/login form POST ───
-  log("auth", `POST /api/login as ${PROVIDER_EMAIL}`);
+  // ── Phase 3: Legacy /api/login POST (open-access posture) ──────
+  // The credentialed flow was removed; /api/login now resolves any POST
+  // to a 303 → /login so legacy callers don't get a 404.
+  log("auth", `POST /api/login (legacy credentialed flow removed)`);
   const provLogin = await loginViaCurlForm(`${BASE_URL}/api/login`, PROVIDER_EMAIL, PROVIDER_PASSWORD);
-  if (provLogin.status === 303 && provLogin.location === "/provider") {
-    pass("02-provider-login-api", { location: provLogin.location, hasCookie: !!provLogin.setCookie });
+  if (provLogin.status === 303 && provLogin.location === "/login") {
+    pass("02-legacy-api-login-provider", { location: provLogin.location });
   } else {
-    fail("02-provider-login-api", `expected 303 /provider, got ${provLogin.status} ${provLogin.location}`);
+    fail("02-legacy-api-login-provider", `expected 303 /login, got ${provLogin.status} ${provLogin.location}`);
   }
 
-  // ── Phase 4: Login as OFI ──────────────────────────────────────
-  log("auth", `POST /api/login as ${OFI_EMAIL}`);
+  // ── Phase 4: Same probe with OFI credentials ───────────────────
+  log("auth", `POST /api/login (OFI credentials — should also 303 → /login)`);
   const ofiLogin = await loginViaCurlForm(`${BASE_URL}/api/login`, OFI_EMAIL, OFI_PASSWORD);
-  if (ofiLogin.status === 303 && ofiLogin.location === "/ofi") {
-    pass("03-ofi-login-api", { location: ofiLogin.location, hasCookie: !!ofiLogin.setCookie });
+  if (ofiLogin.status === 303 && ofiLogin.location === "/login") {
+    pass("03-legacy-api-login-ofi", { location: ofiLogin.location });
   } else {
-    fail("03-ofi-login-api", `expected 303 /ofi, got ${ofiLogin.status} ${ofiLogin.location}`);
+    fail("03-legacy-api-login-ofi", `expected 303 /login, got ${ofiLogin.status} ${ofiLogin.location}`);
   }
 
-  // ── Phase 5: Authenticated route access ────────────────────────
-  log("routes", "Authenticated GET /provider and /ofi");
-  const provCookie = provLogin.setCookie.split(";")[0]; // "t0sb_session=..."
-  const ofiCookie = ofiLogin.setCookie.split(";")[0];
-
-  // Provider console with cookie
-  const provHtml = await fetch(`${BASE_URL}/provider`, {
-    headers: { Cookie: provCookie },
-  }).then((r) => r.text());
+  // ── Phase 5: Open-access route rendering (no cookie needed) ───
+  log("routes", "Open-access GET /provider and /ofi");
+  const provHtml = await fetch(`${BASE_URL}/provider`).then((r) => r.text());
   const provHasQuoteUI = provHtml.includes("Publish Quote") && provHtml.includes('data-testid="publish-quote"');
   if (provHasQuoteUI) {
     pass("04-provider-console-rendered", { size: provHtml.length });
@@ -188,10 +186,8 @@ async function main() {
     });
   }
 
-  // OFI console with cookie
-  const ofiHtml = await fetch(`${BASE_URL}/ofi`, {
-    headers: { Cookie: ofiCookie },
-  }).then((r) => r.text());
+  // OFI console is open-access — no cookie required.
+  const ofiHtml = await fetch(`${BASE_URL}/ofi`).then((r) => r.text());
   const ofiHasQuoteUI = ofiHtml.includes("Get Quote") && ofiHtml.includes('data-testid="btn-quote"');
   if (ofiHasQuoteUI) {
     pass("05-ofi-console-rendered", { size: ofiHtml.length });
@@ -218,12 +214,12 @@ async function main() {
     networkErrors.push({ url: r.url(), failure: r.failure()?.errorText, method: r.method() }),
   );
 
-  // Login via page.request so the cookie lands in the context.
-  log("browser", "login → /ofi (browser session)");
-  await page.request.post(`${BASE_URL}/api/login`, {
-    form: { email: OFI_EMAIL, password: OFI_PASSWORD },
-    maxRedirects: 0,
-  });
+  // Login via direct fetch (manual cookie handling) — avoids Playwright's
+  // page.request cookie-jar bug where Set-Cookie is parsed against the
+  // relative path "/api/login" and crashes with ERR_INVALID_URL.
+  // Login is now open-access; /api/login is a 303 → /login no-op for legacy
+  // callers. Skip the cookie dance and navigate directly to /ofi.
+  log("browser", "open-access → /ofi (no login required)");
   await page.goto(`${BASE_URL}/ofi`, { waitUntil: "domcontentloaded", timeout: 15000 });
   await page.waitForSelector('[data-testid="btn-quote"]', { timeout: 10000 });
   await page.waitForTimeout(2000);

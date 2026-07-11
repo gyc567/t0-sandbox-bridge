@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-07-09T09:38:37.819Z",
+  "baseUrl": "https://api.agtpay.xyz",
+  "apiKeyLast8": "ee53e4f4",
+  "purpose": "live OFI getQuote end-to-end via the post-fix HttpOfiT0Client wire-format parser",
+  "passed": true,
+  "results": [
+    {
+      "name": "01-gbp-swift-success",
+      "status": "PASS",
+      "quoteId": "7-220299073",
+      "rate": 0.742,
+      "payOutAmount": 371,
+      "settlementAmount": 500,
+      "ttlMs": 58810
+    },
+    {
+      "name": "02-gbp-swift-fresh-quote-id",
+      "status": "PASS",
+      "firstId": "7-220299073",
+      "secondId": "7-220299193"
+    },
+    {
+      "name": "03-eur-sepa-no-quote",
+      "status": "PASS",
+      "reason": "NO_QUOTE"
+    },
+    {
+      "name": "04-gbp-unknown-method-handled",
+      "status": "PASS",
+      "failure": {
+        "reason": "BAD_REQUEST",
+        "message": "{\"error\":\"invalid payOutMethod\"}\n"
+      }
+    },
+    {
+      "name": "05-gbp-swift-large",
+      "status": "PASS",
+      "rate": 0.731,
+      "payOutAmount": 731
+    }
+  ]
+}

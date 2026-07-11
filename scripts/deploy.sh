@@ -213,6 +213,9 @@ check_endpoint "/" "首页"
 # Sandbox 页面
 check_endpoint "/sandbox" "Sandbox 页面" "sandbox\|Sandbox"
 
+# Docs 页面
+check_endpoint "/docs" "Docs 页面"
+
 # 静态资源探测
 # Note: 现代 Vercel SSR 输出的 HTML 中 <link href="/assets/...css"> 通常不带引号，
 # 而早期版本会有 'src="/assets/...js"' 等多种形态。两种都接受；找不到时静默跳过

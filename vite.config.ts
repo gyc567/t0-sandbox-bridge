@@ -11,9 +11,23 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+    serverFns: {
+      // CSRF protection is intentionally handled outside TanStack Start's middleware
+      // (see security notes). Suppress the framework warning to keep the dev log clean.
+      disableCsrfMiddlewareWarning: true,
+    },
   },
   // Vercel deployment configuration
   nitro: {
     preset: "vercel",
+  },
+  vite: {
+    resolve: {
+      alias: {
+        // Prevent node:async_hooks from leaking into client bundle (TanStack Start + React 19 bug)
+        "node:async_hooks": "/src/lib/polyfills/async_hooks.ts",
+        "async_hooks": "/src/lib/polyfills/async_hooks.ts",
+      },
+    },
   },
 });

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SandboxRouteImport } from './routes/sandbox'
 import { Route as ProviderRouteImport } from './routes/provider'
+import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as OfiRouteImport } from './routes/ofi'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IntegrationRouteImport } from './routes/integration'
@@ -27,6 +28,11 @@ const SandboxRoute = SandboxRouteImport.update({
 const ProviderRoute = ProviderRouteImport.update({
   id: '/provider',
   path: '/provider',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlaygroundRoute = PlaygroundRouteImport.update({
+  id: '/playground',
+  path: '/playground',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OfiRoute = OfiRouteImport.update({
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/integration': typeof IntegrationRoute
   '/login': typeof LoginRoute
   '/ofi': typeof OfiRoute
+  '/playground': typeof PlaygroundRoute
   '/provider': typeof ProviderRoute
   '/sandbox': typeof SandboxRoute
   '/api/login': typeof ApiLoginRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/integration': typeof IntegrationRoute
   '/login': typeof LoginRoute
   '/ofi': typeof OfiRoute
+  '/playground': typeof PlaygroundRoute
   '/provider': typeof ProviderRoute
   '/sandbox': typeof SandboxRoute
   '/api/login': typeof ApiLoginRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/integration': typeof IntegrationRoute
   '/login': typeof LoginRoute
   '/ofi': typeof OfiRoute
+  '/playground': typeof PlaygroundRoute
   '/provider': typeof ProviderRoute
   '/sandbox': typeof SandboxRoute
   '/api/login': typeof ApiLoginRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/integration'
     | '/login'
     | '/ofi'
+    | '/playground'
     | '/provider'
     | '/sandbox'
     | '/api/login'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/integration'
     | '/login'
     | '/ofi'
+    | '/playground'
     | '/provider'
     | '/sandbox'
     | '/api/login'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/integration'
     | '/login'
     | '/ofi'
+    | '/playground'
     | '/provider'
     | '/sandbox'
     | '/api/login'
@@ -141,6 +153,7 @@ export interface RootRouteChildren {
   IntegrationRoute: typeof IntegrationRoute
   LoginRoute: typeof LoginRoute
   OfiRoute: typeof OfiRoute
+  PlaygroundRoute: typeof PlaygroundRoute
   ProviderRoute: typeof ProviderRoute
   SandboxRoute: typeof SandboxRoute
   ApiLoginRoute: typeof ApiLoginRoute
@@ -161,6 +174,13 @@ declare module '@tanstack/react-router' {
       path: '/provider'
       fullPath: '/provider'
       preLoaderRoute: typeof ProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/playground': {
+      id: '/playground'
+      path: '/playground'
+      fullPath: '/playground'
+      preLoaderRoute: typeof PlaygroundRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ofi': {
@@ -221,6 +241,7 @@ const rootRouteChildren: RootRouteChildren = {
   IntegrationRoute: IntegrationRoute,
   LoginRoute: LoginRoute,
   OfiRoute: OfiRoute,
+  PlaygroundRoute: PlaygroundRoute,
   ProviderRoute: ProviderRoute,
   SandboxRoute: SandboxRoute,
   ApiLoginRoute: ApiLoginRoute,

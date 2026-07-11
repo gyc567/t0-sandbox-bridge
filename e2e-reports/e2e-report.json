@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-07-10T03:53:11.461Z",
+  "baseUrl": "http://127.0.0.1:8080",
+  "passed": true,
+  "results": [
+    {
+      "name": "00-dev-server-up",
+      "status": "PASS",
+      "mode": "reused-existing"
+    },
+    {
+      "name": "01-http-smoke-anon",
+      "status": "PASS",
+      "smoke": [
+        {
+          "path": "/",
+          "status": 200
+        },
+        {
+          "path": "/login",
+          "status": 200
+        },
+        {
+          "path": "/provider",
+          "status": 200
+        },
+        {
+          "path": "/ofi",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "name": "02-legacy-api-login-provider",
+      "status": "PASS",
+      "location": "/login"
+    },
+    {
+      "name": "03-legacy-api-login-ofi",
+      "status": "PASS",
+      "location": "/login"
+    },
+    {
+      "name": "04-provider-console-rendered",
+      "status": "PASS",
+      "size": 21026
+    },
+    {
+      "name": "05-ofi-console-rendered",
+      "status": "PASS",
+      "size": 19944
+    },
+    {
+      "name": "07-ofi-get-quote-button-success-card",
+      "status": "PASS"
+    },
+    {
+      "name": "08-runtime-get-quote-chain",
+      "status": "PASS",
+      "exitCode": 0,
+      "summary": "7/7 integration tests pass"
+    }
+  ],
+  "consoleErrors": [],
+  "networkErrors": [],
+  "screenshots": {
+    "06-ofi-page-loaded": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/06-ofi-page-loaded.png",
+    "07-after-get-quote": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/07-after-get-quote.png"
+  }
+}

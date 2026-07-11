@@ -1,64 +1,65 @@
 {
-  "baseUrl": "http://127.0.0.1:4173",
-  "timestamp": "2026-07-03T08:58:15.914Z",
+  "baseUrl": "http://127.0.0.1:8080",
+  "timestamp": "2026-07-10T02:17:02.342Z",
   "results": [
     {
       "name": "sandbox console loads",
       "status": "PASS",
-      "durationMs": 174
+      "durationMs": 209
     },
     {
       "name": "six primary console cards present",
       "status": "PASS",
-      "durationMs": 97,
+      "durationMs": 75,
       "note": ""
     },
     {
       "name": "API Tester section mounted with controls",
       "status": "PASS",
-      "durationMs": 18,
-      "note": "pk prefix 0xd1"
+      "durationMs": 20,
+      "note": "pk prefix 0x41"
     },
     {
       "name": "Generate produces a valid-looking key pair",
       "status": "PASS",
-      "durationMs": 382,
-      "note": "pub 0x03f63b…"
+      "durationMs": 331,
+      "note": "pub 0x0200dd…"
     },
     {
       "name": "Sign Request yields signature output",
-      "status": "PASS",
-      "durationMs": 38
+      "status": "FAIL",
+      "durationMs": 5022,
+      "note": "main text contains Signature: false"
     },
     {
       "name": "Publish quote updates Quotes card",
-      "status": "PASS",
-      "durationMs": 57,
-      "note": "Quotes · 1"
+      "status": "FAIL",
+      "durationMs": 15019,
+      "note": "Quotes · 0 (timeout)"
     },
     {
       "name": "Simulate USDT settlement updates Payments and Event Log",
-      "status": "PASS",
-      "durationMs": 31,
-      "note": "Payments · 0, Event Log · 208"
+      "status": "FAIL",
+      "durationMs": 15024,
+      "note": "Payments · 0, Event Log · 0 (timeout)"
     },
     {
       "name": "Simulate credit usage updates Payouts and Event Log",
-      "status": "PASS",
-      "durationMs": 28,
-      "note": "Payouts · 0, Event Log · 208"
+      "status": "FAIL",
+      "durationMs": 15026,
+      "note": "Payouts · 0, Event Log · 0 (timeout)"
     },
     {
       "name": "Event Log has entries after simulations",
-      "status": "PASS",
-      "durationMs": 7,
-      "note": "Event Log · 308"
+      "status": "FAIL",
+      "durationMs": 3,
+      "note": "Event Log · 0"
     }
   ],
   "consoleErrors": [],
   "summary": {
     "total": 9,
-    "pass": 9,
-    "fail": 0
+    "pass": 4,
+    "fail": 5
   }
 }

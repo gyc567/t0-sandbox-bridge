@@ -135,45 +135,15 @@ async function main() {
       ],
     });
 
-    // /playground is now a hard 404 (route file removed in phase 3; TanStack Router
-    // 302 redirect in SSR was unstable). Future reinstatement via redirect is
-    // a deferred item. We assert the route returns 404 here.
-    {
-      const page = await context.newPage();
-      try {
-        const resp = await page.goto(`${BASE_URL}/playground`, {
-          waitUntil: "domcontentloaded",
-          timeout: 15000,
-        });
-        const status = resp ? resp.status() : 0;
-        const passed = status === 404;
-        results.push({
-          name: "playground-route-returns-404",
-          path: "/playground",
-          status: passed ? "PASS" : "FAIL",
-          durationMs: 0,
-          error: passed ? undefined : `expected /playground to return 404, got status ${status}`,
-          consoleMessages: [],
-          failedRequests: [],
-          screenshot: undefined,
-        });
-        if (!passed) allPassed = false;
-      } catch (err) {
-        allPassed = false;
-        results.push({
-          name: "playground-route-returns-404",
-          path: "/playground",
-          status: "FAIL",
-          durationMs: 0,
-          error: err.message,
-          consoleMessages: [],
-          failedRequests: [],
-          screenshot: undefined,
-        });
-      } finally {
-        await page.close();
-      }
-    }
+    // /playground is now a thin 302 redirect wrapper to /sandbox (see
+    // src/routes/playground.tsx). The 404 assertion was correct when
+    // the route file was deleted in an earlier delivery, but the
+    // playground now redirects, so this assertion is removed.
+    // Old block retained for audit reference only:
+    //   - name: playground-route-returns-404
+    //   - path: /playground
+    //   - expected: 404
+    //   - actual (current): 302 -> /sandbox
 
     allPassed &= await testPage(context, {
       name: "sandbox",
