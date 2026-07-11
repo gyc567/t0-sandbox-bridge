@@ -211,7 +211,21 @@ check_endpoint() {
 check_endpoint "/" "首页"
 
 # Sandbox 页面
-check_endpoint "/sandbox" "Sandbox 页面" "sandbox\|Sandbox"
+# Marker: page <title>. TanStack Router's error fallback does NOT emit a
+# <title>, so this catches SSR loader failures that 200-the-body-silently.
+check_endpoint "/sandbox" "Sandbox 页面" "Console — T-0"
+
+# OFI 页面 — uses an SSR loader (`ofiSnapshotFn`), so a polyfill
+# regression on node:async_hooks / AsyncLocalStorage will surface here
+# as a 500 (or a TanStack error fallback with no <title>).
+check_endpoint "/ofi" "OFI 页面" "OFI Console"
+
+# Provider 页面 — also an SSR loader (`snapshotFn`).
+check_endpoint "/provider" "Provider 页面" "Provider Console"
+
+# Playground 路由重定向到 /sandbox，所以测的是重定向后的最终页面。
+# curl -sL 会跟随 307，所以最终 body 应该是 sandbox 的页面。
+check_endpoint "/playground" "Playground 页面（→ /sandbox）" "Console — T-0"
 
 # Docs 页面
 check_endpoint "/docs" "Docs 页面"
