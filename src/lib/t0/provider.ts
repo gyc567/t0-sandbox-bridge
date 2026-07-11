@@ -9,7 +9,10 @@
 // execution lifecycle in response to network-driven PayoutRequests.
 
 import type { T0Client } from "./client";
-import type { Currency, NetworkEvent, Payment, PaymentStatus, Payout, Quote, VolumeBand } from "./types";
+import type { Currency, NetworkEvent, Payment, PaymentStatus, Payout, Quote, SettlementState, VolumeBand } from "./types";
+import { DEFAULT_OFI_WALLET, DEFAULT_PROVIDER_WALLET, type SettlementRegistry, type SubmitSettlementInput } from "./settlement";
+
+import type { ReadModelStore } from "./read-model/store";
 
 let counter = 0;
 const nextId = (prefix: string) =>
@@ -35,10 +38,29 @@ export class PayoutProviderService {
   private payouts = new Map<string, Payout>();
   private events: NetworkEvent[] = [];
 
+  /**
+   * Optional Pre-Settlement registry. When present, `notifyUsdtSettlement`
+   * also drives the §4–§5 settlement flow (and the ledger side-effects).
+   * When absent — typical for legacy unit tests — the old behaviour is
+   * preserved: only an event log entry is written.
+   */
+  settlementRegistry: SettlementRegistry | null;
+
+  /**
+   * Optional ReadModelStore for persisting credit usage notifications.
+   * When present, `notifyCreditUsage` also writes to the durable store.
+   */
+  private readonly readModel: ReadModelStore | null;
+
   constructor(
     private readonly client: T0Client,
     private readonly now: () => number = Date.now,
-  ) {}
+    settlementRegistry: SettlementRegistry | null = null,
+    readModel: ReadModelStore | null = null,
+  ) {
+    this.settlementRegistry = settlementRegistry;
+    this.readModel = readModel;
+  }
 
   // ── 1. UpdateQuote ────────────────────────────────────────────
   async publishQuote(input: PublishQuoteInput): Promise<Quote> {
@@ -59,14 +81,69 @@ export class PayoutProviderService {
   }
 
   // ── 4/5. USDT settlement inbound notification ─────────────────
+  /**
+   * Backward-compatible notify. With a settlement registry attached this
+   * also drives §4–§5 (OFI-side submit + log). Without one it falls back
+   * to the original event-log-only behaviour.
+   */
   notifyUsdtSettlement(txHash: string, usd: number) {
     if (usd <= 0) throw new Error("usd must be > 0");
     this.log({ type: "USDTTransactionNotification", txHash, usd, at: this.now() });
+    if (this.settlementRegistry) {
+      this.settlementRegistry.submitSettlement({
+        txHash,
+        blockchain: "TRON",
+        fromAddress: DEFAULT_OFI_WALLET,
+        toAddress: DEFAULT_PROVIDER_WALLET,
+        usdAmount: usd,
+      });
+    }
   }
 
   // ── 6/7. Credit usage ─────────────────────────────────────────
-  notifyCreditUsage(counterparty: string, used: number) {
-    this.log({ type: "CreditUsageNotification", counterparty, used, at: this.now() });
+  notifyCreditUsage(
+    counterparty: string,
+    used: number,
+    meta?: { paymentId?: string; quoteId?: string; rate?: number; expiresAt?: number },
+  ) {
+    const event: NetworkEvent = {
+      type: "CreditUsageNotification",
+      counterparty,
+      used,
+      at: this.now(),
+      ...meta,
+    };
+    this.log(event);
+    if (this.readModel) {
+      this.readModel.putCreditUsage({
+        counterparty,
+        used,
+        ...meta,
+        recordedAt: this.now(),
+      });
+    }
+  }
+
+  /**
+   * §5 chain confirmation (Provider view). When the chain has included the
+   * tx the OFI submitted, the Provider (or a Network simulation) calls this
+   * to drive §7: ledger + both-side credit.
+   */
+  receiveSettlementConfirmation(txHash: string) {
+    if (!this.settlementRegistry) {
+      throw new Error("receiveSettlementConfirmation requires a settlement registry");
+    }
+    return this.settlementRegistry.confirmByChain(txHash);
+  }
+
+  /** Provider-side view of pending OFI submissions. */
+  listPendingSettlements() {
+    return this.settlementRegistry?.listPendingSettlements() ?? [];
+  }
+
+  /** AppendLedgerEntries-style ledger (both sides share the registry). */
+  getSettlementState(): SettlementState | null {
+    return this.settlementRegistry?.snapshot() ?? null;
   }
 
   // ── 11-16. Payout lifecycle (network-driven) ──────────────────

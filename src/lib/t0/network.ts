@@ -3,10 +3,17 @@
 // for an HTTP client only changes this class.
 
 import { PayoutProviderService } from "./provider";
-import type { Currency, Payment, Payout, Quote } from "./types";
+import type { Currency, Payment, Payout, Quote, Settlement, SettlementState } from "./types";
 import { isSupportedCurrency } from "./currencies";
 import type { OfiT0Client } from "./ofi-client";
 import { toGetQuoteResult } from "./quote-mapper";
+import {
+  hasSufficientCredit,
+  type SettlementRegistry,
+  type SubmitSettlementInput,
+} from "./settlement";
+import type { ReadModelStore } from "./read-model/store";
+import type { LimitSnapshot } from "./read-model/types";
 
 // Aligned with docs.t-0.network GetQuoteResponse.oneof (Failure reason enum).
 // Three new values (UPSTREAM_ERROR / UNAUTHORIZED / BAD_REQUEST) cover the
@@ -21,11 +28,12 @@ export type QuoteFailureReason =
   | "REASON_QUOTE_EXPIRED"
   | "REASON_UPSTREAM_ERROR"
   | "REASON_UNAUTHORIZED"
-  | "REASON_BAD_REQUEST";
+  | "REASON_BAD_REQUEST"
+  | "REASON_NO_CREDIT_AVAILABLE";
 
 export type GetQuoteResult =
   | { success: { quote: Quote; payoutAmount: number; settlementAmount: number } }
-  | { failure: { reason: QuoteFailureReason } };
+  | { failure: { reason: QuoteFailureReason; message?: string } };
 
 export interface CreatePaymentInput {
   paymentClientId: string;
@@ -38,25 +46,68 @@ let counter = 0;
 const nextId = (prefix: string) =>
   `${prefix}_${Date.now().toString(36)}_${(++counter).toString(36)}`;
 
+/**
+ * OFI GetQuote returns quotes that exist only on the upstream — they are not
+ * published through the Provider's quote book. Without a registry the
+ * follow-up `createPayment(quoteId)` would see "INVALID_QUOTE_ID" and silently
+ * break the OFI flow (audit §6.1 A1).
+ *
+ * Solution: keep a small TTL-aware LRU keyed by `quote.id`. The lookup goes
+ * provider-snapshot first (local publishes) then externalQuotes (HTTP fetches).
+ * Capacity bound + TTL cleanup prevent unbounded growth in long processes.
+ */
+const EXTERNAL_QUOTE_CACHE_LIMIT = 128;
+
 export class SandboxNetwork {
+  /**
+   * External GetQuote cache. Insertion order = age (Map preserves it),
+   * which lets us evict the oldest entry on capacity overflow.
+   */
+  private readonly externalQuotes = new Map<string, Quote>();
+
+  /**
+   * Pre-Settlement settlement registry. Optional so existing tests that
+   * construct SandboxNetwork without a registry keep working.
+   */
+  private readonly settlementRegistry: SettlementRegistry | null;
+
+  /**
+   * Phase 1 read model: durable storage for T-0 callbacks
+   * (UpdateLimit / AppendLedgerEntries). Optional — when attached,
+   * `latestLimit(counterpartyId)` reads from this store; otherwise it
+   * returns `undefined` and `createPayment` falls back to the existing
+   * SettlementRegistry credit gate.
+   */
+  private readonly readModel: ReadModelStore | null;
+  /** Receiving provider id for the read model (used by `latestLimit`). */
+  private readonly providerId: number;
+
   constructor(
     public readonly provider: PayoutProviderService,
     public readonly ofiClient: OfiT0Client,
     private readonly paymentMethod: string = "PAYMENT_METHOD_TYPE_SEPA",
     private readonly now: () => number = Date.now,
-  ) {}
+    settlementRegistry: SettlementRegistry | null = null,
+    readModel: ReadModelStore | null = null,
+    providerId: number = 0,
+  ) {
+    this.settlementRegistry = settlementRegistry;
+    this.readModel = readModel;
+    this.providerId = providerId;
+  }
 
   /**
    * GetQuote — delegates to the injected OfiT0Client (HTTP or Mock per env).
    * Local validation only: invalid amount + unsupported currency short-circuit
-   * synchronously without hitting the client.
+   * synchronously without hitting the client. Successful upstream quotes are
+   * registered so `createPayment` can resolve them later.
    */
   async getQuote(input: {
     usdAmount: number;
     currency: Currency;
     now?: number;
   }): Promise<GetQuoteResult> {
-    if (input.usdAmount <= 0) {
+    if (!Number.isFinite(input.usdAmount) || input.usdAmount <= 0) {
       return { failure: { reason: "REASON_INVALID_AMOUNT" } };
     }
     if (!isSupportedCurrency(input.currency)) {
@@ -71,19 +122,63 @@ export class SandboxNetwork {
       },
       this.now,
     );
-    return toGetQuoteResult(res, now, input.currency);
+    const result = toGetQuoteResult(res, now, input.currency);
+    if ("success" in result) {
+      this.recordExternalQuote(result.success.quote, now);
+    }
+    return result;
   }
 
-  /** GetQuote by id — validates the specific quote. */
+  /**
+   * Store a freshly-fetched external quote. Enforces capacity + eviction:
+   *   1. Drop expired entries first.
+   *   2. If still at capacity, drop the oldest insertion (Map is insertion-ordered).
+   */
+  private recordExternalQuote(q: Quote, now: number): void {
+    this.evictExpiredExternalQuotes(now);
+    if (this.externalQuotes.size >= EXTERNAL_QUOTE_CACHE_LIMIT) {
+      const oldestKey = this.externalQuotes.keys().next().value;
+      if (oldestKey !== undefined) this.externalQuotes.delete(oldestKey);
+    }
+    this.externalQuotes.set(q.id, q);
+  }
+
+  /** Drop expired entries from the external quote cache. */
+  private evictExpiredExternalQuotes(now: number): void {
+    for (const [id, q] of this.externalQuotes) {
+      if (q.expiresAt <= now) this.externalQuotes.delete(id);
+    }
+  }
+
+  /**
+   * GetQuote by id — resolves both locally-published quotes and externally
+   * fetched ones. Audit §6.1 A1.
+   */
   getQuoteById(quoteId: string, now: number = Date.now()): GetQuoteResult {
-    const q = this.provider.snapshot().quotes.find((x) => x.id === quoteId);
-    if (!q) return { failure: { reason: "REASON_INVALID_QUOTE_ID" } };
-    if (q.expiresAt <= now) return { failure: { reason: "REASON_QUOTE_EXPIRED" } };
+    // 1. Locally-published quote (provider publish book).
+    const local = this.provider.snapshot().quotes.find((x) => x.id === quoteId);
+    if (local) {
+      if (local.expiresAt <= now) return { failure: { reason: "REASON_QUOTE_EXPIRED" } };
+      return {
+        success: {
+          quote: local,
+          payoutAmount: local.band * local.rate,
+          settlementAmount: local.band,
+        },
+      };
+    }
+    // 2. External OFI-fetched quote.
+    const external = this.externalQuotes.get(quoteId);
+    if (!external) return { failure: { reason: "REASON_INVALID_QUOTE_ID" } };
+    if (external.expiresAt <= now) {
+      this.externalQuotes.delete(quoteId);
+      return { failure: { reason: "REASON_QUOTE_EXPIRED" } };
+    }
     return {
       success: {
-        quote: q,
-        payoutAmount: q.band * q.rate,
-        settlementAmount: q.band,
+        quote: external,
+        payoutAmount: external.band * external.rate,
+        settlementAmount: external.band,
       },
     };
   }
@@ -98,21 +193,32 @@ export class SandboxNetwork {
    * (PayoutRequest → Provider.executePayout) so the UI can observe the
    * full chain end-to-end without an async queue.
    */
-  async createPayment(input: CreatePaymentInput, now: number = Date.now()): Promise<
+  async createPayment(
+    input: CreatePaymentInput,
+    now: number = Date.now(),
+  ): Promise<
     | { success: { payment: Payment; created: boolean; payout: Payout } }
-    | { failure: { reason: QuoteFailureReason } }
+    | { failure: { reason: QuoteFailureReason; message?: string } }
   > {
     // Idempotency: if a payment with this clientId already exists, return it
     // together with the existing payout (if any) — never raise.
-    const existing = this.provider
-      .snapshot()
-      .payments.find((p) => p.id === input.paymentClientId);
+    const existing = this.provider.snapshot().payments.find((p) => p.id === input.paymentClientId);
     if (existing) {
       const existingPayout = this.provider
         .snapshot()
         .payouts.find((po) => po.paymentId === existing.id);
       // existingPayout is always defined after createPayment's first call.
       return { success: { payment: existing, created: false, payout: existingPayout! } };
+    }
+
+    // Pre-Settlement gate: when a settlement registry is attached, the
+    // OFI must have topped up enough USDT to cover this payment. This is
+    // the audit-mandated §6/§7 step that closes the OFI → Provider trust gap.
+    if (this.settlementRegistry) {
+      const ofiCredit = this.settlementRegistry.getCredit("ofi");
+      if (!hasSufficientCredit(ofiCredit, input.usdAmount)) {
+        return { failure: { reason: "REASON_NO_CREDIT_AVAILABLE" } };
+      }
     }
 
     const qr = this.getQuoteById(input.quoteId, now);
@@ -122,9 +228,43 @@ export class SandboxNetwork {
     // via the Provider's thin state seam.
     const payment = this.acceptPaymentFromQuote(qr.success.quote, input, now);
 
+    // Reserve credit for the in-flight payment. We do this AFTER quote
+    // validation so an unknown/expired quote doesn't burn a reservation.
+    if (this.settlementRegistry) {
+      try {
+        this.settlementRegistry.reserveCredit(input.usdAmount);
+      } catch (e) {
+        // Should be unreachable because of the gate above, but be defensive.
+        return { failure: { reason: "REASON_NO_CREDIT_AVAILABLE" } };
+      }
+    }
+
     // KISS sandbox: synchronously drive PayoutRequest → Provider.executePayout.
     // In production this would be an async RPC push.
     const payout = await this.requestPayout(payment.id);
+
+    // Settle or release the reservation based on payout outcome.
+    if (this.settlementRegistry) {
+      if (payout.status === "success") {
+        this.settlementRegistry.settleCredit(input.usdAmount);
+        // Auto-emit CreditUsageNotification for OFI with quote context.
+        this.provider.notifyCreditUsage("ofi", input.usdAmount, {
+          paymentId: payment.id,
+          quoteId: qr.success.quote.id,
+          rate: qr.success.quote.rate,
+          expiresAt: qr.success.quote.expiresAt,
+        });
+        // Also emit for Provider (same quote context).
+        this.provider.notifyCreditUsage("provider", input.usdAmount, {
+          paymentId: payment.id,
+          quoteId: qr.success.quote.id,
+          rate: qr.success.quote.rate,
+          expiresAt: qr.success.quote.expiresAt,
+        });
+      } else {
+        this.settlementRegistry.releaseCredit(input.usdAmount);
+      }
+    }
 
     return { success: { payment, created: true, payout } };
   }
@@ -133,11 +273,7 @@ export class SandboxNetwork {
    * Body of the "accept" step: validate quote, persist the accepted Payment.
    * Caller (createPayment) owns the idempotency check.
    */
-  private acceptPaymentFromQuote(
-    quote: Quote,
-    input: CreatePaymentInput,
-    now: number,
-  ): Payment {
+  private acceptPaymentFromQuote(quote: Quote, input: CreatePaymentInput, now: number): Payment {
     const payment: Payment = {
       id: input.paymentClientId,
       quoteId: quote.id,
@@ -156,7 +292,10 @@ export class SandboxNetwork {
    * OFI → Network CreatePaymentIntent (Phase 8): create a pending payment
    * linked to a quote. Funds not yet confirmed; rate is indicative.
    */
-  createPaymentIntent(input: { quoteId: string; beneficiaryRef: string }, now: number = Date.now()): Payment {
+  createPaymentIntent(
+    input: { quoteId: string; beneficiaryRef: string },
+    now: number = Date.now(),
+  ): Payment {
     const quote = this.provider.snapshot().quotes.find((q) => q.id === input.quoteId);
     if (!quote) throw new Error("unknown quote");
     const payment: Payment = {
@@ -260,5 +399,64 @@ export class SandboxNetwork {
   /** Snapshot of payments visible to an OFI operator (everything; sandbox has one OFI). */
   listPayments(): Payment[] {
     return this.provider.snapshot().payments;
+  }
+
+  // ── Test-only access (kept narrow on purpose) ─────────────────────
+
+  /**
+   * Read-only accessor for the external quote registry size. Tests use this
+   * to assert eviction behaviour without exposing the underlying Map.
+   */
+  externalQuoteCount(): number {
+    this.evictExpiredExternalQuotes(this.now());
+    return this.externalQuotes.size;
+  }
+
+  // ── §4 + §5 — OFI-driven settlement submission (delegated) ────
+
+  /**
+   * OFI side: submit a USDT transfer. Requires a settlement registry; throws
+   * otherwise. The provider's `notifyUsdtSettlement` also calls the same
+   * registry so legacy sandbox buttons converge on one path.
+   */
+  submitUsdtSettlement(input: SubmitSettlementInput): Settlement {
+    if (!this.settlementRegistry) {
+      throw new Error("submitUsdtSettlement requires a settlement registry");
+    }
+    return this.settlementRegistry.submitSettlement(input);
+  }
+
+  /**
+   * §5 chain confirmation (Provider-driven; OFI can also call this to
+   * fast-forward the demo). Throws if no registry is attached.
+   */
+  receiveSettlementConfirmation(txHash: string): Settlement {
+    if (!this.settlementRegistry) {
+      throw new Error("receiveSettlementConfirmation requires a settlement registry");
+    }
+    return this.settlementRegistry.confirmByChain(txHash);
+  }
+
+  getSettlementState(): SettlementState {
+    if (!this.settlementRegistry) {
+      return { pending: [], ledger: [], ofiCredit: { available: 0, reserved: 0 }, providerCredit: { available: 0, reserved: 0 } };
+    }
+    return this.settlementRegistry.snapshot();
+  }
+
+  // ── Phase 1: read-model accessors ─────────────────────────────────
+
+  /**
+   * Latest `LimitSnapshot` for the given counterparty as recorded by
+   * the T-0 `UpdateLimit` callback. Returns `undefined` when no read
+   * model is attached or no limit has been recorded yet.
+   */
+  latestLimit(counterpartyId: number): LimitSnapshot | undefined {
+    return this.readModel?.latestLimit(this.providerId, counterpartyId);
+  }
+
+  /** Whether a read model is attached. */
+  hasReadModel(): boolean {
+    return this.readModel !== null;
   }
 }

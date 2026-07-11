@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { create } from "@bufbuild/protobuf";
 import {
   PayoutRequestSchema,
@@ -321,5 +321,130 @@ describe("createProviderServiceImpl", () => {
     });
     const appendRes = await impl.appendLedgerEntries(appendReq, ctx);
     expect(appendRes.$typeName).toBe("tzero.v1.payment.AppendLedgerEntriesResponse");
+  });
+});
+
+// ── Phase 1: inbox wiring (pre-settlement.test-report.md Step 6) ──────
+// New test cases are appended BELOW — the cases above are intentionally
+// untouched.
+
+import {
+  resetSharedCallbackInboxForTest,
+  setSharedCallbackInboxForTest,
+} from "./read-model/instance";
+import { CallbackInbox } from "./read-model/inbox";
+import { InMemoryStore } from "./read-model/store";
+import { limitEventKey, ledgerEventKey } from "./read-model/store";
+
+describe("updateLimit forwards to the CallbackInbox (Phase 1 wiring)", () => {
+  let store: InMemoryStore;
+  let inbox: CallbackInbox;
+
+  beforeEach(() => {
+    store = new InMemoryStore();
+    inbox = new CallbackInbox(store, { providerId: 7 });
+    setSharedCallbackInboxForTest(inbox);
+  });
+
+  afterEach(() => {
+    resetSharedCallbackInboxForTest();
+  });
+
+  it("persists the limit and returns an empty response", async () => {
+    const req = create(UpdateLimitRequestSchema, {
+      limits: [
+        create(UpdateLimitRequest_LimitSchema, {
+          version: 5n,
+          counterpartId: 23,
+          payoutLimit: { unscaled: BigInt(1000), exponent: 0 },
+          creditLimit: { unscaled: BigInt(5000), exponent: 0 },
+        }),
+      ],
+    });
+    const res = await updateLimit(req, ctx, network);
+    expect(res.$typeName).toBe("tzero.v1.payment.UpdateLimitResponse");
+    // Limit is now in the read model.
+    const latest = store.latestLimit(7, 23);
+    expect(latest?.version).toBe(5n);
+    expect(latest?.payoutLimit).toEqual({ unscaled: "1000", exponent: 0 });
+    // Inbox dedupe record was created and processed.
+    expect(store.getInbox(limitEventKey(23, 7, 5n))?.processedAt).toBeTypeOf("number");
+  });
+
+  it("is idempotent: replaying the same UpdateLimit does not double-store", async () => {
+    const req = create(UpdateLimitRequestSchema, {
+      limits: [
+        create(UpdateLimitRequest_LimitSchema, {
+          version: 9n,
+          counterpartId: 1,
+          payoutLimit: { unscaled: BigInt(100), exponent: 0 },
+        }),
+      ],
+    });
+    await updateLimit(req, ctx, network);
+    await updateLimit(req, ctx, network);
+    expect(store.listLimits(7, 1)).toHaveLength(1);
+  });
+
+  it("ACKs even on a malformed payload (defensive policy)", async () => {
+    const req = create(UpdateLimitRequestSchema, { limits: [] });
+    const res = await updateLimit(req, ctx, network);
+    expect(res.$typeName).toBe("tzero.v1.payment.UpdateLimitResponse");
+  });
+});
+
+describe("appendLedgerEntries forwards to the CallbackInbox (Phase 1 wiring)", () => {
+  let store: InMemoryStore;
+  let inbox: CallbackInbox;
+
+  beforeEach(() => {
+    store = new InMemoryStore();
+    inbox = new CallbackInbox(store, { providerId: 7 });
+    setSharedCallbackInboxForTest(inbox);
+  });
+
+  afterEach(() => {
+    resetSharedCallbackInboxForTest();
+  });
+
+  it("persists the ledger entries and returns an empty response", async () => {
+    const req = create(AppendLedgerEntriesRequestSchema, {
+      transactions: [
+        create(AppendLedgerEntriesRequest_TransactionSchema, {
+          transactionId: 42n,
+          entries: [
+            create(AppendLedgerEntriesRequest_LedgerEntrySchema, {
+              accountOwnerId: 23,
+              accountType: 20, // BALANCE
+              credit: { unscaled: BigInt(100), exponent: 0 },
+            }),
+          ],
+        }),
+      ],
+    });
+    const res = await appendLedgerEntries(req, ctx, network);
+    expect(res.$typeName).toBe("tzero.v1.payment.AppendLedgerEntriesResponse");
+    expect(store.getLedgerTransaction(42n)).toHaveLength(1);
+    expect(store.getInbox(ledgerEventKey(42n))?.processedAt).toBeTypeOf("number");
+  });
+
+  it("is idempotent on duplicate transactionId", async () => {
+    const req = create(AppendLedgerEntriesRequestSchema, {
+      transactions: [
+        create(AppendLedgerEntriesRequest_TransactionSchema, {
+          transactionId: 1n,
+          entries: [
+            create(AppendLedgerEntriesRequest_LedgerEntrySchema, {
+              accountOwnerId: 1,
+              accountType: 20,
+              credit: { unscaled: BigInt(100), exponent: 0 },
+            }),
+          ],
+        }),
+      ],
+    });
+    await appendLedgerEntries(req, ctx, network);
+    await appendLedgerEntries(req, ctx, network);
+    expect(store.getLedgerTransaction(1n)).toHaveLength(1);
   });
 });

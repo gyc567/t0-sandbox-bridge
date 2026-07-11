@@ -11,9 +11,25 @@ import {
   rawToOfiSuccess,
   type OfiFailureReason,
   type OfiQuoteResponse,
+  type RawProviderQuote,
 } from "./quote-mapper";
 
 type RawDecimal = { unscaled: number; exponent: number };
+
+/**
+ * Live-observed "no quote" reason code from agtpay (integer 10).
+ *
+ * SOURCE: Live testing on 2026-07-10 — agtpay server returned
+ *   Result.Failure.reason = 10 (integer) for a no-quote condition,
+ *   distinct from the documented REASON_QUOTE_NOT_FOUND (integer 1).
+ *
+ * TREATMENT: Accept as NO_QUOTE for resilience. REMOVE once agtpay
+ * confirms the official enum value; until then this constant exists
+ * so the source and expiry of the workaround are auditable.
+ *
+ * See audit §6.1 A8.
+ */
+export const LIVE_OBSERVED_NO_QUOTE_REASON = 10;
 
 // ── 接口 ──────────────────────────────────────────────────────
 
@@ -105,11 +121,7 @@ export class HttpOfiT0Client implements OfiT0Client {
    * or string) are reported as `UPSTREAM` so the UI shows a friendly error
    * and the operator can decide whether to retry.
    */
-  private parseResponse(
-    json: unknown,
-    req: OfiQuoteRequest,
-    now: number,
-  ): OfiQuoteResponse {
+  private parseResponse(json: unknown, req: OfiQuoteRequest, now: number): OfiQuoteResponse {
     const env = json as Record<string, unknown>;
 
     // Find the result envelope under either casing.
@@ -125,18 +137,19 @@ export class HttpOfiT0Client implements OfiT0Client {
       const reason = failure.reason;
       // REASON_QUOTE_NOT_FOUND — spec lists it as a string. The integer enum
       // value is 1; we accept both forms and any other "no quote" reason code
-      // (e.g. agtpay server returned reason=10 in live tests, distinct from
+      // (agtpay server returned reason=10 in live tests, distinct from
       // the documented 1) as NO_QUOTE.
-      if (reason === "REASON_QUOTE_NOT_FOUND" || reason === 1 || reason === 10) {
+      if (
+        reason === "REASON_QUOTE_NOT_FOUND" ||
+        reason === 1 ||
+        reason === LIVE_OBSERVED_NO_QUOTE_REASON
+      ) {
         return { failure: { reason: "NO_QUOTE" } };
       }
       // String REASON_UNSPECIFIED → UPSTREAM (per spec mapping).
       // Any other integer reason → also UPSTREAM (unknown code), but include
       // the raw reason in the message for operator debugging.
-      const message =
-        typeof reason === "string"
-          ? reason
-          : `unknown reason code: ${reason}`;
+      const message = typeof reason === "string" ? reason : `unknown reason code: ${reason}`;
       return { failure: { reason: "UPSTREAM", message } };
     }
 
@@ -150,6 +163,8 @@ export class HttpOfiT0Client implements OfiT0Client {
 
     // ── Field extraction (spec OR wire) ──────────────────────────
     const rate = success.rate as RawDecimal | undefined;
+    // audit §6.1 A4: unparseable upstream expiration must surface as
+    // UPSTREAM, not as a quote that silently expires.
     const expiration = this.parseExpiration(success.expiration);
     const quoteIdRaw =
       (success.quoteId as
@@ -167,14 +182,16 @@ export class HttpOfiT0Client implements OfiT0Client {
       (success.settlementAmount as RawDecimal | undefined) ??
       (success.settlement_amount as RawDecimal | undefined);
 
-    if (!rate || expiration === null || !quoteIdRaw || !payOutAmount || !settlementAmount) {
+    if (!rate || !quoteIdRaw || !payOutAmount || !settlementAmount) {
       return { failure: { reason: "UPSTREAM", message: "missing fields in success payload" } };
+    }
+    if (expiration === null) {
+      return { failure: { reason: "UPSTREAM", message: "unparseable expiration" } };
     }
 
     // Build the QuoteID in our standard "providerId-quoteId" string form.
     // Wire format may be camelCase (quoteId/providerId) OR snake_case
-    // (quote_id/provider_id) — accept both. quoteIdRaw is guaranteed non-null
-    // here because the L170 guard short-circuited otherwise.
+    // (quote_id/provider_id) — accept both.
     let providerIdInternal: number | undefined;
     let quoteIdInner: number | undefined;
     if (typeof (quoteIdRaw as { providerId?: number }).providerId === "number") {
@@ -189,42 +206,61 @@ export class HttpOfiT0Client implements OfiT0Client {
       return { failure: { reason: "UPSTREAM", message: "invalid quoteId object" } };
     }
 
-    return {
-      success: rawToOfiSuccess(
-        {
-          rate,
-          expiration,
-          quoteId: { quoteId: quoteIdInner, providerId: providerIdInternal },
-          payOutAmount,
-          settlementAmount,
+    // ── Optional: forward `allQuotes[]` to the mapper so the settlement
+    //    breakdown is preserved (audit §1.2 #6). The mapper matches the
+    //    selected composite quoteId against this array.
+    const allQuotes = (env.allQuotes as readonly RawProviderQuote[] | undefined) ??
+      (env.AllQuotes as readonly RawProviderQuote[] | undefined);
+
+    try {
+      return {
+        success: rawToOfiSuccess(
+          {
+            rate,
+            expiration,
+            quoteId: { quoteId: quoteIdInner, providerId: providerIdInternal },
+            payOutAmount,
+            settlementAmount,
+          },
+          req.usdAmount,
+          req.currency,
+          now,
+          allQuotes,
+        ),
+      };
+    } catch (e) {
+      // rawToOfiSuccess throws on RFC3339 parse error. audit A4: don't
+      // pretend this is an expired quote — it's a malformed upstream
+      // response.
+      return {
+        failure: {
+          reason: "UPSTREAM",
+          message: e instanceof Error ? e.message : "upstream parse error",
         },
-        req.usdAmount,
-        req.currency,
-        now,
-      ),
-    };
+      };
+    }
   }
 
   /**
    * Parse the `expiration` field from either:
    *   - RFC3339 string: "2026-07-09T12:00:00Z"
    *   - proto3 JSON Timestamp: { seconds: number, nanos: number }
-   * Returns null on failure (caller will treat as UPSTREAM).
+   *
+   * Returns `null` on failure (callers must treat this as UPSTREAM).
+   * Audit §6.1 A4: previously the fallback was an epoch string which masked
+   * the failure as an expired quote.
    */
-  private parseExpiration(exp: unknown): string {
+  private parseExpiration(exp: unknown): string | null {
     if (typeof exp === "string") return exp;
     if (exp && typeof exp === "object") {
       const t = exp as { seconds?: number | string; nanos?: number };
       const sec = typeof t.seconds === "string" ? Number(t.seconds) : t.seconds;
-      if (typeof sec === "number" && Number.isFinite(sec)) {
-        // proto Timestamp: total ms = seconds * 1000 + nanos / 1e6
+      if (typeof sec === "number" && Number.isFinite(sec) && sec > 0) {
         const ms = sec * 1000 + Math.floor((t.nanos ?? 0) / 1_000_000);
         if (Number.isFinite(ms) && ms > 0) return new Date(ms).toISOString();
       }
     }
-    // Last-resort fallback — let the downstream parseRfc3339 throw if even
-    // this fails, so the error path stays explicit.
-    return "1970-01-01T00:00:00Z";
+    return null;
   }
 }
 
@@ -238,9 +274,7 @@ export type PickBestQuoteFn = (
   usdAmount: number,
   currency: Currency,
   now: number,
-) =>
-  | { rate: number; expiresAt: number; createdAt: number; quoteId: string }
-  | null;
+) => { rate: number; expiresAt: number; createdAt: number; quoteId: string } | null;
 
 export interface MockOfiT0ClientOptions {
   pickBestQuote: PickBestQuoteFn;

@@ -59,6 +59,12 @@ describe("formatQuoteFailure", () => {
     expect(m.detail).toMatch(/currency/);
   });
 
+  it("explains REASON_NO_CREDIT_AVAILABLE with a top-up hint", () => {
+    const m = formatQuoteFailure("REASON_NO_CREDIT_AVAILABLE");
+    expect(m.title).toMatch(/credit/i);
+    expect(m.detail).toMatch(/top|settlement|\/ofi/i);
+  });
+
   it("falls back to a generic message for unknown reasons", () => {
     const m = formatQuoteFailure("REASON_FUTURE_THING" as never);
     expect(m.title).toMatch(/quote lookup failed/i);

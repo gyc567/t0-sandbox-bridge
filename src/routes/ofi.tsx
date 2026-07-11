@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import React, { useState, useCallback } from "react";
 import {
@@ -6,9 +6,12 @@ import {
   ofiCreatePaymentFn,
   ofiCompleteManualAmlFn,
   ofiSnapshotFn,
+  ofiReadModelFn,
+  ofiSubmitSettlementFn,
 } from "@/lib/t0/t0.functions";
-import { logoutFn, getSessionFn } from "@/lib/auth/auth.functions";
 import type { Currency, Payment } from "@/lib/t0/types";
+import type { NetworkEvent } from "@/lib/t0/types";
+import type { SettlementState } from "@/lib/t0/settlement";
 import { getCurrencyLabel } from "@/lib/t0/currencies";
 import { formatQuoteFailure } from "@/lib/t0/quote-message";
 import { formatQuoteForDisplay, type QuoteDisplay } from "@/lib/t0/quote-display";
@@ -25,13 +28,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LogOut, Wallet, Send, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
+import { Wallet, Send, RefreshCw, CheckCircle2, XCircle, PiggyBank, Activity } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
-import { QuoteManagementTabs } from "@/components/ofi/QuoteManagementTabs";
+import { OfiSidebarMenu } from "@/components/ofi/OfiSidebarMenu";
 
 type OfiSnapshot = {
   payments: Payment[];
+  payouts: Payout[];
   availableCurrencies: Currency[];
+  settlementState: SettlementState;
+  events: NetworkEvent[];
 };
 
 export const Route = createFileRoute("/ofi")({
@@ -44,31 +50,122 @@ export const Route = createFileRoute("/ofi")({
       },
     ],
   }),
-  beforeLoad: async () => {
-    const { session } = await getSessionFn();
-    if (!session) throw redirect({ to: "/login", search: { redirect: "/ofi" } });
-    if (session.role !== "ofi") throw redirect({ to: "/provider" });
-    return { session };
-  },
   // SSR loader so the console renders with data even before client hydration.
   loader: async () => ofiSnapshotFn(),
   component: OfiPage,
 });
 
 function OfiPage() {
-  const ctx = Route.useRouteContext() as { session: { role: "ofi"; userId: string } };
   const initial = Route.useLoaderData() as OfiSnapshot;
   const [data, setData] = useState<OfiSnapshot>(initial);
-  const router = useRouter();
 
   const getQuote = useServerFn(ofiGetQuoteFn);
   const createPayment = useServerFn(ofiCreatePaymentFn);
   const completeManualAml = useServerFn(ofiCompleteManualAmlFn);
   const snapshot = useServerFn(ofiSnapshotFn);
-  const logout = useServerFn(logoutFn);
+  const readModel = useServerFn(ofiReadModelFn);
+  const submitSettlement = useServerFn(ofiSubmitSettlementFn);
+
+  // ── Phase 2: Funding Workspace state ────────────────────────────
+  // The funding panel reads the durable read model. We use a fixed
+  // counterparty id (1) for the sandbox — production deployments
+  // resolve this from authenticated session.
+  const COUNTERPARTY_ID = 1;
+  const [readModelData, setReadModelData] = useState<{
+    latestLimit: {
+      providerId: number;
+      counterpartyId: number;
+      version: bigint;
+      payoutLimit: { unscaled: string; exponent: number };
+      creditLimit?: { unscaled: string; exponent: number };
+      creditUsage?: { unscaled: string; exponent: number };
+      reserve?: { unscaled: string; exponent: number };
+      receivedAt: number;
+    } | null;
+    activeProjections: Array<{
+      id: string;
+      chain: string;
+      txHash: string;
+      amount: { unscaled: string; exponent: number };
+      chainStatus: string;
+      accountingStatus: string;
+      detectedAt: number;
+      lastEventAt: number;
+    }>;
+  } | null>(null);
+
+  const refreshReadModel = useCallback(async () => {
+    const r = (await readModel({ data: { counterpartyId: COUNTERPARTY_ID } })) as {
+      latestLimit: {
+        providerId: number;
+        counterpartyId: number;
+        version: bigint;
+        payoutLimit: { unscaled: string; exponent: number };
+        creditLimit?: { unscaled: string; exponent: number };
+        creditUsage?: { unscaled: string; exponent: number };
+        reserve?: { unscaled: string; exponent: number };
+        receivedAt: number;
+      } | null;
+      activeProjections: Array<{
+        id: string;
+        chain: string;
+        txHash: string;
+        amount: { unscaled: string; exponent: number };
+        chainStatus: string;
+        accountingStatus: string;
+        detectedAt: number;
+        lastEventAt: number;
+      }>;
+    };
+    // Serialize BigInt to string for JSON safety.
+    setReadModelData({
+      latestLimit: r.latestLimit
+        ? {
+            ...r.latestLimit,
+            version: r.latestLimit.version.toString() as unknown as bigint,
+          }
+        : null,
+      activeProjections: r.activeProjections.map((p) => ({
+        id: p.id,
+        chain: p.chain,
+        txHash: p.txHash,
+        amount: p.amount,
+        chainStatus: p.chainStatus,
+        accountingStatus: p.accountingStatus,
+        detectedAt: p.detectedAt,
+        lastEventAt: p.lastEventAt,
+      })),
+    });
+  }, [readModel]);
+
+  // Auto-load read model on mount.
+  React.useEffect(() => {
+    void refreshReadModel();
+  }, [refreshReadModel]);
+
+  const [txHashDraft, setTxHashDraft] = useState("");
+  const [fundingAmount, setFundingAmount] = useState(5000);
+  const [fundingChain, setFundingChain] = useState<"TRON" | "ETHEREUM" | "BSC">("TRON");
+  const onFund = () =>
+    run(async () => {
+      const result = await submitSettlement({
+        data: {
+          blockchain: fundingChain,
+          fromAddress: "TXw1OFI…sandbox",
+          toAddress: "TXw2Provider…sandbox",
+          usdAmount: fundingAmount,
+          ...(txHashDraft ? { txHash: txHashDraft } : {}),
+        },
+      });
+      // After submitting, the sandbox registry tracks it; refresh the
+      // read model so the active projections list updates.
+      await refreshReadModel();
+      await refresh();
+      return result;
+    });
 
   const refresh = useCallback(async () => {
-    const s = await snapshot({});
+    const s = (await snapshot({})) as OfiSnapshot;
     setData(s);
   }, [snapshot]);
 
@@ -169,12 +266,6 @@ function OfiPage() {
       await refresh();
     });
 
-  const onLogout = async () => {
-    await logout({});
-    await router.invalidate();
-    router.navigate({ to: "/login" });
-  };
-
   const currencies: Currency[] = data.availableCurrencies;
 
   return (
@@ -194,10 +285,6 @@ function OfiPage() {
             <Button variant="outline" size="sm" onClick={refresh} disabled={busy}>
               <RefreshCw className={`w-4 h-4 ${busy ? "animate-spin" : ""}`} />
               Refresh
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onLogout} data-testid="logout">
-              <LogOut className="w-4 h-4" />
-              Sign out
             </Button>
           </div>
         </header>
@@ -220,7 +307,474 @@ function OfiPage() {
           </div>
         )}
 
-        <QuoteManagementTabs>
+        <OfiSidebarMenu
+          fundingContent={
+            <PanelCard step="04" title="Funding & Capacity">
+              <div className="space-y-4" data-testid="funding-panel">
+                {readModelData?.latestLimit ? (
+                  <div className="grid gap-3 md:grid-cols-4 font-mono text-caption">
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Payout limit
+                      </p>
+                      <p className="text-foreground">
+                        <span className="tabular">
+                          ${readModelData.latestLimit.payoutLimit.unscaled}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Credit limit
+                      </p>
+                      <p className="text-foreground">
+                        <span className="tabular">
+                          ${readModelData.latestLimit.creditLimit?.unscaled ?? "—"}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Credit usage
+                      </p>
+                      <p className="text-foreground">
+                        <span className="tabular">
+                          ${readModelData.latestLimit.creditUsage?.unscaled ?? "—"}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Reserve
+                      </p>
+                      <p className="text-foreground">
+                        <span className="tabular">
+                          ${readModelData.latestLimit.reserve?.unscaled ?? "—"}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p
+                    className="font-mono text-muted-foreground"
+                    style={{ fontSize: "12px" }}
+                    data-testid="funding-no-limit"
+                  >
+                    Network has not yet informed us of a payout limit. Capacity is unknown until the
+                    first <code>UpdateLimit</code> callback arrives.
+                  </p>
+                )}
+
+                <div
+                  className="font-mono rounded border border-hairline p-3 space-y-3"
+                  style={{ fontSize: "12px" }}
+                >
+                  <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
+                    Sandbox: simulate a USDT transfer by submitting a txHash. Real deployments should
+                    use the OFI Treasury workflow to transfer from a whitelisted wallet.
+                  </p>
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div>
+                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Amount (USD)
+                      </Label>
+                      <Input
+                        type="number"
+                        value={fundingAmount}
+                        onChange={(e) => setFundingAmount(Number(e.target.value))}
+                        className="w-32 font-mono"
+                        data-testid="funding-amount"
+                      />
+                    </div>
+                    <div>
+                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Chain
+                      </Label>
+                      <Select
+                        value={fundingChain}
+                        onValueChange={(v) => setFundingChain(v as typeof fundingChain)}
+                      >
+                        <SelectTrigger className="w-32 font-mono" data-testid="funding-chain">
+                          <SelectValue aria-label={fundingChain}>{fundingChain}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="TRON">TRON</SelectItem>
+                          <SelectItem value="ETHEREUM">ETHEREUM</SelectItem>
+                          <SelectItem value="BSC">BSC</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex-1 min-w-[180px]">
+                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                        txHash (optional, auto-generated if blank)
+                      </Label>
+                      <Input
+                        type="text"
+                        value={txHashDraft}
+                        onChange={(e) => setTxHashDraft(e.target.value)}
+                        placeholder="0x…"
+                        className="w-full font-mono"
+                        data-testid="funding-txhash"
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      className="btn-glow"
+                      onClick={onFund}
+                      disabled={busy}
+                      data-testid="btn-fund"
+                    >
+                      <PiggyBank className="w-4 h-4" />
+                      Submit funding
+                    </Button>
+                  </div>
+                </div>
+
+                {readModelData && readModelData.activeProjections.length > 0 && (
+                  <div
+                    className="font-mono rounded border border-hairline p-3 space-y-2"
+                    data-testid="active-projections"
+                  >
+                    <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
+                      Active projections
+                    </p>
+                    {readModelData.activeProjections.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex flex-wrap items-center gap-2"
+                        data-testid={`projection-${p.id}`}
+                      >
+                        <Activity className="w-3 h-3 text-muted-foreground" />
+                        <span className="tabular">{p.txHash.slice(0, 10)}…</span>
+                        <span className="text-muted-foreground">{p.chain}</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span>{p.chainStatus}</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span>{p.accountingStatus}</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="tabular">${p.amount.unscaled}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </PanelCard>
+          }
+          paymentPreSettlementContent={
+            <>
+              <PanelCard step="05" title="USDT Settlement Transfer">
+                <div className="space-y-4">
+                  <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                    OFI initiates a USDT transfer from their whitelisted wallet to the Payout Provider's whitelisted wallet. This is the pre-settlement step (§4) that tops up credit for future payments.
+                  </p>
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div>
+                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Amount (USD)
+                      </Label>
+                      <Input
+                        type="number"
+                        value={fundingAmount}
+                        onChange={(e) => setFundingAmount(Number(e.target.value))}
+                        className="w-32 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Chain
+                      </Label>
+                      <Select
+                        value={fundingChain}
+                        onValueChange={(v) => setFundingChain(v as typeof fundingChain)}
+                      >
+                        <SelectTrigger className="w-32 font-mono">
+                          <SelectValue aria-label={fundingChain}>{fundingChain}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="TRON">TRON</SelectItem>
+                          <SelectItem value="ETHEREUM">ETHEREUM</SelectItem>
+                          <SelectItem value="BSC">BSC</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex-1 min-w-[180px]">
+                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                        txHash (optional)
+                      </Label>
+                      <Input
+                        type="text"
+                        value={txHashDraft}
+                        onChange={(e) => setTxHashDraft(e.target.value)}
+                        placeholder="0x…"
+                        className="w-full font-mono"
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      className="btn-glow"
+                      onClick={onFund}
+                      disabled={busy}
+                    >
+                      <PiggyBank className="w-4 h-4" />
+                      Submit settlement
+                    </Button>
+                  </div>
+                </div>
+              </PanelCard>
+
+              <PanelCard step="06" title="Credit Usage & Ledger">
+                <div className="space-y-4">
+                  <div className="grid gap-3 md:grid-cols-2 font-mono text-caption">
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Available credit
+                      </p>
+                      <p className="text-foreground">
+                        <span className="tabular">${data.settlementState.ofiCredit.available.toLocaleString()}</span>
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
+                        Reserved credit
+                      </p>
+                      <p className="text-foreground">
+                        <span className="tabular">${data.settlementState.ofiCredit.reserved.toLocaleString()}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {data.settlementState.ledger.length === 0 ? (
+                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
+                      No ledger entries yet. Submit a USDT settlement to see credit changes.
+                    </p>
+                  ) : (
+                    <List
+                      items={[...data.settlementState.ledger].reverse()}
+                      emptyMessage="No ledger entries."
+                      render={(entry) => (
+                        <div
+                          key={`${entry.txHash}-${entry.at}`}
+                          className="flex items-center justify-between gap-2 border-b border-hairline py-2 last:border-0"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <StatusDot
+                              status={
+                                entry.reason === "SETTLEMENT_CREDIT"
+                                  ? "confirmed"
+                                  : entry.reason === "RESERVATION"
+                                    ? "pending"
+                                    : entry.reason === "SETTLEMENT"
+                                      ? "success"
+                                      : "rejected"
+                              }
+                            />
+                            <span className="font-mono tabular text-caption text-foreground truncate">
+                              {entry.reason}
+                            </span>
+                          </div>
+                          <div className="flex gap-2 shrink-0">
+                            <span className="font-mono text-caption text-muted-foreground">
+                              {entry.account}
+                            </span>
+                            <span
+                              className={`font-mono tabular text-caption ${entry.delta >= 0 ? "text-accent-green" : "text-[#ff453a]"}`}
+                            >
+                              {entry.delta >= 0 ? "+" : ""}
+                              {entry.delta.toLocaleString()}
+                            </span>
+                            <span className="font-mono text-caption text-muted-foreground">
+                              {new Date(entry.at).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    />
+                  )}
+                </div>
+              </PanelCard>
+
+              <PanelCard step="06b" title="Credit Usage Notifications (to OFI)">
+                <div className="space-y-4">
+                  <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                    Notifications from the network regarding credit usage against published quotes, including settlement confirmation and payment settlement details.
+                  </p>
+                  {data.events.filter((e): e is NetworkEvent & { type: "CreditUsageNotification" } => e.type === "CreditUsageNotification" && e.counterparty === "ofi").length === 0 ? (
+                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
+                      No credit usage notifications yet. Submit a settlement or create a payment to trigger the flow.
+                    </p>
+                  ) : (
+                    <List
+                      items={data.events
+                        .filter((e): e is NetworkEvent & { type: "CreditUsageNotification" } => e.type === "CreditUsageNotification" && e.counterparty === "ofi")
+                        .map((e) => ({
+                          id: `${e.counterparty}-${e.at}`,
+                          counterparty: e.counterparty,
+                          used: e.used,
+                          paymentId: e.paymentId,
+                          quoteId: e.quoteId,
+                          rate: e.rate,
+                          expiresAt: e.expiresAt,
+                          at: e.at,
+                        }))}
+                      emptyMessage="No credit usage notifications."
+                      render={(item) => (
+                        <div
+                          key={item.id}
+                          className="flex flex-col gap-1 border-b border-hairline py-2 last:border-0"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <StatusDot status="received" />
+                              <span className="font-mono tabular text-caption text-foreground truncate">
+                                {item.paymentId ? `Payment ${item.paymentId.slice(0, 20)}…` : `Credit used: ${item.used.toLocaleString()}`}
+                              </span>
+                            </div>
+                            <span className="font-mono text-caption text-muted-foreground shrink-0">
+                              {new Date(item.at).toLocaleString()}
+                            </span>
+                          </div>
+                          {item.quoteId && (
+                            <div className="flex flex-wrap gap-2 pl-6">
+                              <span className="font-mono text-caption text-muted-foreground">
+                                Quote: {item.quoteId.slice(0, 16)}…
+                              </span>
+                              {item.rate !== undefined && (
+                                <span className="font-mono text-caption text-muted-foreground">
+                                  Rate: {item.rate.toFixed(4)}
+                                </span>
+                              )}
+                              {item.expiresAt !== undefined && (
+                                <span className="font-mono text-caption text-muted-foreground">
+                                  Valid until: {new Date(item.expiresAt).toLocaleString()}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    />
+                  )}
+                </div>
+              </PanelCard>
+            </>
+          }
+          paymentContinuedContent={
+            <>
+              <PanelCard step="07" title="Create Payment">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      paymentClientId (idempotency key)
+                    </Label>
+                    <Input
+                      value={clientId}
+                      onChange={(e) => setClientId(e.target.value)}
+                      className="font-mono text-caption"
+                      data-testid="client-id"
+                    />
+                  </div>
+                  <div>
+                    <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      Beneficiary ref
+                    </Label>
+                    <Input
+                      value={beneficiaryRef}
+                      onChange={(e) => setBeneficiaryRef(e.target.value)}
+                      className="font-mono text-caption"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      quoteId
+                    </Label>
+                    <Input
+                      value={quoteId ?? ""}
+                      onChange={(e) => setQuoteId(e.target.value || null)}
+                      className="font-mono text-caption"
+                      placeholder="Run Get Quote first"
+                      data-testid="quote-id"
+                    />
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="btn-glow mt-4"
+                  disabled={busy || !quoteId}
+                  onClick={onCreatePayment}
+                  data-testid="btn-create"
+                >
+                  <Send className="w-4 h-4" />
+                  Create Payment
+                </Button>
+                {paymentResult !== null && (
+                  <Textarea
+                    readOnly
+                    rows={5}
+                    className="mt-4 font-mono text-fine-print"
+                    value={JSON.stringify(paymentResult, null, 2)}
+                    data-testid="payment-result"
+                  />
+                )}
+              </PanelCard>
+
+              <PanelCard step="08" title="Payment Lifecycle · Callbacks">
+                <div className="space-y-4">
+                  <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                    Network callbacks: Payout Accepted → Payout Success → Payment Confirmed.
+                  </p>
+                  {data.events.filter((e) => ["PayoutAccepted", "PayoutSuccess", "PaymentConfirmed"].includes(e.type)).length === 0 ? (
+                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
+                      No lifecycle callbacks yet. Create a payment to trigger the flow.
+                    </p>
+                  ) : (
+                    <List
+                      items={data.events
+                        .filter((e) => ["PayoutAccepted", "PayoutSuccess", "PaymentConfirmed"].includes(e.type))
+                        .map((e) => ({
+                          id: `${e.type}-${e.at}`,
+                          type: e.type,
+                          at: e.at,
+                          detail:
+                            e.type === "PayoutAccepted"
+                              ? `Payout ${e.payoutId} accepted`
+                              : e.type === "PayoutSuccess"
+                                ? `Payout ${e.payoutId} succeeded`
+                                : e.type === "PaymentConfirmed"
+                                  ? `Payment ${e.paymentId} confirmed`
+                                  : e.type,
+                        }))}
+                      emptyMessage="No lifecycle callbacks."
+                      render={(item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-2 border-b border-hairline py-2 last:border-0"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <StatusDot
+                              status={
+                                item.type === "PayoutSuccess" || item.type === "PaymentConfirmed"
+                                  ? "confirmed"
+                                  : item.type === "PayoutAccepted"
+                                    ? "pending"
+                                    : "received"
+                              }
+                            />
+                            <span className="font-mono tabular text-caption text-foreground truncate">
+                              {item.detail}
+                            </span>
+                          </div>
+                          <span className="font-mono text-caption text-muted-foreground shrink-0">
+                            {new Date(item.at).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    />
+                  )}
+                </div>
+              </PanelCard>
+            </>
+          }
+        >
           <PanelCard step="01" title="Get Quote">
             <div className="flex flex-wrap items-end gap-3">
               <div>
@@ -317,109 +871,78 @@ function OfiPage() {
               </div>
             )}
           </PanelCard>
-        </QuoteManagementTabs>
 
-        <PanelCard step="02" title="Create Payment">
-          <div className="grid gap-3 md:grid-cols-2">
-            <div>
-              <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                paymentClientId (idempotency key)
-              </Label>
-              <Input
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                className="font-mono text-caption"
-                data-testid="client-id"
-              />
-            </div>
-            <div>
-              <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                Beneficiary ref
-              </Label>
-              <Input
-                value={beneficiaryRef}
-                onChange={(e) => setBeneficiaryRef(e.target.value)}
-                className="font-mono text-caption"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                quoteId
-              </Label>
-              <Input
-                value={quoteId ?? ""}
-                onChange={(e) => setQuoteId(e.target.value || null)}
-                className="font-mono text-caption"
-                placeholder="Run Get Quote first"
-                data-testid="quote-id"
-              />
-            </div>
-          </div>
-          <Button
-            size="sm"
-            className="btn-glow mt-4"
-            disabled={busy || !quoteId}
-            onClick={onCreatePayment}
-            data-testid="btn-create"
-          >
-            <Send className="w-4 h-4" />
-            Create Payment
-          </Button>
-          {paymentResult !== null && (
-            <Textarea
-              readOnly
-              rows={5}
-              className="mt-4 font-mono text-fine-print"
-              value={JSON.stringify(paymentResult, null, 2)}
-              data-testid="payment-result"
+          <PanelCard step="02" title={`My Payments · ${data.payments.length}`}>
+            <List
+              items={data.payments}
+              testId="payments-list"
+              render={(p) => {
+                // Find associated payout for this payment
+                const payout = data.payouts.find((po) => po.paymentId === p.id);
+                return (
+                  <div
+                    key={p.id}
+                    className="flex flex-col gap-1 border-b border-hairline py-2 last:border-0"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <StatusDot status={p.status} />
+                        <span className="font-mono tabular text-caption text-foreground truncate">
+                          {p.id} · {p.currency} {p.localAmount.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={busy || p.status === "confirmed"}
+                          onClick={() => onApprove(p)}
+                          data-testid={`approve-${p.id}`}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Approve
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={busy || p.status === "rejected"}
+                          onClick={() => onReject(p)}
+                          data-testid={`reject-${p.id}`}
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pl-6">
+                      <span className="font-mono text-caption text-muted-foreground">
+                        Quote: {p.quoteId.slice(0, 16)}…
+                      </span>
+                      <span className="font-mono text-caption text-muted-foreground">
+                        USD: ${p.usdAmount.toLocaleString()}
+                      </span>
+                      <span className="font-mono text-caption text-muted-foreground">
+                        Ref: {p.beneficiaryRef}
+                      </span>
+                      {payout && (
+                        <span className={`font-mono text-caption ${payout.status === "success" ? "text-accent-green" : payout.status === "failed" ? "text-[#ff453a]" : "text-muted-foreground"}`}>
+                          Payout: {payout.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              }}
             />
-          )}
-        </PanelCard>
+          </PanelCard>
+        </OfiSidebarMenu>
 
-        <PanelCard step="03" title={`My Payments · ${data.payments.length}`}>
-          <List
-            items={data.payments}
-            testId="payments-list"
-            render={(p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between gap-2 border-b border-hairline py-2 last:border-0"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <StatusDot status={p.status} />
-                  <span className="font-mono tabular text-caption text-foreground truncate">
-                    {p.id} · {p.currency} {p.localAmount.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex gap-1.5 shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={busy || p.status === "confirmed"}
-                    onClick={() => onApprove(p)}
-                    data-testid={`approve-${p.id}`}
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Approve
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={busy || p.status === "rejected"}
-                    onClick={() => onReject(p)}
-                    data-testid={`reject-${p.id}`}
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    Reject
-                  </Button>
-                </div>
-              </div>
-            )}
-          />
-        </PanelCard>
-
-        <p className="font-mono text-muted-canvas text-center" style={{ fontSize: "11px" }}>
-          Signed in as ofi user {ctx.session.userId}
+        <p
+          className="font-mono text-muted-canvas text-center"
+          style={{ fontSize: "11px" }}
+          data-testid="ofi-role-footer"
+        >
+          OFI role · open-access sandbox
         </p>
       </div>
     </SiteLayout>

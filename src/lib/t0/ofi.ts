@@ -3,8 +3,9 @@
 // Single responsibility: hide provider/network details from the route layer.
 
 import { SandboxNetwork, type CreatePaymentInput, type GetQuoteResult } from "./network";
-import type { Payment } from "./types";
+import type { Payment, Settlement, SettlementState } from "./types";
 import { SUPPORTED_CURRENCIES, type Currency } from "./currencies";
+import type { Blockchain, SubmitSettlementInput } from "./settlement";
 
 export interface OfiSnapshot {
   payments: Payment[];
@@ -19,6 +20,21 @@ export interface GetQuoteInput {
   currency: Currency;
 }
 
+export interface SubmitSettlementViewInput {
+  txHash?: string;
+  blockchain: Blockchain;
+  fromAddress: string;
+  toAddress: string;
+  usdAmount: number;
+  intentRefs?: readonly string[];
+}
+
+/**
+ * OFIService is the OFI-side thin layer. It does NOT own state; everything
+ * lives on `SandboxNetwork` (which in turn holds the SettlementRegistry).
+ * Keeping OFIService stateless is what lets the registry be a single
+ * source of truth for both views.
+ */
 export class OFIService {
   constructor(private readonly network: SandboxNetwork, private readonly now: () => number = Date.now) {}
 
@@ -54,6 +70,32 @@ export class OFIService {
     // corridor, which is the correct error path.
     const availableCurrencies = SUPPORTED_CURRENCIES.map((c) => c.code);
     return { payments, availableCurrencies };
+  }
+
+  // ── §4 + §5 — OFI submits USDT settlement ──────────────────────
+
+  /**
+   * OFI initiates a USDT transfer on chain. Returns the PENDING settlement
+   * the registry stored. Idempotent on txHash.
+   */
+  submitUsdtSettlement(input: SubmitSettlementViewInput): Settlement {
+    const payload: SubmitSettlementInput = {
+      blockchain: input.blockchain,
+      fromAddress: input.fromAddress,
+      toAddress: input.toAddress,
+      usdAmount: input.usdAmount,
+      ...(input.txHash !== undefined ? { txHash: input.txHash } : {}),
+      ...(input.intentRefs !== undefined ? { intentRefs: input.intentRefs } : {}),
+    };
+    return this.network.submitUsdtSettlement(payload);
+  }
+
+  /**
+   * OFI's read view — same registry snapshot the Provider sees, but
+   * OFI-side helpers around it.
+   */
+  getSettlementState(): SettlementState {
+    return this.network.getSettlementState();
   }
 }
 

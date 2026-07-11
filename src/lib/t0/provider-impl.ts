@@ -35,6 +35,16 @@ import {
 } from "@t-0/provider-sdk";
 import { create } from "@bufbuild/protobuf";
 import type { SandboxNetwork } from "./network";
+import { getCallbackInbox } from "./read-model/instance";
+
+/**
+ * Resolve the module-level CallbackInbox shared with `index.ts` (server
+ * fns) and the read-model singleton. The RPC handlers read it on every
+ * call so test overrides take effect immediately.
+ */
+function callbackInbox(): ReturnType<typeof getCallbackInbox> {
+  return getCallbackInbox();
+}
 
 /**
  * Convert a proto bigint paymentId into the internal string id.
@@ -105,13 +115,20 @@ export async function updatePayment(
 
 /** RPC 3: UpdateLimit — the network informs us of a counterparty's credit limit. */
 export async function updateLimit(
-  _req: UpdateLimitRequest,
+  req: UpdateLimitRequest,
   _ctx: HandlerContext,
   _network: SandboxNetwork,
 ): Promise<UpdateLimitResponse> {
-  // The sandbox doesn't track persistent credit limits — the real
-  // implementation would persist `req.limits[]` and surface them to the
-  // OFI console. For now, accept-and-acknowledge.
+  // Forward the payload to the CallbackInbox for durable, idempotent
+  // storage. Parsing failures are caught here so the RPC still ACKs
+  // — the inbox records the failure for later inspection.
+  try {
+    callbackInbox().handleUpdateLimit(req as unknown as { limits: readonly import("./read-model/projection").ProtoLimitShape[] });
+  } catch {
+    // Defensive: the inbox itself doesn't throw for well-formed proto
+    // payloads. A throw here means a malformed payload or a bug;
+    // either way, do not propagate to the network.
+  }
   return create(UpdateLimitResponseSchema, {});
 }
 
@@ -140,13 +157,17 @@ export async function approvePaymentQuote(
 
 /** RPC 5: AppendLedgerEntries — the network reports ledger activity. */
 export async function appendLedgerEntries(
-  _req: AppendLedgerEntriesRequest,
+  req: AppendLedgerEntriesRequest,
   _ctx: HandlerContext,
   _network: SandboxNetwork,
 ): Promise<AppendLedgerEntriesResponse> {
-  // The sandbox doesn't persist a separate ledger — events are kept
-  // in-process by the orchestrator. Real implementation would mirror
-  // the entries into a durable store.
+  // Forward the payload to the CallbackInbox for durable, idempotent
+  // storage. See updateLimit for the defensive ACK policy.
+  try {
+    callbackInbox().handleAppendLedgerEntries(req as unknown as { transactions: readonly import("./read-model/projection").ProtoTransactionShape[] });
+  } catch {
+    // See updateLimit for rationale.
+  }
   return create(AppendLedgerEntriesResponseSchema, {});
 }
 

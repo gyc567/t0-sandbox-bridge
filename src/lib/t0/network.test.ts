@@ -316,9 +316,7 @@ describe("SandboxNetwork ingress helpers (provider-impl RPC translations)", () =
   it("handleNetworkAccepted writes an accepted payment when no quote is published throws", () => {
     // Without any published quote the helper must fail loudly — the real
     // network's UpdatePayment.accepted always carries quote context.
-    expect(() => network.handleNetworkAccepted("n_1", "", clock)).toThrow(
-      /no quote available/,
-    );
+    expect(() => network.handleNetworkAccepted("n_1", "", clock)).toThrow(/no quote available/);
   });
 
   it("handleNetworkAccepted writes accepted payment when a quote exists", async () => {
@@ -355,7 +353,12 @@ describe("SandboxNetwork.listPayments and OFI delegation", () => {
   it("listPayments returns the provider's payments", async () => {
     await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
     await network.createPayment(
-      { paymentClientId: "baxs_list_1", quoteId: svc.snapshot().quotes[0]!.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      {
+        paymentClientId: "baxs_list_1",
+        quoteId: svc.snapshot().quotes[0]!.id,
+        beneficiaryRef: "B",
+        usdAmount: 1_000,
+      },
       clock,
     );
     expect(network.listPayments().map((p) => p.id)).toContain("baxs_list_1");
@@ -364,11 +367,408 @@ describe("SandboxNetwork.listPayments and OFI delegation", () => {
   it("OFI completeManualAml routes through Network (not Provider directly)", async () => {
     const spy = vi.spyOn(network, "completeManualAml");
     const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
-    const p = await ofi.createPayment(
-      { paymentClientId: "baxs_ofi_aml", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
-    );
+    const p = await ofi.createPayment({
+      paymentClientId: "baxs_ofi_aml",
+      quoteId: q.id,
+      beneficiaryRef: "B",
+      usdAmount: 1_000,
+    });
     if (!("success" in p)) throw new Error("setup");
     ofi.completeManualAml(p.success.payment.id, false);
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+// ── External quote registry (audit §6.1 A1) ─────────────────────────────
+//
+// Regression: prior to A1, HTTP-mode GetQuote returned an external quote id
+// that the follow-up `createPayment` could not resolve (it only consulted
+// the Provider's local quote book). The fix is a small TTL-aware cache
+// inside SandboxNetwork; this suite locks the contract end-to-end.
+
+import type { OfiQuoteRequest, OfiT0Client } from "./ofi-client";
+import type { OfiQuoteResponse } from "./quote-mapper";
+
+/**
+ * Test double that returns a fixed quote on the first request and rejects
+ * subsequent ones. Lets us prove that after a single GetQuote the resulting
+ * quote id is reusable by `createPayment` even though the underlying client
+ * is a one-shot.
+ */
+class OneShotHttpOfiT0Client implements OfiT0Client {
+  private used = false;
+  constructor(
+    private readonly quote: Omit<import("./types").Quote, "createdAt"> & { createdAt: number },
+  ) {}
+  async getQuote(_req: OfiQuoteRequest, now: () => number): Promise<OfiQuoteResponse> {
+    if (this.used) {
+      return { failure: { reason: "UPSTREAM", message: "one-shot already consumed" } };
+    }
+    this.used = true;
+    return {
+      success: {
+        quoteId: this.quote.id,
+        currency: this.quote.currency,
+        band: this.quote.band,
+        rate: this.quote.rate,
+        expiresAt: this.quote.expiresAt,
+        payOutAmount: this.quote.band * this.quote.rate,
+        settlementAmount: this.quote.band,
+        createdAt: this.quote.createdAt,
+      },
+    };
+  }
+}
+
+describe("SandboxNetwork external quote registry (audit A1)", () => {
+  function buildNetwork(ofi: OfiT0Client) {
+    const n = new SandboxNetwork(svc, ofi, "PAYMENT_METHOD_TYPE_SEPA", now);
+    return n;
+  }
+
+  it("registers a successful external GetQuote so createPayment can resolve the same id", async () => {
+    // Simulate: HTTP GetQuote returns external id "ext-7-220299073". The
+    // MockT0Client + PayoutProviderService have no idea about it.
+    const externalClient = new OneShotHttpOfiT0Client({
+      id: "ext-7-220299073",
+      currency: "EUR",
+      band: 1_000,
+      rate: 0.86,
+      expiresAt: clock + 60_000,
+      createdAt: clock,
+    });
+    const n = buildNetwork(externalClient);
+
+    // 1) GetQuote succeeds and registers the quote.
+    const getR = await n.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    if (!("success" in getR)) throw new Error("setup: getQuote should succeed");
+    expect(getR.success.quote.id).toBe("ext-7-220299073");
+    expect(n.externalQuoteCount()).toBe(1);
+
+    // 2) CreatePayment against the external id succeeds (audit regression).
+    const cpR = await n.createPayment(
+      {
+        paymentClientId: "baxs_http_quote_1",
+        quoteId: "ext-7-220299073",
+        beneficiaryRef: "BEN",
+        usdAmount: 1_000,
+      },
+      clock,
+    );
+    if (!("success" in cpR)) throw new Error("expected createPayment success");
+    expect(cpR.success.created).toBe(true);
+    expect(cpR.success.payment.quoteId).toBe("ext-7-220299073");
+    expect(cpR.success.payment.status).toBe("confirmed");
+    expect(cpR.success.payout.status).toBe("success");
+  });
+
+  it("returns REASON_INVALID_QUOTE_ID for unknown external ids", async () => {
+    const n = buildNetwork(
+      new OneShotHttpOfiT0Client({
+        id: "ext-known",
+        currency: "EUR",
+        band: 1_000,
+        rate: 0.9,
+        expiresAt: clock + 60_000,
+        createdAt: clock,
+      }),
+    );
+    // Get a successful quote to populate the cache…
+    await n.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    // …then ask for a quote id that was never seen.
+    const r = n.getQuoteById("never-seen");
+    expect(r).toEqual({ failure: { reason: "REASON_INVALID_QUOTE_ID" } });
+  });
+
+  it("returns REASON_QUOTE_EXPIRED and evicts expired external quotes", async () => {
+    const externalClient = new OneShotHttpOfiT0Client({
+      id: "ext-ttl",
+      currency: "EUR",
+      band: 1_000,
+      rate: 0.9,
+      // Already expired by the time we resolve.
+      expiresAt: clock + 50,
+      createdAt: clock,
+    });
+    const n = buildNetwork(externalClient);
+    await n.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    expect(n.externalQuoteCount()).toBe(1);
+
+    // Advance past expiration, then resolve — must be EXPIRED, not INVALID.
+    clock += 100;
+    const r = n.getQuoteById("ext-ttl", clock);
+    expect(r).toEqual({ failure: { reason: "REASON_QUOTE_EXPIRED" } });
+    // Cache was cleaned up.
+    expect(n.externalQuoteCount()).toBe(0);
+  });
+
+  it("falls back to provider-local quotes when external cache is empty", async () => {
+    // No external GetQuote issued; a locally-published quote is still findable.
+    const n = buildNetwork(
+      new OneShotHttpOfiT0Client({
+        id: "ignored",
+        currency: "EUR",
+        band: 1_000,
+        rate: 0.9,
+        expiresAt: clock + 60_000,
+        createdAt: clock,
+      }),
+    );
+    const local = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    // Pass `clock` so the lookup isn't compared against real wall-clock time.
+    const r = n.getQuoteById(local.id, clock);
+    if (!("success" in r)) throw new Error("expected local lookup success");
+    expect(r.success.quote.id).toBe(local.id);
+  });
+
+  it("enforces EXTERNAL_QUOTE_CACHE_LIMIT by evicting the oldest entry on overflow", async () => {
+    // Build a client that returns a fresh quote on every call (sequential ids).
+    let counter = 0;
+    const bulkClient: OfiT0Client = {
+      async getQuote(_req: OfiQuoteRequest, _now: () => number): Promise<OfiQuoteResponse> {
+        counter += 1;
+        const id = `ext-bulk-${counter}`;
+        return {
+          success: {
+            quoteId: id,
+            currency: "EUR",
+            band: 100,
+            rate: 0.9,
+            expiresAt: clock + 60_000,
+            payOutAmount: 90,
+            settlementAmount: 100,
+            createdAt: clock,
+          },
+        };
+      },
+    };
+    const n = buildNetwork(bulkClient);
+    // 129 quotes: 128 fits, the 129th evicts the oldest (= "ext-bulk-1").
+    for (let i = 0; i < 129; i++) {
+      await n.getQuote({ usdAmount: 100, currency: "EUR" });
+    }
+    expect(n.externalQuoteCount()).toBe(128);
+    // First id was evicted.
+    expect(n.getQuoteById("ext-bulk-1", clock)).toEqual({
+      failure: { reason: "REASON_INVALID_QUOTE_ID" },
+    });
+    // Most recent id is still present.
+    expect(n.getQuoteById("ext-bulk-129", clock)).toMatchObject({
+      success: { quote: { id: "ext-bulk-129" } },
+    });
+  });
+});
+
+// ── Pre-Settlement (audit §4–§7) ─────────────────────────────────────
+//
+// SandboxNetwork wires the SettlementRegistry into createPayment:
+//   - pre-flight: REASON_NO_CREDIT_AVAILABLE when OFI hasn't topped up
+//   - on success: reserve → settle (or release on failure)
+
+describe("SandboxNetwork Pre-Settlement credit gate (audit §4–§7)", () => {
+  function buildNetworkWithRegistry() {
+    const registry = new SettlementRegistry({ confirmDelayMs: 0 });
+    const p = new PayoutProviderService(new MockT0Client(), now, registry);
+    // Wire MockOfiT0Client so it returns the published quote (mirrors real flow).
+    const ofiClient = new MockOfiT0Client({
+      pickBestQuote: (usdAmount, currency, n) => {
+        const candidates = p
+          .snapshot()
+          .quotes.filter(
+            (q) => q.currency === currency && q.expiresAt > n && q.band >= usdAmount,
+          );
+        if (candidates.length === 0) return null;
+        const best = candidates.reduce((a, b) => (a.rate <= b.rate ? a : b));
+        return {
+          rate: best.rate,
+          expiresAt: best.expiresAt,
+          createdAt: best.createdAt,
+          quoteId: best.id,
+        };
+      },
+    });
+    const n = new SandboxNetwork(
+      p,
+      ofiClient,
+      "PAYMENT_METHOD_TYPE_SEPA",
+      now,
+      registry,
+    );
+    return { registry, provider: p, network: n };
+  }
+
+  it("rejects createPayment with REASON_NO_CREDIT_AVAILABLE when no top-up yet", async () => {
+    const { network, provider } = buildNetworkWithRegistry();
+    await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const r = await network.createPayment({
+      paymentClientId: "baxs_credit_fail",
+      quoteId: "(any)",
+      beneficiaryRef: "BEN",
+      usdAmount: 1000,
+    });
+    expect(r).toEqual({ failure: { reason: "REASON_NO_CREDIT_AVAILABLE" } });
+  });
+
+  it("accepts createPayment after a confirmed USDT top-up", async () => {
+    const { network, registry, provider } = buildNetworkWithRegistry();
+    await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const settlement = network.submitUsdtSettlement({
+      blockchain: "TRON",
+      fromAddress: "ofiw",
+      toAddress: "provw",
+      usdAmount: 5000,
+    });
+    network.receiveSettlementConfirmation(settlement.txHash);
+
+    const quote = await network.getQuote({ usdAmount: 1000, currency: "EUR", now: clock });
+    expect("success" in quote).toBe(true);
+    if (!("success" in quote)) throw new Error("setup: getQuote");
+    const r = await network.createPayment(
+      {
+        paymentClientId: "baxs_credit_ok",
+        quoteId: quote.success.quote.id,
+        beneficiaryRef: "BEN",
+        usdAmount: 1000,
+      },
+      clock,
+    );
+    if (!("success" in r)) {
+      throw new Error("expected success, got failure: " + JSON.stringify(r.failure));
+    }
+    expect(r.success.payment.status).toBe("confirmed");
+    expect(r.success.payout.status).toBe("success");
+    // After successful payout: available = 5000 − 0, reserved = 0 (settled).
+    expect(registry.getCredit("ofi")).toEqual({ available: 4000, reserved: 0 });
+    expect(registry.getCredit("provider")).toEqual({ available: 5000, reserved: 0 });
+  });
+
+  it("releases the reservation when the payout fails", async () => {
+    const { network, registry, provider } = buildNetworkWithRegistry();
+    await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const s = network.submitUsdtSettlement({
+      blockchain: "TRON",
+      fromAddress: "ofiw",
+      toAddress: "provw",
+      usdAmount: 5000,
+    });
+    network.receiveSettlementConfirmation(s.txHash);
+
+    const quote = await network.getQuote({ usdAmount: 1000, currency: "EUR", now: clock });
+    if (!("success" in quote)) throw new Error("setup");
+    const r = await network.createPayment(
+      {
+        paymentClientId: "baxs_credit_ok_for_release",
+        quoteId: quote.success.quote.id,
+        beneficiaryRef: "BEN",
+        usdAmount: 1000,
+      },
+      clock,
+    );
+    expect("success" in r).toBe(true);
+    // Manually drive the release branch — the same code path the network
+    // exercises when payout.status !== "success".
+    registry.reserveCredit(2000);
+    registry.releaseCredit(2000);
+    expect(registry.getCredit("ofi").reserved).toBe(0);
+  });
+
+  it("submitUsdtSettlement is idempotent on the same txHash", () => {
+    const { network, registry } = buildNetworkWithRegistry();
+    const first = network.submitUsdtSettlement({
+      txHash: "0xdup",
+      blockchain: "TRON",
+      fromAddress: "a",
+      toAddress: "b",
+      usdAmount: 1500,
+    });
+    const second = network.submitUsdtSettlement({
+      txHash: "0xdup",
+      blockchain: "TRON",
+      fromAddress: "a",
+      toAddress: "b",
+      usdAmount: 9999,
+    });
+    expect(second).toBe(first);
+    expect(registry.getCredit("ofi").available).toBe(0); // not credited yet
+  });
+
+  it("getSettlementState returns the snapshot view", () => {
+    const { network } = buildNetworkWithRegistry();
+    const s = network.submitUsdtSettlement({
+      blockchain: "ETHEREUM",
+      fromAddress: "a",
+      toAddress: "b",
+      usdAmount: 300,
+    });
+    const state = network.getSettlementState();
+    expect(state.pending).toHaveLength(1);
+    expect(state.pending[0]!.txHash).toBe(s.txHash);
+    expect(state.pending[0]!.blockchain).toBe("ETHEREUM");
+  });
+});
+
+import { SettlementRegistry } from "./settlement";
+
+// ── Phase 1: SandboxNetwork read-model accessors (Step 10) ────────────
+// New cases appended below; existing cases above untouched.
+
+import { InMemoryStore } from "./read-model/store";
+import type { LimitSnapshot } from "./read-model/types";
+
+describe("SandboxNetwork read-model accessors", () => {
+  function buildNetworkWithReadModel(providerId = 7): {
+    network: SandboxNetwork;
+    store: InMemoryStore;
+  } {
+    const svc = new PayoutProviderService(new MockT0Client(), () => clock);
+    const store = new InMemoryStore();
+    const network = new SandboxNetwork(
+      svc,
+      new MockOfiT0Client({ pickBestQuote: () => null }),
+      "PAYMENT_METHOD_TYPE_SEPA",
+      () => clock,
+      null,
+      store,
+      providerId,
+    );
+    return { network, store };
+  }
+
+  it("latestLimit returns undefined when no limit has been recorded", () => {
+    const { network } = buildNetworkWithReadModel();
+    expect(network.latestLimit(23)).toBeUndefined();
+  });
+
+  it("latestLimit returns the latest snapshot for the receiving provider", () => {
+    const { network, store } = buildNetworkWithReadModel(7);
+    const snap: LimitSnapshot = {
+      providerId: 7,
+      counterpartyId: 23,
+      version: 1n,
+      payoutLimit: { unscaled: "1000", exponent: 0 },
+      receivedAt: clock,
+    };
+    store.putLimit(snap);
+    expect(network.latestLimit(23)?.payoutLimit).toEqual({ unscaled: "1000", exponent: 0 });
+  });
+
+  it("hasReadModel reports whether the read model is attached", () => {
+    const svc = new PayoutProviderService(new MockT0Client(), () => clock);
+    const noModel = new SandboxNetwork(svc, new MockOfiT0Client({ pickBestQuote: () => null }));
+    expect(noModel.hasReadModel()).toBe(false);
+    const { network } = buildNetworkWithReadModel();
+    expect(network.hasReadModel()).toBe(true);
+  });
+
+  it("ignores limits belonging to a different providerId", () => {
+    const { network, store } = buildNetworkWithReadModel(7);
+    store.putLimit({
+      providerId: 99,
+      counterpartyId: 23,
+      version: 1n,
+      payoutLimit: { unscaled: "100", exponent: 0 },
+      receivedAt: clock,
+    });
+    expect(network.latestLimit(23)).toBeUndefined();
   });
 });

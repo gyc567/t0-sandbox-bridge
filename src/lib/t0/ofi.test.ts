@@ -4,6 +4,7 @@ import { PayoutProviderService } from "./provider";
 import { SandboxNetwork } from "./network";
 import { OFIService } from "./ofi";
 import { MockOfiT0Client, type OfiT0Client } from "./ofi-client";
+import { SettlementRegistry } from "./settlement";
 
 let clock = 1_700_000_000_000;
 const now = () => clock;
@@ -217,5 +218,67 @@ describe("Manual AML (OFI side)", () => {
     if (!("success" in r)) return;
     const p = ofi.completeManualAml(r.success.payment.id, false);
     expect(p.status).toBe("rejected");
+  });
+});
+
+// ── Pre-Settlement (audit §4–§7) — OFI-facing helpers ─────────────────
+
+describe("OFIService Pre-Settlement (audit §4–§7)", () => {
+  function buildOFIWithRegistry() {
+    const registry = new SettlementRegistry({ confirmDelayMs: 0 });
+    const p = new PayoutProviderService(new MockT0Client(), now, registry);
+    const n = new SandboxNetwork(
+      p,
+      new MockOfiT0Client({ pickBestQuote: () => null }),
+      "PAYMENT_METHOD_TYPE_SEPA",
+      now,
+      registry,
+    );
+    return {
+      registry,
+      network: n,
+      provider: p,
+      ofi: new OFIService(n, now),
+    };
+  }
+
+  it("submitUsdtSettlement delegates to the registry", () => {
+    const { ofi } = buildOFIWithRegistry();
+    const s = ofi.submitUsdtSettlement({
+      blockchain: "TRON",
+      fromAddress: "TXw1OFI",
+      toAddress: "TXw2Provider",
+      usdAmount: 2500,
+    });
+    expect(s.status).toBe("PENDING");
+    expect(s.usdAmount).toBe(2500);
+    expect(s.blockchain).toBe("TRON");
+  });
+
+  it("submitUsdtSettlement honours caller-supplied txHash", () => {
+    const { ofi } = buildOFIWithRegistry();
+    const s = ofi.submitUsdtSettlement({
+      txHash: "0xfixed",
+      blockchain: "BSC",
+      fromAddress: "a",
+      toAddress: "b",
+      usdAmount: 100,
+    });
+    expect(s.txHash).toBe("0xfixed");
+    expect(s.blockchain).toBe("BSC");
+  });
+
+  it("getSettlementState returns OFI's snapshot view", () => {
+    const { ofi } = buildOFIWithRegistry();
+    ofi.submitUsdtSettlement({
+      blockchain: "ETHEREUM",
+      fromAddress: "a",
+      toAddress: "b",
+      usdAmount: 750,
+    });
+    const state = ofi.getSettlementState();
+    expect(state.pending).toHaveLength(1);
+    expect(state.ofiCredit).toEqual({ available: 0, reserved: 0 });
+    expect(state.providerCredit).toEqual({ available: 0, reserved: 0 });
   });
 });

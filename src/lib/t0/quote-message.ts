@@ -57,6 +57,11 @@ const MESSAGES: Record<QuoteFailureReason, QuoteFailureMessage> = {
     detail:
       "The request to agtpay was malformed. Verify currency, amount, and payment method.",
   },
+  REASON_NO_CREDIT_AVAILABLE: {
+    title: "Insufficient USDT credit",
+    detail:
+      "The OFI hasn't topped up enough USDT for this payment. Submit a settlement on /ofi first.",
+  },
 };
 
 /**

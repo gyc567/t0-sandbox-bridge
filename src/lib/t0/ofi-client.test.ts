@@ -424,9 +424,10 @@ describe("HttpOfiT0Client.getQuote", () => {
     expect("failure" in r && r.failure.reason).toBe("UPSTREAM");
   });
 
-  it("falls back to epoch when expiration object has invalid (non-numeric) seconds", async () => {
-    // parseExpiration tries Number(t.seconds) when seconds is a string —
-    // if NaN, it falls through to the epoch fallback.
+  it("returns UPSTREAM when expiration object has invalid (non-numeric) seconds", async () => {
+    // audit §6.1 A4: unparseable upstream expiration must surface as UPSTREAM,
+    // not as a quote whose expiresAt gets faked to epoch (which would then
+    // be classified as "already expired" — a lie about the upstream).
     const fetchImpl = mkFetch({
       Result: {
         Success: {
@@ -443,7 +444,52 @@ describe("HttpOfiT0Client.getQuote", () => {
       { usdAmount: 1000, currency: "EUR", paymentMethod: "PAYMENT_METHOD_TYPE_SEPA" },
       () => NOW,
     );
-    expect("success" in r && r.success.expiresAt).toBe(0);
+    expect("failure" in r && r.failure.reason).toBe("UPSTREAM");
+    if ("failure" in r) {
+      expect(r.failure.message).toMatch(/unparseable expiration/);
+    }
+  });
+
+  it("returns UPSTREAM when expiration object has zero/negative seconds", async () => {
+    // seconds=0 would have computed to "1970-01-01..." — also a lie. The
+    // new contract returns UPSTREAM instead.
+    const fetchImpl = mkFetch({
+      Result: {
+        Success: {
+          rate: { unscaled: 92, exponent: -2 },
+          expiration: { seconds: 0, nanos: 0 },
+          quoteId: { quoteId: 1, providerId: 1 },
+          payOutAmount: { unscaled: 920, exponent: 0 },
+          settlementAmount: { unscaled: 1000, exponent: 0 },
+        },
+      },
+    });
+    const client = buildClient({ fetchImpl });
+    const r = await client.getQuote(
+      { usdAmount: 1000, currency: "EUR", paymentMethod: "PAYMENT_METHOD_TYPE_SEPA" },
+      () => NOW,
+    );
+    expect("failure" in r && r.failure.reason).toBe("UPSTREAM");
+  });
+
+  it("returns UPSTREAM when expiration object is missing seconds entirely", async () => {
+    const fetchImpl = mkFetch({
+      Result: {
+        Success: {
+          rate: { unscaled: 92, exponent: -2 },
+          expiration: { nanos: 0 },
+          quoteId: { quoteId: 1, providerId: 1 },
+          payOutAmount: { unscaled: 920, exponent: 0 },
+          settlementAmount: { unscaled: 1000, exponent: 0 },
+        },
+      },
+    });
+    const client = buildClient({ fetchImpl });
+    const r = await client.getQuote(
+      { usdAmount: 1000, currency: "EUR", paymentMethod: "PAYMENT_METHOD_TYPE_SEPA" },
+      () => NOW,
+    );
+    expect("failure" in r && r.failure.reason).toBe("UPSTREAM");
   });
 
   it("returns UPSTREAM when quoteId has neither camelCase nor snake_case fields", async () => {
@@ -526,5 +572,88 @@ describe("MockOfiT0Client.getQuote", () => {
       () => NOW,
     );
     expect(pickBestQuote).toHaveBeenCalledWith(500, "GBP", NOW);
+  });
+});
+
+// ── HttpOfiT0Client parses `allQuotes[]` settlement (Phase 1 Step 8)
+// New cases appended below; existing cases above untouched.
+
+import type { RawProviderQuote } from "./quote-mapper";
+
+describe("HttpOfiT0Client forwards allQuotes[] to settlement breakdown", () => {
+  // Mirrors the shape used by other success-path tests in this file.
+  function buildSuccessJson(extra?: Record<string, unknown>): Record<string, unknown> {
+    return {
+      result: {
+        success: {
+          rate: { unscaled: 86, exponent: -2 },
+          expiration: FUTURE,
+          quoteId: { quoteId: 67890, providerId: 1 },
+          payOutAmount: { unscaled: 860, exponent: 0 },
+          settlementAmount: { unscaled: 1000, exponent: 0 },
+        },
+      },
+      allQuotes: [],
+      ...extra,
+    };
+  }
+
+  function makeClient(json: unknown): HttpOfiT0Client {
+    return new HttpOfiT0Client({
+      baseUrl: "https://example.test",
+      apiKey: "test-key",
+      fetchImpl: vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(json)),
+        json: () => Promise.resolve(json),
+      }),
+    });
+  }
+
+  it("matches the selected quote against allQuotes and returns the breakdown", async () => {
+    const allQuotes: RawProviderQuote[] = [
+      {
+        providerId: 1,
+        quoteId: 67890,
+        settlement: {
+          prefundingAmount: { unscaled: 750, exponent: 0 },
+          creditLimit: { unscaled: 5000, exponent: 0 },
+        },
+      },
+    ];
+    const client = makeClient(buildSuccessJson({ allQuotes }));
+    const result = await client.getQuote(
+      { usdAmount: 1000, currency: "EUR", paymentMethod: "PAYMENT_METHOD_TYPE_SEPA" },
+      () => NOW,
+    );
+    if (!("success" in result)) throw new Error("expected success");
+    expect(result.success.settlement?.available).toBe(true);
+    expect(result.success.settlement?.prefundingAmount).toBe(750);
+    expect(result.success.settlement?.creditLimit).toBe(5000);
+  });
+
+  it("returns no breakdown when allQuotes is empty", async () => {
+    const client = makeClient(buildSuccessJson());
+    const result = await client.getQuote(
+      { usdAmount: 1000, currency: "EUR", paymentMethod: "PAYMENT_METHOD_TYPE_SEPA" },
+      () => NOW,
+    );
+    if (!("success" in result)) throw new Error("expected success");
+    expect(result.success.settlement).toBeUndefined();
+  });
+
+  it("returns no breakdown when allQuotes exists but no entry matches", async () => {
+    const client = makeClient(
+      buildSuccessJson({
+        allQuotes: [{ providerId: 99, quoteId: 1 }],
+      }),
+    );
+    const result = await client.getQuote(
+      { usdAmount: 1000, currency: "EUR", paymentMethod: "PAYMENT_METHOD_TYPE_SEPA" },
+      () => NOW,
+    );
+    if (!("success" in result)) throw new Error("expected success");
+    expect(result.success.settlement).toBeUndefined();
   });
 });

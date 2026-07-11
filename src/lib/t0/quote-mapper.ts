@@ -3,12 +3,13 @@
 //
 // 设计要点:
 // - Decimal 双向转换处理浮点精度(用 Math.round(round * 1e10) / 1e10 + string parse)
-// - RFC3339 → epoch ms 解析,无效输入抛 Error 由调用方处理
+// - RFC3339 → epoch ms 解析,无效输入返回 null 由调用方映射为 UPSTREAM
+//   (audit §6.1 A4: 改写为 epoch 会伪装成"已过期 quote")
 // - ID 拼装遵循文档 §3 字段映射表(providerId-quoteId)
 // - 失败原因四分类(NO_QUOTE / UPSTREAM / UNAUTHORIZED / BAD_REQUEST)
 //   → 内部 9 个 QuoteFailureReason,新增 3 个
 
-import type { Currency, Quote, VolumeBand } from "./types";
+import type { Currency, Quote } from "./types";
 import type { GetQuoteResult, QuoteFailureReason } from "./network";
 
 // ── Decimal 转换 ──────────────────────────────────────────────
@@ -74,6 +75,100 @@ export interface OfiQuoteSuccess {
   settlementAmount: number;
   /** 服务端取的时间戳 */
   createdAt: number;
+  /**
+   * Optional funding breakdown from the upstream AGTPay envelope's
+   * `allQuotes[]` array (audit §1.2 #6). When the matched provider quote
+   * carries a settlement sub-message, this is populated. Otherwise the
+   * field is `undefined` and the UI renders the funding recommendation
+   * as `unavailable` rather than fabricating a value.
+   */
+  settlement?: SettlementBreakdown;
+}
+
+/**
+ * Funding breakdown for the selected quote, surfaced from the upstream
+ * `allQuotes[].settlement` envelope. All fields are optional because the
+ * upstream response may omit them. `available` distinguishes "this
+ * envelope was present" from "we couldn't get the data" — when `false`,
+ * the UI must not display any fabricated recommendation.
+ */
+export interface SettlementBreakdown {
+  readonly available: boolean;
+  amount?: number;
+  creditLimit?: number;
+  totalUsed?: number;
+  prefundingAmount?: number;
+  executable?: boolean;
+  providerId?: number;
+}
+
+/**
+ * Shape of a single entry from the upstream `allQuotes[]` array. Only
+ * the fields we currently use are declared; everything else is passed
+ * through in `rawSettlement` for diagnostic / replay purposes.
+ */
+export interface RawProviderQuote {
+  quoteId?: number;
+  providerId?: number;
+  executable?: boolean;
+  fix?: Decimal;
+  settlement?: RawProviderSettlement;
+}
+
+export interface RawProviderSettlement {
+  amount?: Decimal;
+  creditLimit?: Decimal;
+  totalUsed?: Decimal;
+  prefundingAmount?: Decimal;
+  providerId?: number;
+}
+
+/**
+ * Best-effort match of the selected quote against the upstream
+ * `allQuotes[]` array, returning the settlement breakdown if present.
+ *
+ * Match key: `${providerId}-${quoteId}` — identical to the
+ * `OfiQuoteSuccess.quoteId` form built in `rawToOfiSuccess`. If the
+ * upstream omits `allQuotes`, or the matching entry is missing / lacks a
+ * settlement sub-message, returns `undefined`. The UI distinguishes
+ * "missing breakdown" from "available breakdown" via the `?.available`
+ * guard — it should never display fabricated values when this returns
+ * `undefined`.
+ */
+export function findSettlementBreakdown(
+  selectedQuoteId: string,
+  allQuotes: readonly RawProviderQuote[] | undefined,
+): SettlementBreakdown | undefined {
+  if (!allQuotes || allQuotes.length === 0) {
+    return undefined;
+  }
+  for (const q of allQuotes) {
+    if (q.providerId === undefined || q.quoteId === undefined) continue;
+    const composite = `${q.providerId}-${q.quoteId}`;
+    if (composite !== selectedQuoteId) continue;
+    if (!q.settlement) {
+      // Matched the quote but no settlement sub-message — return a
+      // marker object so the UI knows the quote exists.
+      return {
+        available: false,
+        executable: q.executable,
+        providerId: q.providerId,
+      };
+    }
+    const s = q.settlement;
+    const breakdown: SettlementBreakdown = {
+      available: true,
+      executable: q.executable,
+      providerId: q.providerId,
+    };
+    if (s.amount !== undefined) breakdown.amount = decimalToNumber(s.amount);
+    if (s.creditLimit !== undefined) breakdown.creditLimit = decimalToNumber(s.creditLimit);
+    if (s.totalUsed !== undefined) breakdown.totalUsed = decimalToNumber(s.totalUsed);
+    if (s.prefundingAmount !== undefined) breakdown.prefundingAmount = decimalToNumber(s.prefundingAmount);
+    if (s.providerId !== undefined) breakdown.providerId = s.providerId;
+    return breakdown;
+  }
+  return undefined;
 }
 
 export type OfiQuoteResponse =
@@ -85,22 +180,40 @@ export type OfiQuoteResponse =
 /** 4 分类失败 → 内部 9 个 QuoteFailureReason 之一 */
 export function toQuoteFailureReason(reason: OfiFailureReason): QuoteFailureReason {
   switch (reason) {
-    case "NO_QUOTE":     return "REASON_NO_QUOTE_AVAILABLE";
-    case "UPSTREAM":     return "REASON_UPSTREAM_ERROR";
-    case "UNAUTHORIZED": return "REASON_UNAUTHORIZED";
-    case "BAD_REQUEST":  return "REASON_BAD_REQUEST";
+    case "NO_QUOTE":
+      return "REASON_NO_QUOTE_AVAILABLE";
+    case "UPSTREAM":
+      return "REASON_UPSTREAM_ERROR";
+    case "UNAUTHORIZED":
+      return "REASON_UNAUTHORIZED";
+    case "BAD_REQUEST":
+      return "REASON_BAD_REQUEST";
   }
 }
 
 // ── OfiQuoteResponse → GetQuoteResult(给 SandboxNetwork 用) ──
 
+/**
+ * Convert OfiClient result to GetQuoteResult.
+ *
+ * audit §6.1 A4: if upstream returned an unparseable `expiration`, the client
+ * surfaces that as `OfiQuoteResponse.success.expiresAt = NaN` (raw mapper
+ * throws before reaching here), so we never coerce an invalid time to epoch.
+ *
+ * audit §6.1 A7: the upstream `message` is propagated into `failure.message`
+ * so server-side logging retains diagnostic context (UI does not read this).
+ */
 export function toGetQuoteResult(
   res: OfiQuoteResponse,
   now: number,
   fallbackCurrency: Currency,
 ): GetQuoteResult {
   if ("failure" in res) {
-    return { failure: { reason: toQuoteFailureReason(res.failure.reason) } };
+    const failure: { reason: QuoteFailureReason; message?: string } = {
+      reason: toQuoteFailureReason(res.failure.reason),
+    };
+    if (res.failure.message) failure.message = res.failure.message;
+    return { failure };
   }
   const s = res.success;
   // 服务器返回的 quote 已过期 → 视作 EXPIRED
@@ -110,10 +223,7 @@ export function toGetQuoteResult(
   const quote: Quote = {
     id: s.quoteId,
     currency: fallbackCurrency,
-    // s.band originates from the OFI request usdAmount; cast through VolumeBand
-    // because the Quote type is intentionally narrow (sandbox uses fixed bands).
-    // The runtime value is still a number; downstream consumers tolerate it.
-    band: s.band as VolumeBand,
+    band: s.band, // band is now `number` (audit A3); OFI request amount is the truth
     rate: s.rate,
     expiresAt: s.expiresAt,
     createdAt: s.createdAt,
@@ -134,7 +244,12 @@ export function toGetQuoteResult(
  */
 export interface RawSuccess {
   rate: Decimal;
-  expiration: string;
+  /**
+   * Either RFC3339 string or proto Timestamp — `null` signals the client
+   * could not parse this field, in which case `rawToOfiSuccess` throws
+   * (caller maps to UPSTREAM).
+   */
+  expiration: string | null;
   quoteId: { quoteId: number; providerId: number };
   payOutAmount: Decimal;
   settlementAmount: Decimal;
@@ -145,9 +260,18 @@ export function rawToOfiSuccess(
   reqUsdAmount: number,
   fallbackCurrency: Currency,
   now: number,
+  allQuotes?: readonly RawProviderQuote[],
 ): OfiQuoteSuccess {
-  return {
-    quoteId: `${raw.quoteId.providerId}-${raw.quoteId.quoteId}`,
+  // audit §6.1 A4: invalid upstream expiration is an upstream error, not an
+  // expired quote. Surface as a thrown Error so the HttpOfiT0Client can
+  // classify it as UPSTREAM.
+  if (raw.expiration === null) {
+    throw new Error("upstream returned an unparseable expiration");
+  }
+  const quoteId = `${raw.quoteId.providerId}-${raw.quoteId.quoteId}`;
+  const settlement = findSettlementBreakdown(quoteId, allQuotes);
+  const success: OfiQuoteSuccess = {
+    quoteId,
     currency: fallbackCurrency,
     band: reqUsdAmount,
     rate: decimalToNumber(raw.rate),
@@ -156,4 +280,6 @@ export function rawToOfiSuccess(
     settlementAmount: decimalToNumber(raw.settlementAmount),
     createdAt: now,
   };
+  if (settlement !== undefined) success.settlement = settlement;
+  return success;
 }
