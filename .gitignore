@@ -38,3 +38,9 @@ coverage/
 .env
 .env.local
 .env.*.local
+
+# Ad-hoc debug scripts (local troubleshooting — not part of the app)
+scripts/debug-*.cjs
+
+# Embedded agent config repo (we keep the index reference, not the nested repo)
+.agents/agents-md/
