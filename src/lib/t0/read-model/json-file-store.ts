@@ -203,6 +203,10 @@ export class JsonFileStore implements ReadModelStore {
     return this.inner.hasInbox(eventKey);
   }
 
+  snapshotInbox(): ReadonlyMap<string, InboxRecord> {
+    return this.inner.snapshotInbox();
+  }
+
   // ── Credit Usage Notifications ────────────────────────────────────────
 
   putCreditUsage(record: import("./types").CreditUsageNotificationRecord): void {

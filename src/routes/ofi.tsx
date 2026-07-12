@@ -11,7 +11,7 @@ import {
   ofiApprovePaymentQuoteFn,
   triggerManualAmlFn,
 } from "@/lib/t0/t0.functions";
-import type { Currency, Payment } from "@/lib/t0/types";
+import type { Currency, Payment, Payout } from "@/lib/t0/types";
 import type { NetworkEvent } from "@/lib/t0/types";
 import type { SettlementState } from "@/lib/t0/settlement";
 import { getCurrencyLabel } from "@/lib/t0/currencies";

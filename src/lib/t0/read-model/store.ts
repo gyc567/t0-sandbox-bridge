@@ -90,6 +90,10 @@ export interface ReadModelStore {
    *  status). Used as the dedupe gate. */
   hasInbox(eventKey: string): boolean;
 
+  /** Diagnostic snapshot: every inbox record indexed by eventKey.
+   *  Used by server-fn read endpoints to expose dedupe state to the UI. */
+  snapshotInbox(): ReadonlyMap<string, InboxRecord>;
+
   // ── Credit Usage Notifications ──────────────────────────────────────
 
   /** Persist a Credit Usage Notification record. */

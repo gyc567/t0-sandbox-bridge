@@ -104,7 +104,7 @@ describe("parseLimit", () => {
       version: 7n,
       payoutLimit: { unscaled: "1000", exponent: 0 },
       receivedAt: NOW,
-      rawPayload: limit,
+      rawPayload: JSON.stringify(limit, (_k, v) => (typeof v === "bigint" ? v.toString() : v)),
     });
     expect(snap.creditLimit).toEqual({ unscaled: "5000", exponent: 0 });
     expect(snap.creditUsage).toEqual({ unscaled: "1000", exponent: 0 });

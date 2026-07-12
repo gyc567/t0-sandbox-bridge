@@ -259,8 +259,10 @@ export interface LimitSnapshot {
   readonly creditUsage?: Decimal;
   readonly reserve?: Decimal;
   readonly receivedAt: number;
-  /** Raw proto payload for audit/replay. */
-  readonly rawPayload?: unknown;
+  /** Raw proto payload for audit/replay, serialised as JSON. Stored as a
+   *  string so server-fn `ValidateSerializableMapped` accepts it; consumers
+   *  that need the structured object should `JSON.parse(rawPayload)`. */
+  readonly rawPayload?: string;
 }
 
 export type LedgerAccountType =
@@ -290,7 +292,9 @@ export interface LedgerEntry {
     | { kind: "piFundsReceived"; paymentIntentId: bigint }
     | { kind: "unknown" };
   readonly receivedAt: number;
-  readonly rawPayload?: unknown;
+  /** Raw proto payload for audit/replay, serialised as JSON. See
+   *  `LimitSnapshot.rawPayload` for the rationale on the string shape. */
+  readonly rawPayload?: string;
 }
 
 export type InboxMethod = "UPDATE_LIMIT" | "APPEND_LEDGER_ENTRIES";

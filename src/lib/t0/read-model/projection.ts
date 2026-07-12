@@ -32,6 +32,15 @@ import {
   type SettlementProjection,
 } from "./types";
 
+/**
+ * JSON.stringify can't natively encode `bigint`. We coerce to decimal
+ * string so the snapshot survives a server-fn wire round-trip without
+ * hitting `TypeError: Do not know how to serialize a BigInt`.
+ */
+function bigintSafeStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, v) => (typeof v === "bigint" ? v.toString() : v));
+}
+
 // ── UpdateLimit parsing ────────────────────────────────────────────────
 
 /**
@@ -68,7 +77,7 @@ export function parseLimit(
     creditUsage: parseOptionalDecimal(limit.creditUsage, "creditUsage"),
     reserve: parseOptionalDecimal(limit.reserve, "reserve"),
     receivedAt,
-    rawPayload: limit,
+    rawPayload: bigintSafeStringify(limit),
   };
 }
 
@@ -133,7 +142,7 @@ function parseLedgerEntry(
     debit: parseOptionalDecimal(entry.debit, "debit"),
     context,
     receivedAt,
-    rawPayload: entry,
+    rawPayload: bigintSafeStringify(entry),
   };
 }
 

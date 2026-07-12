@@ -7,9 +7,9 @@ import {
   notifyCreditFn,
   requestPayoutFn,
   snapshotFn,
-  readProviderCounterparties,
-  readCallbackInboxState,
-  readProviderLedger,
+  providerCounterpartiesFn,
+  callbackInboxStateFn,
+  providerLedgerFn,
 } from "@/lib/t0/t0.functions";
 // (auth removed — sandbox console is open access; no login required)
 import type { Currency, Payment, Payout, Quote, VolumeBand } from "@/lib/t0/types";
@@ -71,9 +71,9 @@ function ProviderPage() {
   // Provider role is providerId 0 in this sandbox. Production would
   // resolve from auth.
   const PROVIDER_ID = 0;
-  const counterpartiesReadModel = useServerFn(readProviderCounterparties);
-  const inboxStateReadModel = useServerFn(readCallbackInboxState);
-  const ledgerReadModel = useServerFn(readProviderLedger);
+  const counterpartiesReadModel = useServerFn(providerCounterpartiesFn);
+  const inboxStateReadModel = useServerFn(callbackInboxStateFn);
+  const ledgerReadModel = useServerFn(providerLedgerFn);
 
   type CounterpartyRow = { counterpartyId: number; latest: LimitSnapshot | null };
   const [counterparties, setCounterparties] = useState<CounterpartyRow[]>([]);
@@ -447,6 +447,15 @@ function ProviderPage() {
                 </div>
               </PanelCard>
             </>
+          }
+          paymentManualAmlContent={
+            <PanelCard step="04" title="Payment-Manual AML (Provider view)">
+              <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
+                OFI handles Manual AML on the OFI console. The Provider view
+                is reactive only — inbound approvals and rejections from OFI
+                surface in the Event Log below.
+              </p>
+            </PanelCard>
           }
         />
 
