@@ -1,0 +1,43 @@
+{
+  "baseUrl": "http://127.0.0.1:8080",
+  "passed": 0,
+  "results": [
+    {
+      "name": "provider-currency-band",
+      "path": "/provider",
+      "status": "FAIL",
+      "durationMs": 1158,
+      "error": "Currency dropdown did not open after click",
+      "checks": [
+        {
+          "name": "page title",
+          "pass": true
+        },
+        {
+          "name": "publish quote button",
+          "pass": true
+        },
+        {
+          "name": "currency dropdown trigger",
+          "pass": true
+        },
+        {
+          "name": "band dropdown trigger",
+          "pass": true
+        },
+        {
+          "name": "currency listbox opened",
+          "pass": false
+        }
+      ],
+      "consoleMessages": [
+        {
+          "type": "pageerror",
+          "text": "Module \"node:fs\" has been externalized for browser compatibility. Cannot access \"node:fs.existsSync\" in client code.  See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details."
+        }
+      ],
+      "failedRequests": [],
+      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/provider-currency-band-failure.png"
+    }
+  ]
+}

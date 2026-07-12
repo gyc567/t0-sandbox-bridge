@@ -131,10 +131,10 @@ describe("updatePayment", () => {
     expect(res.$typeName).toBe("tzero.v1.payment.UpdatePaymentResponse");
     // After sandbox setup the payment is "confirmed" (createPayment runs
     // the payout synchronously). handleManualAmlCheck then marks it
-    // "rejected" pending operator re-approval.
+    // "pending_aml" pending operator re-approval.
     const snapshot = svc.snapshot();
     const p = snapshot.payments.find((x) => x.id === `n_${paymentId.toString()}`);
-    expect(p?.status).toBe("rejected");
+    expect(p?.status).toBe("pending_aml");
   });
 
   it("handles a failed update without throwing", async () => {

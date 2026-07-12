@@ -4,6 +4,7 @@ import { SandboxNetwork } from "./network";
 import { HttpOfiT0Client, MockOfiT0Client } from "./ofi-client";
 import type { OfiT0Client } from "./ofi-client";
 import { SettlementRegistry } from "./settlement";
+import { sharedCallbackInbox, sharedStore } from "./read-model/instance";
 
 // ── Provider → Network push client (unchanged) ─────────────────────
 const ngrokUrl = process.env.T0_NGROK_URL;
@@ -163,7 +164,6 @@ const ofiClient = buildOfiClient(providerService);
 // Default InMemoryStore; production deployments can swap in a
 // JsonFileStore (read-model/json-file-store.ts) by re-creating
 // `sharedCallbackInbox` after import.
-import { sharedCallbackInbox, sharedStore } from "./read-model/instance";
 export { sharedCallbackInbox as callbackInbox, sharedStore as readModelStore };
 export const sandboxNetwork = new SandboxNetwork(
   providerService,

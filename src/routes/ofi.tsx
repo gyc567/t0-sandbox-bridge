@@ -8,6 +8,8 @@ import {
   ofiSnapshotFn,
   ofiReadModelFn,
   ofiSubmitSettlementFn,
+  ofiApprovePaymentQuoteFn,
+  triggerManualAmlFn,
 } from "@/lib/t0/t0.functions";
 import type { Currency, Payment } from "@/lib/t0/types";
 import type { NetworkEvent } from "@/lib/t0/types";
@@ -28,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Wallet, Send, RefreshCw, CheckCircle2, XCircle, PiggyBank, Activity } from "lucide-react";
+import { Wallet, Send, RefreshCw, CheckCircle2, XCircle, PiggyBank, Activity, Shield, FileCheck } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { OfiSidebarMenu } from "@/components/ofi/OfiSidebarMenu";
 
@@ -62,9 +64,11 @@ function OfiPage() {
   const getQuote = useServerFn(ofiGetQuoteFn);
   const createPayment = useServerFn(ofiCreatePaymentFn);
   const completeManualAml = useServerFn(ofiCompleteManualAmlFn);
+  const triggerManualAml = useServerFn(triggerManualAmlFn);
   const snapshot = useServerFn(ofiSnapshotFn);
   const readModel = useServerFn(ofiReadModelFn);
   const submitSettlement = useServerFn(ofiSubmitSettlementFn);
+  const approvePaymentQuote = useServerFn(ofiApprovePaymentQuoteFn);
 
   // ── Phase 2: Funding Workspace state ────────────────────────────
   // The funding panel reads the durable read model. We use a fixed
@@ -263,6 +267,26 @@ function OfiPage() {
   const onReject = (p: Payment) =>
     run(async () => {
       await completeManualAml({ data: { paymentId: p.id, approved: false } });
+      await refresh();
+    });
+
+  const onTriggerAml = (p: Payment) =>
+    run(async () => {
+      await triggerManualAml({ data: { paymentId: p.id } });
+      await refresh();
+    });
+
+  // ── OFI Payment-Manual AML: Approve/Reject Quote (Last Look) ───────
+  const onApproveQuote = (paymentId: string, quoteId: string) =>
+    run(async () => {
+      await approvePaymentQuote({ data: { paymentId, quoteId } });
+      await refresh();
+    });
+
+  const onRejectQuote = (paymentId: string, quoteId: string) =>
+    run(async () => {
+      // Reject quote: mark payment as rejected via manual AML
+      await completeManualAml({ data: { paymentId, approved: false } });
       await refresh();
     });
 
@@ -553,7 +577,7 @@ function OfiPage() {
                       emptyMessage="No ledger entries."
                       render={(entry) => (
                         <div
-                          key={`${entry.txHash}-${entry.at}`}
+                          key={entry.id}
                           className="flex items-center justify-between gap-2 border-b border-hairline py-2 last:border-0"
                         >
                           <div className="flex items-center gap-2 min-w-0">
@@ -774,6 +798,177 @@ function OfiPage() {
               </PanelCard>
             </>
           }
+          paymentManualAmlContent={
+            <>
+              <PanelCard step="09" title="Payout Requests">
+                <div className="space-y-4">
+                  <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                    Payout requests from the Provider awaiting OFI's "Last Look" quote approval. After the Provider completes manual AML review, the Network sends a refreshed quote for the OFI to approve or reject before payout execution proceeds.
+                  </p>
+                  {data.payments.filter((p) => p.status === "accepted").length === 0 ? (
+                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
+                      No payout requests awaiting approval. Create a payment and wait for the Provider to complete AML review.
+                    </p>
+                  ) : (
+                    <List
+                      items={data.payments.filter((p) => p.status === "accepted")}
+                      emptyMessage="No payout requests awaiting approval."
+                      render={(p) => (
+                        <div
+                          key={p.id}
+                          className="flex flex-col gap-1 border-b border-hairline py-2 last:border-0"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <StatusDot status={p.status} />
+                              <span className="font-mono tabular text-caption text-foreground truncate">
+                                {p.id} · {p.currency} {p.localAmount.toFixed(2)} · {p.beneficiaryRef}
+                              </span>
+                            </div>
+                            <div className="flex gap-1.5 shrink-0">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={busy}
+                                onClick={() => onApproveQuote(p.id, p.quoteId)}
+                                data-testid={`aml-approve-quote-${p.id}`}
+                              >
+                                <Shield className="w-3.5 h-3.5" />
+                                Approve Quote
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={busy}
+                                onClick={() => onRejectQuote(p.id, p.quoteId)}
+                                data-testid={`aml-reject-quote-${p.id}`}
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                Reject Quote
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 pl-6">
+                            <span className="font-mono text-caption text-muted-foreground">
+                              Quote: {p.quoteId.slice(0, 16)}…
+                            </span>
+                            <span className="font-mono text-caption text-muted-foreground">
+                              USD: ${p.usdAmount.toLocaleString()}
+                            </span>
+                            <span className="font-mono text-caption text-muted-foreground">
+                              Status: {p.status}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    />
+                  )}
+                </div>
+              </PanelCard>
+
+              <PanelCard step="10" title="Quote Confirmations">
+                <div className="space-y-4">
+                  <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                    Quote confirmations sent by the OFI during the Last Look approval step. These represent the OFI's approval or rejection of the refreshed quote rates after the Provider's manual AML review.
+                  </p>
+                  {data.events.filter((e): e is NetworkEvent & { type: "OfiAmlEvent" } => e.type === "OfiAmlEvent").length === 0 ? (
+                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
+                      No quote confirmations yet. Approve or reject a payout request to trigger the Last Look flow.
+                    </p>
+                  ) : (
+                    <List
+                      items={data.events
+                        .filter((e): e is NetworkEvent & { type: "OfiAmlEvent" } => e.type === "OfiAmlEvent")
+                        .map((e) => ({
+                          id: `${e.type}-${e.at}`,
+                          type: e.type,
+                          paymentId: e.paymentId,
+                          quoteId: e.quoteId,
+                          action: e.action,
+                          at: e.at,
+                        }))}
+                      emptyMessage="No quote confirmations."
+                      render={(item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-2 border-b border-hairline py-2 last:border-0"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <StatusDot
+                              status={item.action === "approved" ? "confirmed" : "rejected"}
+                            />
+                            <span className="font-mono tabular text-caption text-foreground truncate">
+                              Payment {item.paymentId.slice(0, 20)}… · Quote {item.quoteId.slice(0, 16)}…
+                            </span>
+                            <span className={`font-mono text-caption ${item.action === "approved" ? "text-accent-green" : "text-[#ff453a]"}`}>
+                              {item.action === "approved" ? "Approved" : "Rejected"}
+                            </span>
+                          </div>
+                          <span className="font-mono text-caption text-muted-foreground shrink-0">
+                            {new Date(item.at).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    />
+                  )}
+                </div>
+              </PanelCard>
+
+              <PanelCard step="11" title="Payment Confirmed">
+                <div className="space-y-4">
+                  <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                    Payments that have been fully confirmed by the Network after successful payout execution. The complete manual AML flow is finished.
+                  </p>
+                  {data.payments.filter((p) => p.status === "confirmed").length === 0 ? (
+                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
+                      No confirmed payments yet. Approve a quote, then wait for the Provider to execute the payout.
+                    </p>
+                  ) : (
+                    <List
+                      items={data.payments.filter((p) => p.status === "confirmed")}
+                      emptyMessage="No confirmed payments."
+                      render={(p) => {
+                        const payout = data.payouts.find((po) => po.paymentId === p.id);
+                        return (
+                          <div
+                            key={p.id}
+                            className="flex flex-col gap-1 border-b border-hairline py-2 last:border-0"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <StatusDot status="confirmed" />
+                                <span className="font-mono tabular text-caption text-foreground truncate">
+                                  {p.id} · {p.currency} {p.localAmount.toFixed(2)} · {p.beneficiaryRef}
+                                </span>
+                              </div>
+                              <div className="flex gap-1.5 shrink-0">
+                                {payout && (
+                                  <span className={`font-mono text-caption ${payout.status === "success" ? "text-accent-green" : payout.status === "failed" ? "text-[#ff453a]" : "text-muted-foreground"}`}>
+                                    Payout: {payout.status}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2 pl-6">
+                              <span className="font-mono text-caption text-muted-foreground">
+                                Quote: {p.quoteId.slice(0, 16)}…
+                              </span>
+                              <span className="font-mono text-caption text-muted-foreground">
+                                USD: ${p.usdAmount.toLocaleString()}
+                              </span>
+                              <span className="font-mono text-caption text-accent-green">
+                                Status: {p.status}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                  )}
+                </div>
+              </PanelCard>
+            </>
+          }
         >
           <PanelCard step="01" title="Get Quote">
             <div className="flex flex-wrap items-end gap-3">
@@ -912,6 +1107,16 @@ function OfiPage() {
                           <XCircle className="w-3.5 h-3.5" />
                           Reject
                         </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={busy || p.status === "pending_aml"}
+                          onClick={() => onTriggerAml(p)}
+                          data-testid={`trigger-aml-${p.id}`}
+                        >
+                          <Shield className="w-3.5 h-3.5" />
+                          Trigger AML
+                        </Button>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 pl-6">
@@ -927,6 +1132,7 @@ function OfiPage() {
                       {payout && (
                         <span className={`font-mono text-caption ${payout.status === "success" ? "text-accent-green" : payout.status === "failed" ? "text-[#ff453a]" : "text-muted-foreground"}`}>
                           Payout: {payout.status}
+                          {payout.fee !== undefined && ` · Fee: $${payout.fee.toFixed(2)}`}
                         </span>
                       )}
                     </div>

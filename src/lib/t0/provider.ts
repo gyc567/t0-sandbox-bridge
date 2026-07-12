@@ -62,6 +62,14 @@ export class PayoutProviderService {
     this.readModel = readModel;
   }
 
+  /** Restore state from a persisted snapshot (idempotent). */
+  loadSnapshot(state: { quotes: Quote[]; payments: Payment[]; payouts: Payout[]; events: NetworkEvent[] }): void {
+    for (const q of state.quotes) this.quotes.set(q.id, q);
+    for (const p of state.payments) this.payments.set(p.id, p);
+    for (const po of state.payouts) this.payouts.set(po.id, po);
+    this.events = [...state.events];
+  }
+
   // ── 1. UpdateQuote ────────────────────────────────────────────
   async publishQuote(input: PublishQuoteInput): Promise<Quote> {
     if (input.rate <= 0) throw new Error("rate must be > 0");
@@ -164,10 +172,13 @@ export class PayoutProviderService {
     if (!payment) throw new Error("unknown payment");
     if (payment.status !== "accepted") throw new Error("payment not in accepted state");
 
+    const fee = Math.round(payment.usdAmount * 0.0005 * 100) / 100; // 0.05%, 2-decimal precision
+
     const payout: Payout = {
       id: nextId("po"),
       paymentId,
       status: "accepted",
+      fee,
       updatedAt: this.now(),
     };
     this.payouts.set(payout.id, payout);
@@ -237,6 +248,14 @@ export class PayoutProviderService {
   }
 
   /**
+   * Mark a payment for manual AML review (transitions any → pending_aml).
+   * Pure state-write; throws on unknown payment.
+   */
+  markPaymentPendingAml(paymentId: string): Payment {
+    return this.markPaymentStatus(paymentId, "pending_aml");
+  }
+
+  /**
    * Refresh the TTL on a quote (Last Look approval). Throws on unknown quote.
    */
   refreshQuoteTtl(quoteId: string): Quote {
@@ -286,6 +305,22 @@ export class PayoutProviderService {
     quote.id = newId;
     this.quotes.delete(oldId);
     this.quotes.set(newId, quote);
+  }
+
+  /**
+   * Log a Quote Confirmation event from the T-0 Network (Last Look approval).
+   * Called when the network relays the OFI's quote approval/rejection.
+   */
+  logQuoteConfirmation(paymentId: string, quoteId: string, approved: boolean): void {
+    this.log({ type: "QuoteConfirmation", paymentId, quoteId, approved, at: this.now() });
+  }
+
+  /**
+   * Log an OFI AML event (OFI-side Last Look approval/rejection of a quote).
+   * Called when the OFI approves or rejects a quote during the manual AML flow.
+   */
+  logOfiAmlEvent(paymentId: string, quoteId: string, action: "approved" | "rejected"): void {
+    this.log({ type: "OfiAmlEvent", paymentId, quoteId, action, at: this.now() });
   }
 
   private log(e: NetworkEvent) {

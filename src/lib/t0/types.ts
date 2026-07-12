@@ -28,7 +28,7 @@ export interface Quote {
   createdAt: number;
 }
 
-export type PaymentStatus = "pending" | "accepted" | "rejected" | "confirmed";
+export type PaymentStatus = "pending" | "accepted" | "rejected" | "confirmed" | "pending_aml";
 export type PayoutStatus = "pending" | "accepted" | "success" | "failed";
 
 export interface Payment {
@@ -46,6 +46,7 @@ export interface Payout {
   id: string;
   paymentId: string;
   status: PayoutStatus;
+  fee?: number; // Network fee in USD (0.05% of usdAmount)
   reason?: string;
   updatedAt: number;
 }
@@ -57,7 +58,9 @@ export type NetworkEvent =
   | { type: "PaymentAccepted"; paymentId: string; at: number }
   | { type: "PayoutAccepted"; payoutId: string; at: number }
   | { type: "PayoutSuccess"; payoutId: string; at: number }
-  | { type: "PaymentConfirmed"; paymentId: string; at: number };
+  | { type: "PaymentConfirmed"; paymentId: string; at: number }
+  | { type: "QuoteConfirmation"; paymentId: string; quoteId: string; approved: boolean; at: number }
+  | { type: "OfiAmlEvent"; paymentId: string; quoteId: string; action: "approved" | "rejected"; at: number };
 
 // ── Pre-Settlement (audit §4–§7) ──────────────────────────────────────
 //

@@ -143,30 +143,42 @@ describe("SandboxNetwork.createPayment (Network owns accept + routes PayoutReque
 // ── completeManualAml ──────────────────────────────────────────────
 
 describe("SandboxNetwork.completeManualAml", () => {
-  it("approve moves payment to accepted", async () => {
+  it("approve moves payment from pending_aml to accepted", async () => {
     const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
-    // recordPayment(seed pending → success accepted)
+    // recordPayment(seed pending_aml → accepted)
     const p = await network.createPayment(
       { paymentClientId: "baxs_aml_app", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
       clock,
     );
     if (!("success" in p)) throw new Error("setup");
-    // createPayment already drives payout to success; mark rejected first
+    // createPayment already drives payout to success; mark pending_aml first
     // to verify approve restores it to accepted.
-    svc.markPaymentStatus(p.success.payment.id, "rejected");
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
     const updated = network.completeManualAml(p.success.payment.id, true);
     expect(updated.status).toBe("accepted");
   });
 
-  it("reject moves payment to rejected", async () => {
+  it("reject moves payment from pending_aml to rejected", async () => {
     const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
     const p = await network.createPayment(
       { paymentClientId: "baxs_aml_rej", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
       clock,
     );
     if (!("success" in p)) throw new Error("setup");
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
     const updated = network.completeManualAml(p.success.payment.id, false);
     expect(updated.status).toBe("rejected");
+  });
+
+  it("throws when payment is not in pending_aml state", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: "baxs_aml_bad_state", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    // payment is "confirmed" after createPayment (synchronous payout)
+    expect(() => network.completeManualAml(p.success.payment.id, true)).toThrow(/pending_aml/);
   });
 
   it("throws on unknown payment", () => {
@@ -335,7 +347,7 @@ describe("SandboxNetwork ingress helpers (provider-impl RPC translations)", () =
     expect(svc.snapshot().payments.filter((x) => x.id === "n_idem")).toHaveLength(1);
   });
 
-  it("handleManualAmlCheck marks the payment as rejected", async () => {
+  it("handleManualAmlCheck marks the payment as pending_aml", async () => {
     const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
     const r = await network.createPayment(
       { paymentClientId: "baxs_aml_ingress", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
@@ -343,7 +355,22 @@ describe("SandboxNetwork ingress helpers (provider-impl RPC translations)", () =
     );
     if (!("success" in r)) throw new Error("setup");
     const p = network.handleManualAmlCheck(r.success.payment.id);
-    expect(p.status).toBe("rejected");
+    expect(p.status).toBe("pending_aml");
+  });
+
+  it("triggerManualAml moves payment to pending_aml", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const r = await network.createPayment(
+      { paymentClientId: "baxs_trigger_aml", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in r)) throw new Error("setup");
+    const p = network.triggerManualAml(r.success.payment.id);
+    expect(p.status).toBe("pending_aml");
+  });
+
+  it("triggerManualAml throws when payment not found", () => {
+    expect(() => network.triggerManualAml("nonexistent")).toThrow("not found");
   });
 });
 
@@ -374,6 +401,9 @@ describe("SandboxNetwork.listPayments and OFI delegation", () => {
       usdAmount: 1_000,
     });
     if (!("success" in p)) throw new Error("setup");
+    // createPayment drives payout to success, so payment is "confirmed".
+    // Mark it "pending_aml" first so completeManualAml can run.
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
     ofi.completeManualAml(p.success.payment.id, false);
     expect(spy).toHaveBeenCalled();
   });

@@ -28,6 +28,7 @@ describe("t0.functions server-fn wiring", () => {
     expect(typeof fns.ofiGetQuoteFn).toBe("function");
     expect(typeof fns.ofiCreatePaymentFn).toBe("function");
     expect(typeof fns.ofiCompleteManualAmlFn).toBe("function");
+    expect(typeof fns.triggerManualAmlFn).toBe("function");
   });
 
   it("the source routes orchestrator-touched flows through sandboxNetwork", () => {
@@ -51,6 +52,10 @@ describe("t0.functions server-fn wiring", () => {
     // confirmFundsFn → sandboxNetwork.confirmFunds
     expect(src).toMatch(
       /export const confirmFundsFn[\s\S]*?sandboxNetwork\.confirmFunds/,
+    );
+    // triggerManualAmlFn → sandboxNetwork.triggerManualAml
+    expect(src).toMatch(
+      /export const triggerManualAmlFn[\s\S]*?sandboxNetwork\.triggerManualAml/,
     );
     // publishQuoteFn → providerService.publishQuote (Provider-side)
     expect(src).toMatch(

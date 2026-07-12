@@ -15,6 +15,7 @@ import {
 import type { Currency, Payment, Payout, Quote, VolumeBand } from "@/lib/t0/types";
 import type { NetworkEvent } from "@/lib/t0/types";
 import type { LimitSnapshot, LedgerEntry } from "@/lib/t0/read-model/types";
+import { SUPPORTED_CURRENCIES } from "@/lib/t0/currencies";
 import { PanelCard, StatusDot, List, EventLogPanel } from "@/components/console";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +54,7 @@ export const Route = createFileRoute("/provider")({
 });
 
 const BANDS: VolumeBand[] = [1_000, 5_000, 10_000, 25_000, 250_000, 1_000_000];
-const CURRENCIES: Currency[] = ["USD", "EUR", "GBP", "CNH", "MXN", "BRL", "NGN", "INR"];
+const CURRENCIES: Currency[] = SUPPORTED_CURRENCIES.map((c) => c.code);
 
 function ProviderPage() {
   const initial = Route.useLoaderData() as ProviderSnapshot;

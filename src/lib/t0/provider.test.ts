@@ -149,6 +149,52 @@ describe("PayoutProviderService", () => {
     );
   });
 
+  it("executePayout computes network fee as 0.05% of usdAmount", async () => {
+    svc.recordPayment({
+      id: `pm_${clock}_fee`,
+      quoteId: `qt_${clock}`,
+      currency: "EUR",
+      usdAmount: 1000,
+      localAmount: 920,
+      beneficiaryRef: "F",
+      status: "accepted",
+      createdAt: clock,
+    });
+    const po = await svc.executePayout(`pm_${clock}_fee`);
+    expect(po.fee).toBe(0.5); // 1000 * 0.0005 = 0.5
+  });
+
+  it("executePayout rounds fee to 2 decimals", async () => {
+    svc.recordPayment({
+      id: `pm_${clock}_fee2`,
+      quoteId: `qt_${clock}`,
+      currency: "EUR",
+      usdAmount: 1234.56,
+      localAmount: 1135.8,
+      beneficiaryRef: "F2",
+      status: "accepted",
+      createdAt: clock,
+    });
+    const po = await svc.executePayout(`pm_${clock}_fee2`);
+    expect(po.fee).toBe(0.62); // 1234.56 * 0.0005 = 0.61728 → 0.62
+  });
+
+  it("executePayout includes fee on failed payouts too", async () => {
+    svc.recordPayment({
+      id: `pm_${clock}_failfee`,
+      quoteId: `qt_${clock}`,
+      currency: "EUR",
+      usdAmount: 5000,
+      localAmount: 4600,
+      beneficiaryRef: "FF",
+      status: "accepted",
+      createdAt: clock,
+    });
+    const po = await svc.executePayout(`pm_${clock}_failfee`, { fail: true });
+    expect(po.fee).toBe(2.5); // 5000 * 0.0005 = 2.5
+    expect(po.status).toBe("failed");
+  });
+
   it("rekeyPayment no-ops when the new id already exists (defensive branch)", () => {
     svc.recordPayment({
       id: `pm_a`,

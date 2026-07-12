@@ -207,6 +207,9 @@ describe("Manual AML (OFI side)", () => {
     const r = await ofi.createPayment({ paymentClientId: "baxs_aml_1", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 });
     expect("success" in r).toBe(true);
     if (!("success" in r)) return;
+    // createPayment drives payout to success, so payment is "confirmed".
+    // Mark it "pending_aml" first so completeManualAml can run.
+    provider.markPaymentStatus(r.success.payment.id, "pending_aml");
     const p = ofi.completeManualAml(r.success.payment.id, true);
     expect(p.status).toBe("accepted");
   });
@@ -216,6 +219,7 @@ describe("Manual AML (OFI side)", () => {
     const r = await ofi.createPayment({ paymentClientId: "baxs_aml_2", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 });
     expect("success" in r).toBe(true);
     if (!("success" in r)) return;
+    provider.markPaymentStatus(r.success.payment.id, "pending_aml");
     const p = ofi.completeManualAml(r.success.payment.id, false);
     expect(p.status).toBe("rejected");
   });

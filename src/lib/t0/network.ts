@@ -334,6 +334,11 @@ export class SandboxNetwork {
 
   /** OFI-driven manual AML decision. */
   completeManualAml(paymentId: string, approved: boolean): Payment {
+    const payment = this.provider.snapshot().payments.find((p) => p.id === paymentId);
+    if (!payment) throw new Error("unknown payment");
+    if (payment.status !== "pending_aml") {
+      throw new Error(`payment must be in pending_aml state, got ${payment.status}`);
+    }
     return this.provider.markPaymentStatus(paymentId, approved ? "accepted" : "rejected");
   }
 
@@ -389,11 +394,21 @@ export class SandboxNetwork {
   /**
    * Network → Provider UpdatePayment.manualAmlCheck ingress. Network
    * asks the Provider to put the payment under manual AML review.
-   * Provider marks it "rejected" pending operator re-approval (mirrors
-   * the prior provider-impl semantics).
+   * Provider marks it "pending_aml" pending operator re-approval.
    */
   handleManualAmlCheck(paymentId: string): Payment {
-    return this.provider.markPaymentStatus(paymentId, "rejected");
+    return this.provider.markPaymentStatus(paymentId, "pending_aml");
+  }
+
+  /**
+   * OFI → Network: simulate a network-side manual AML trigger.
+   * Moves the payment to "pending_aml" so the Provider operator can
+   * approve or reject it via completeManualAml.
+   */
+  triggerManualAml(paymentId: string): Payment {
+    const payment = this.provider.snapshot().payments.find((p) => p.id === paymentId);
+    if (!payment) throw new Error(`payment not found: ${paymentId}`);
+    return this.provider.markPaymentStatus(paymentId, "pending_aml");
   }
 
   /** Snapshot of payments visible to an OFI operator (everything; sandbox has one OFI). */

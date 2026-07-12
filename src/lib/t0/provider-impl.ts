@@ -142,6 +142,8 @@ export async function approvePaymentQuote(
   const quoteId = req.payOutQuoteId.toString();
   try {
     network.approvePaymentQuote(paymentId, quoteId);
+    // Log the quote confirmation event so the Provider UI can display it.
+    network.provider.logQuoteConfirmation(paymentId, quoteId, true);
     return create(ApprovePaymentQuoteResponseSchema, {
       result: { case: "accepted", value: create(ApprovePaymentQuoteResponse_AcceptedSchema, {}) },
     });

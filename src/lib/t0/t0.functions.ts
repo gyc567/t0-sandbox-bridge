@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { providerService, sandboxNetwork, settlementRegistry, readModelStore, callbackInbox } from "./index";
 import type { Currency, VolumeBand } from "./types";
+import { SUPPORTED_CURRENCIES } from "./currencies";
 import type { CreatePaymentInput } from "./network";
 import type { Blockchain } from "./settlement";
 import type { LimitSnapshot, LedgerEntry, SettlementProjection } from "./read-model/types";
@@ -43,11 +44,24 @@ export const completeManualAmlFn = createServerFn({ method: "POST" })
   .validator((d: { paymentId: string; approved: boolean }) => d)
   .handler(async ({ data }) => sandboxNetwork.completeManualAml(data.paymentId, data.approved));
 
+export const triggerManualAmlFn = createServerFn({ method: "POST" })
+  .validator((d: { paymentId: string }) => d)
+  .handler(async ({ data }) => sandboxNetwork.triggerManualAml(data.paymentId));
+
 export const approvePaymentQuoteFn = createServerFn({ method: "POST" })
   .validator((d: { paymentId: string; quoteId: string }) => d)
   .handler(async ({ data }) =>
     sandboxNetwork.approvePaymentQuote(data.paymentId, data.quoteId),
   );
+
+export const ofiApprovePaymentQuoteFn = createServerFn({ method: "POST" })
+  .validator((d: { paymentId: string; quoteId: string }) => d)
+  .handler(async ({ data }) => {
+    const result = sandboxNetwork.approvePaymentQuote(data.paymentId, data.quoteId);
+    // Log OFI AML event for display in the OFI console
+    providerService.logOfiAmlEvent(data.paymentId, data.quoteId, "approved");
+    return result;
+  });
 
 export const createPaymentIntentFn = createServerFn({ method: "POST" })
   .validator((d: { quoteId: string; beneficiaryRef: string }) => d)
@@ -61,7 +75,7 @@ export const confirmFundsFn = createServerFn({ method: "POST" })
 export const ofiSnapshotFn = createServerFn({ method: "GET" }).handler(async () => ({
   payments: sandboxNetwork.listPayments(),
   payouts: providerService.snapshot().payouts,
-  availableCurrencies: ["EUR", "GBP", "JPY", "BRL", "MXN", "PHP", "IDR", "VND"] as Currency[],
+  availableCurrencies: SUPPORTED_CURRENCIES.map((c) => c.code),
   settlementState: sandboxNetwork.getSettlementState(),
   events: providerService.snapshot().events,
 }));

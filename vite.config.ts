@@ -28,5 +28,8 @@ export default defineConfig({
     // bundle, so we don't need to redirect `node:async_hooks` (the previous
     // alias replaced it on both sides, which broke getStartContext() server-
     // side and turned every SSR loader / server fn into a 500).
+    server: {
+      allowedHosts: ["absurd-payphone-hankie.ngrok-free.dev"],
+    },
   },
 });

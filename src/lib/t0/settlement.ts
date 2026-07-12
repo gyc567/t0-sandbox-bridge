@@ -50,6 +50,12 @@ export type LedgerReason =
   | "SETTLEMENT";
 
 export interface LedgerEntry {
+  /** Server-side unique id — stable across the lifetime of one process.
+   *  Used as the React `key` in the OFI console's ledger list. Two
+   *  ledger entries produced by the same settlement (OFI_AVAILABLE +
+   *  PROVIDER_AVAILABLE) share the same `txHash` and `at`, so they
+   *  cannot be reconciled by those fields alone. */
+  readonly id: string;
   readonly txHash: string;
   readonly account: LedgerAccount;
   readonly delta: number;
@@ -112,6 +118,9 @@ export class SettlementRegistry {
   private ofiCredit: CreditState = { available: 0, reserved: 0 };
   private providerCredit: CreditState = { available: 0, reserved: 0 };
   private nextSettlementId = 1;
+  /** Monotonic id source for ledger entries. Reset on restart (sandbox
+   *  only — see CLAUDE.md note on persistence). */
+  private nextLedgerId = 1;
 
   private readonly confirmDelayMs: number;
   private readonly pendingTtlMs: number;
@@ -123,6 +132,32 @@ export class SettlementRegistry {
     this.pendingTtlMs = opts.pendingTtlMs ?? DEFAULT_PENDING_TTL_MS;
     this.now = opts.now ?? Date.now;
     this.onConfirm = opts.onConfirm;
+  }
+
+  /** Restore state from a persisted snapshot (idempotent). */
+  loadState(state: SettlementState & { nextSettlementId?: number; nextLedgerId?: number }): void {
+    for (const s of state.pending) this.pending.set(s.txHash, s);
+    for (const s of state.ledger) {
+      // Rebuild ledger without duplicating entries. Backfill `id` if the
+      // snapshot was written before LedgerEntry grew the field.
+      const hasId = typeof (s as { id?: unknown }).id === "string";
+      const entry = hasId ? s : ({ ...s, id: `ledger_${this.nextLedgerId++}` } as LedgerEntry);
+      if (
+        !this.ledger.some(
+          (e) => e.txHash === entry.txHash && e.at === entry.at && e.reason === entry.reason,
+        )
+      ) {
+        this.ledger.push(entry);
+      }
+    }
+    this.ofiCredit = { ...state.ofiCredit };
+    this.providerCredit = { ...state.providerCredit };
+    if (state.nextSettlementId !== undefined) {
+      this.nextSettlementId = state.nextSettlementId;
+    }
+    if (state.nextLedgerId !== undefined) {
+      this.nextLedgerId = state.nextLedgerId;
+    }
   }
 
   // ── §4 + §5 ─ OFI submits a USDT transfer on chain ─────────────
@@ -335,20 +370,30 @@ export class SettlementRegistry {
     return [...this.ledger];
   }
 
-  snapshot(): SettlementState {
+  snapshot(): SettlementState & { nextSettlementId: number; nextLedgerId: number } {
     this.evictExpired(this.now());
     return {
       pending: [...this.pending.values()],
       ledger: [...this.ledger],
       ofiCredit: this.ofiCredit,
       providerCredit: this.providerCredit,
+      nextSettlementId: this.nextSettlementId,
+      nextLedgerId: this.nextLedgerId,
     };
   }
 
   // ── Internals ────────────────────────────────────────────────────
 
-  private appendLedger(entry: LedgerEntry): void {
-    this.ledger.push(entry);
+  private appendLedger(entry: Omit<LedgerEntry, "id"> & { id?: string }): void {
+    // Choke point for ledger writes — stamp a server-unique id here so
+    // every entry (regardless of which internal caller produced it)
+    // carries a stable React reconciliation key. The caller may pass an
+    // id (e.g. when restoring from a snapshot) but typically it does not.
+    const stamped: LedgerEntry =
+      typeof entry.id === "string" && entry.id.length > 0
+        ? (entry as LedgerEntry)
+        : { ...entry, id: `ledger_${this.nextLedgerId++}` };
+    this.ledger.push(stamped);
   }
 
   /**
