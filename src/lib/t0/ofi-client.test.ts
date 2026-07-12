@@ -602,6 +602,7 @@ describe("HttpOfiT0Client forwards allQuotes[] to settlement breakdown", () => {
     return new HttpOfiT0Client({
       baseUrl: "https://example.test",
       apiKey: "test-key",
+      timeoutMs: 5000,
       fetchImpl: vi.fn().mockResolvedValue({
         ok: true,
         status: 200,

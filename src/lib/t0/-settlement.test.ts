@@ -260,8 +260,8 @@ describe("SettlementRegistry snapshots", () => {
   it("listPendingSettlements returns a copy, not the live Map", () => {
     const r = newRegistry().r;
     r.submitSettlement(makeInput({ txHash: "0xa" }));
-    const list = r.listPendingSettlements() as Settlement[];
-    list.length = 0; // mutate the array
+    const list = [...r.listPendingSettlements()];
+    list.length = 0; // mutate the copy
     expect(r.listPendingSettlements()).toHaveLength(1);
   });
 

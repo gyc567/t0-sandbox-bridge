@@ -12,6 +12,7 @@ import {
   GetQuoteResponseSchema,
   GetQuoteResponse_SuccessSchema,
   GetQuoteResponse_FailureSchema,
+  GetQuoteResponse_Failure_Reason,
 } from "@t-0/provider-sdk";
 
 describe("toUpdateQuoteRequest", () => {
@@ -85,7 +86,9 @@ describe("fromGetQuoteResponse", () => {
   });
 
   it("extracts reason from a Failure response", () => {
-    const failure = create(GetQuoteResponse_FailureSchema, { reason: 1 });
+    const failure = create(GetQuoteResponse_FailureSchema, {
+      reason: GetQuoteResponse_Failure_Reason.QUOTE_NOT_FOUND,
+    });
     const response = create(GetQuoteResponseSchema, {
       result: { case: "failure", value: failure },
     });
@@ -122,7 +125,7 @@ describe("fromGetQuoteResponse", () => {
     // Round-trip via toGetQuoteRequest + fromGetQuoteResponse with the
     // decimal stripped out — defends the `if (!value) return 0` branch.
     const req = toGetQuoteRequest({ usdAmount: 0, currency: "USD" });
-    expect(req.amount!.amount.value.unscaled).toBe(BigInt(0));
+    expect(req.amount!.amount.value!.unscaled).toBe(BigInt(0));
   });
 
   it("returns OTHER when the result case is neither success nor failure", () => {

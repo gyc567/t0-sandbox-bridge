@@ -18,6 +18,8 @@ const TYPE_COLOR: Record<NetworkEvent["type"], string> = {
   PayoutAccepted: "text-[#7ec488]",
   PayoutSuccess: "text-accent-cyan",
   PaymentConfirmed: "text-[#7ec488]",
+  QuoteConfirmation: "text-muted-foreground",
+  OfiAmlEvent: "text-[#7ec488]",
 };
 
 /**
@@ -32,10 +34,11 @@ function fmtTime(at: number): string {
  * Compact short-id for the various event shapes.
  */
 function shortId(e: NetworkEvent): string {
-  if ("quoteId" in e) return e.quoteId;
-  if ("paymentId" in e) return e.paymentId;
-  if ("payoutId" in e) return e.payoutId;
-  if ("txHash" in e) return `${e.txHash.slice(0, 10)}…`;
+  if ("quoteId" in e && e.quoteId !== undefined) return e.quoteId;
+  if ("paymentId" in e && e.paymentId !== undefined) return e.paymentId;
+  if ("payoutId" in e && e.payoutId !== undefined) return e.payoutId;
+  const txHash = (e as { txHash?: string }).txHash;
+  if (txHash !== undefined) return `${txHash.slice(0, 10)}…`;
   return "";
 }
 

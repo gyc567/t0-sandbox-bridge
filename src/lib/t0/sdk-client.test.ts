@@ -5,7 +5,9 @@ import {
   DecimalSchema,
   GetQuoteResponseSchema,
   GetQuoteResponse_SuccessSchema,
+  GetQuoteResponse_Failure_Reason,
   CreatePaymentResponseSchema,
+  CreatePaymentResponse_Failure_Reason,
   UpdateQuoteResponseSchema,
   type Client,
   NetworkService,
@@ -29,7 +31,7 @@ const acceptedPaymentResp = (id: bigint) =>
     paymentClientId: "client_1",
     result: {
       case: "accepted",
-      value: { paymentId: id, created: true, paymentClientId: "client_1" },
+      value: { paymentId: id },
     },
   });
 
@@ -76,7 +78,10 @@ describe("wrapSdkClient.getQuote", () => {
 
   it("returns a failure reason when the SDK responds with failure", async () => {
     const failure = create(GetQuoteResponseSchema, {
-      result: { case: "failure", value: { reason: 2 } },
+      result: {
+        case: "failure",
+        value: { reason: GetQuoteResponse_Failure_Reason.CREDIT_OR_PREDEPOSIT_REQUIRED },
+      },
     });
     const client = wrapSdkClient(mkSdk({ getQuote: async () => failure }));
     const r = await client.getQuote({ usdAmount: 1000, currency: "EUR" });
@@ -123,7 +128,7 @@ describe("wrapSdkClient.createPayment", () => {
     const client = wrapSdkClient(mkSdk({
       createPayment: async () => create(CreatePaymentResponseSchema, {
         paymentClientId: "c",
-        result: { case: "accepted", value: { paymentId: 42, created: true, paymentClientId: "c" } },
+        result: { case: "accepted", value: { paymentId: BigInt(42) } },
       }),
     }));
     const r = await client.createPayment({
@@ -141,7 +146,10 @@ describe("wrapSdkClient.createPayment", () => {
     const client = wrapSdkClient(mkSdk({
       createPayment: async () => create(CreatePaymentResponseSchema, {
         paymentClientId: "c",
-        result: { case: "failure", value: { reason: 1 } },
+        result: {
+          case: "failure",
+          value: { reason: CreatePaymentResponse_Failure_Reason.QUOTE_NOT_FOUND },
+        },
       }),
     }));
     const r = await client.createPayment({

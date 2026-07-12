@@ -76,11 +76,11 @@ function payoutsToCSV(payouts: Payout[]): string[] {
 
 /** Extract ID from NetworkEvent */
 function eventId(e: NetworkEvent): string {
-  if ("quoteId" in e) return e.quoteId;
-  if ("txHash" in e) return e.txHash;
-  if ("paymentId" in e) return e.paymentId;
-  if ("payoutId" in e) return e.payoutId;
-  if ("counterparty" in e) return e.counterparty;
+  if ("quoteId" in e && e.quoteId !== undefined) return e.quoteId;
+  if ("txHash" in e && e.txHash !== undefined) return e.txHash;
+  if ("paymentId" in e && e.paymentId !== undefined) return e.paymentId;
+  if ("payoutId" in e && e.payoutId !== undefined) return e.payoutId;
+  if ("counterparty" in e && e.counterparty !== undefined) return e.counterparty;
   /* c8 ignore next */ return "";
 }
 

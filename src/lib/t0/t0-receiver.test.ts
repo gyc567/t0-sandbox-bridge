@@ -167,19 +167,19 @@ describe("buildT0Receiver", () => {
   const svc = new PayoutProviderService(new MockT0Client(), () => FROZEN_NOW);
 
   it("returns 405 for non-POST methods", async () => {
-    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, service: svc });
+    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, network: svc as never });
     const res = await receiver(new Request("http://localhost/x", { method: "GET" }));
     expect(res.status).toBe(405);
   });
 
   it("returns 401 when signature verification fails (missing headers)", async () => {
-    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, service: svc });
+    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, network: svc as never });
     const res = await receiver(new Request("http://localhost/x", { method: "POST", body: "body" }));
     expect(res.status).toBe(401);
   });
 
   it("returns 408 when timestamp is stale", async () => {
-    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, service: svc });
+    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, network: svc as never });
     // Use real-time signing so the timestamp is in range, then send to a
     // receiver whose "now" is the real time minus 5 min.
     const req = makeRealtimeRequest("", 0);
@@ -193,14 +193,14 @@ describe("buildT0Receiver", () => {
   });
 
   it("returns 401 when signature doesn't match body", async () => {
-    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, service: svc });
+    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, network: svc as never });
     const req = makeRealtimeRequest("original", 0, "DIFFERENT BODY");
     const res = await receiver(req);
     expect(res.status).toBe(401);
   });
 
   it("dispatches a valid signed payOut (connect envelope, not 401/408)", async () => {
-    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, service: svc });
+    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, network: svc as never });
     const body = JSON.stringify({ paymentId: "99", currency: "EUR", clientQuoteId: "qt" });
     const req = makeRealtimeRequest(body);
     const res = await receiver(req);
@@ -209,7 +209,7 @@ describe("buildT0Receiver", () => {
   });
 
   it("returns 404 for an unknown provider path", async () => {
-    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, service: svc });
+    const receiver = buildT0Receiver({ networkPublicKey: TEST_PUBLIC_KEY_HEX, network: svc as never });
     const req = makeRealtimeRequest("body");
     // Force a URL that matches our catch-all but no router handler.
     const headers = new Headers(req.headers);

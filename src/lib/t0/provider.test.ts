@@ -251,7 +251,7 @@ describe("PayoutProviderService", () => {
 
   it("rekeyQuote no-ops when the new id already exists (defensive branch)", async () => {
     const qa = await svc.publishQuote({ currency: "USD", band: 1_000, rate: 1 });
-    const qb = await svc.publishQuote({ currency: "USD", band: 2_000, rate: 1.1 });
+    const qb = await svc.publishQuote({ currency: "USD", band: 5_000, rate: 1.1 });
     // qb exists; attempt to rekey qa → qb → defensive branch returns.
     svc.rekeyQuote(qa.id, qb.id);
     // Both quotes still present.

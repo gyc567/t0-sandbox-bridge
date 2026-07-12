@@ -62,7 +62,7 @@ function fromTimestamp(ts: Timestamp | undefined): number {
   return Number(ts.seconds) * 1000;
 }
 
-function toBand(band: VolumeBand, rate: number, clientQuoteId: string): UpdateQuoteRequest_Quote_Band {
+function toBand(band: number, rate: number, clientQuoteId: string): UpdateQuoteRequest_Quote_Band {
   return create(UpdateQuoteRequest_Quote_BandSchema, {
     clientQuoteId,
     maxAmount: toDecimal(band),
@@ -74,7 +74,13 @@ function toBand(band: VolumeBand, rate: number, clientQuoteId: string): UpdateQu
 
 export interface OutboundQuoteInput {
   currency: Currency;
-  band: VolumeBand;
+  /**
+   * USD band amount. Typed as `number` (not `VolumeBand`) because the
+   * adapter runs at the request boundary and the source `Quote.band`
+   * field is a plain `number`; the proto wire format accepts any
+   * positive integer unscaled value.
+   */
+  band: number;
   rate: number;
   expiresAt: number; // epoch ms
 }

@@ -233,15 +233,19 @@ describe("appendLedgerEntries", () => {
     const req = create(AppendLedgerEntriesRequestSchema, {
       transactions: [
         create(AppendLedgerEntriesRequest_TransactionSchema, {
-          transaction: { case: "payout", value: { payoutId: BigInt(1), amount: { unscaled: BigInt(100), exponent: 2 } } },
-        }),
-      ],
-      ledgerEntries: [
-        create(AppendLedgerEntriesRequest_LedgerEntrySchema, {
-          debit: { account: "a", amount: "100" },
-          credit: { account: "b", amount: "100" },
-          timestamp: "2026-01-01",
-          transactionId: "tx1",
+          transactionId: BigInt(1),
+          transactionDetails: {
+            case: "payout",
+            value: { paymentId: BigInt(1) },
+          },
+          entries: [
+            create(AppendLedgerEntriesRequest_LedgerEntrySchema, {
+              accountOwnerId: 1,
+              accountType: 0,
+              debit: { unscaled: BigInt(100), exponent: 0 },
+              credit: { unscaled: BigInt(100), exponent: 0 },
+            }),
+          ],
         }),
       ],
     });
@@ -249,10 +253,9 @@ describe("appendLedgerEntries", () => {
     expect(res.$typeName).toBe("tzero.v1.payment.AppendLedgerEntriesResponse");
   });
 
-  it("handles empty transactions and entries", async () => {
+  it("handles empty transactions", async () => {
     const req = create(AppendLedgerEntriesRequestSchema, {
       transactions: [],
-      ledgerEntries: [],
     });
     const res = await appendLedgerEntries(req, ctx, network);
     expect(res.$typeName).toBe("tzero.v1.payment.AppendLedgerEntriesResponse");
@@ -317,7 +320,6 @@ describe("createProviderServiceImpl", () => {
     // appendLedgerEntries
     const appendReq = create(AppendLedgerEntriesRequestSchema, {
       transactions: [],
-      ledgerEntries: [],
     });
     const appendRes = await impl.appendLedgerEntries(appendReq, ctx);
     expect(appendRes.$typeName).toBe("tzero.v1.payment.AppendLedgerEntriesResponse");
