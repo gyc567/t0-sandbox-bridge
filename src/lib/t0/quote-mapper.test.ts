@@ -331,16 +331,12 @@ describe("findSettlementBreakdown", () => {
   });
 
   it("returns undefined when no entry matches the selected quoteId", () => {
-    const allQuotes: RawProviderQuote[] = [
-      { providerId: 99, quoteId: 1 },
-    ];
+    const allQuotes: RawProviderQuote[] = [{ providerId: 99, quoteId: 1 }];
     expect(findSettlementBreakdown(SELECTED, allQuotes)).toBeUndefined();
   });
 
   it("returns a marker (available:false) when matched but no settlement", () => {
-    const allQuotes: RawProviderQuote[] = [
-      { providerId: 1, quoteId: 67890, executable: true },
-    ];
+    const allQuotes: RawProviderQuote[] = [{ providerId: 1, quoteId: 67890, executable: true }];
     const result = findSettlementBreakdown(SELECTED, allQuotes);
     expect(result?.available).toBe(false);
     expect(result?.executable).toBe(true);

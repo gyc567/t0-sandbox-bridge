@@ -13,21 +13,9 @@
 // used in tests; production should pass a `JsonFileStore` (or a real
 // DB-backed implementation once the persistence decision lands).
 
-import {
-  ledgerEventKey,
-  limitEventKey,
-  type ReadModelStore,
-} from "./store";
-import {
-  parseAppendLedgerEntriesRequest,
-  parseUpdateLimitRequest,
-  toDecimal,
-} from "./projection";
-import type {
-  InboxMethod,
-  InboxRecord,
-  LimitSnapshot,
-} from "./types";
+import { ledgerEventKey, limitEventKey, type ReadModelStore } from "./store";
+import { parseAppendLedgerEntriesRequest, parseUpdateLimitRequest, toDecimal } from "./projection";
+import type { InboxMethod, InboxRecord, LimitSnapshot } from "./types";
 
 /**
  * `providerId` is the receiving provider's id. UpdateLimit payloads
@@ -61,9 +49,10 @@ export class CallbackInbox {
    * Returns the list of newly-stored snapshots. Already-stored
    * versions are filtered out.
    */
-  handleUpdateLimit(
-    req: { limits: readonly import("./projection").ProtoLimitShape[] },
-  ): { snapshots: readonly LimitSnapshot[]; alreadyProcessed: boolean } {
+  handleUpdateLimit(req: { limits: readonly import("./projection").ProtoLimitShape[] }): {
+    snapshots: readonly LimitSnapshot[];
+    alreadyProcessed: boolean;
+  } {
     const receivedAt = this.now();
     const parsed = parseUpdateLimitRequest(req, receivedAt);
     const stored: LimitSnapshot[] = [];
@@ -96,9 +85,12 @@ export class CallbackInbox {
    * dedupe unit — a duplicate transaction is a no-op. The full list of
    * entries from new transactions is returned.
    */
-  handleAppendLedgerEntries(
-    req: { transactions: readonly import("./projection").ProtoTransactionShape[] },
-  ): { entries: readonly import("./types").LedgerEntry[]; duplicateTransactionIds: readonly bigint[] } {
+  handleAppendLedgerEntries(req: {
+    transactions: readonly import("./projection").ProtoTransactionShape[];
+  }): {
+    entries: readonly import("./types").LedgerEntry[];
+    duplicateTransactionIds: readonly bigint[];
+  } {
     const receivedAt = this.now();
     const parsed = parseAppendLedgerEntriesRequest(req, receivedAt);
     const stored: import("./types").LedgerEntry[] = [];
@@ -141,8 +133,8 @@ export class CallbackInbox {
   /** Whether a given (counterparty, version) has been processed. */
   hasLimitVersion(counterpartyId: number, version: bigint): boolean {
     return (
-      this.store.getInbox(limitEventKey(counterpartyId, this.providerId, version))
-        ?.processedAt !== undefined
+      this.store.getInbox(limitEventKey(counterpartyId, this.providerId, version))?.processedAt !==
+      undefined
     );
   }
 
@@ -158,11 +150,7 @@ export class CallbackInbox {
 
   // ── Internals ────────────────────────────────────────────────────────
 
-  private recordInbox(
-    eventKey: string,
-    method: InboxMethod,
-    payload: unknown,
-  ): InboxRecord {
+  private recordInbox(eventKey: string, method: InboxMethod, payload: unknown): InboxRecord {
     return this.store.appendInbox({
       eventKey,
       method,

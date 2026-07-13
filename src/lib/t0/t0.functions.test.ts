@@ -14,11 +14,7 @@
 
 import { describe, it, expect } from "vitest";
 import { sharedStore, sharedCallbackInbox } from "./read-model/instance";
-import type {
-  LimitSnapshot,
-  LedgerEntry,
-  SettlementProjection,
-} from "./read-model/types";
+import type { LimitSnapshot, LedgerEntry, SettlementProjection } from "./read-model/types";
 import {
   readOfiReadModel,
   readProviderLimitHistory,
@@ -56,9 +52,7 @@ function makeLedger(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   };
 }
 
-function makeProjection(
-  overrides: Partial<SettlementProjection> = {},
-): SettlementProjection {
+function makeProjection(overrides: Partial<SettlementProjection> = {}): SettlementProjection {
   return {
     id: "p1",
     chain: "TRON",
@@ -97,8 +91,12 @@ describe("readOfiReadModel", () => {
 
   it("returns only active projections (excludes terminal statuses)", () => {
     sharedStore.putProjection(makeProjection({ id: "p1", txHash: "0xa", chainStatus: "DETECTED" }));
-    sharedStore.putProjection(makeProjection({ id: "p2", txHash: "0xb", chainStatus: "CONFIRMING" }));
-    sharedStore.putProjection(makeProjection({ id: "p3", txHash: "0xc", chainStatus: "CONFIRMED" }));
+    sharedStore.putProjection(
+      makeProjection({ id: "p2", txHash: "0xb", chainStatus: "CONFIRMING" }),
+    );
+    sharedStore.putProjection(
+      makeProjection({ id: "p3", txHash: "0xc", chainStatus: "CONFIRMED" }),
+    );
     sharedStore.putProjection(makeProjection({ id: "p4", txHash: "0xd", chainStatus: "REORGED" }));
     sharedStore.putProjection(makeProjection({ id: "p5", txHash: "0xe", chainStatus: "INVALID" }));
     sharedStore.putProjection(makeProjection({ id: "p6", txHash: "0xf", chainStatus: "UNKNOWN" }));
@@ -110,7 +108,9 @@ describe("readOfiReadModel", () => {
     sharedStore.putProjection(makeProjection({ id: "p1", txHash: "0xa", detectedAt: 300 }));
     sharedStore.putProjection(makeProjection({ id: "p2", txHash: "0xb", detectedAt: 100 }));
     const r = readOfiReadModel({ counterpartyId: 703 });
-    expect(r.activeProjections.filter((p) => p.id === "p2" || p.id === "p1").map((p) => p.id)).toEqual(["p2", "p1"]);
+    expect(
+      r.activeProjections.filter((p) => p.id === "p2" || p.id === "p1").map((p) => p.id),
+    ).toEqual(["p2", "p1"]);
   });
 });
 
@@ -246,12 +246,16 @@ describe("readCallbackInboxState", () => {
       transactions: [
         {
           transactionId: txBase,
-          entries: [{ accountOwnerId: 5002, accountType: 20, credit: { unscaled: "100", exponent: 0 } }],
+          entries: [
+            { accountOwnerId: 5002, accountType: 20, credit: { unscaled: "100", exponent: 0 } },
+          ],
           transactionDetails: { case: "undefined" },
         },
         {
           transactionId: txBase + 1n,
-          entries: [{ accountOwnerId: 5002, accountType: 20, credit: { unscaled: "200", exponent: 0 } }],
+          entries: [
+            { accountOwnerId: 5002, accountType: 20, credit: { unscaled: "200", exponent: 0 } },
+          ],
           transactionDetails: { case: "undefined" },
         },
       ],

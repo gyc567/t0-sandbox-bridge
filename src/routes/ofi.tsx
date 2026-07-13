@@ -19,6 +19,7 @@ import { formatQuoteFailure } from "@/lib/t0/quote-message";
 import { formatQuoteForDisplay, type QuoteDisplay } from "@/lib/t0/quote-display";
 import type { CreatePaymentInput, GetQuoteResult } from "@/lib/t0/network";
 import { PanelCard, StatusDot, List } from "@/components/console";
+import { OfiManualAmlPanel } from "@/components/ofi/OfiManualAmlPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +31,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Wallet, Send, RefreshCw, CheckCircle2, XCircle, PiggyBank, Activity, Shield, FileCheck } from "lucide-react";
+import {
+  Wallet,
+  Send,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  PiggyBank,
+  Activity,
+  Shield,
+  FileCheck,
+} from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { OfiSidebarMenu } from "@/components/ofi/OfiSidebarMenu";
 
@@ -394,12 +405,15 @@ function OfiPage() {
                   style={{ fontSize: "12px" }}
                 >
                   <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
-                    Sandbox: simulate a USDT transfer by submitting a txHash. Real deployments should
-                    use the OFI Treasury workflow to transfer from a whitelisted wallet.
+                    Sandbox: simulate a USDT transfer by submitting a txHash. Real deployments
+                    should use the OFI Treasury workflow to transfer from a whitelisted wallet.
                   </p>
                   <div className="flex flex-wrap items-end gap-3">
                     <div>
-                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      <Label
+                        className="font-mono text-muted-foreground"
+                        style={{ fontSize: "11px" }}
+                      >
                         Amount (USD)
                       </Label>
                       <Input
@@ -411,7 +425,10 @@ function OfiPage() {
                       />
                     </div>
                     <div>
-                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      <Label
+                        className="font-mono text-muted-foreground"
+                        style={{ fontSize: "11px" }}
+                      >
                         Chain
                       </Label>
                       <Select
@@ -429,7 +446,10 @@ function OfiPage() {
                       </Select>
                     </div>
                     <div className="flex-1 min-w-[180px]">
-                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      <Label
+                        className="font-mono text-muted-foreground"
+                        style={{ fontSize: "11px" }}
+                      >
                         txHash (optional, auto-generated if blank)
                       </Label>
                       <Input
@@ -489,11 +509,16 @@ function OfiPage() {
               <PanelCard step="05" title="USDT Settlement Transfer">
                 <div className="space-y-4">
                   <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                    OFI initiates a USDT transfer from their whitelisted wallet to the Payout Provider's whitelisted wallet. This is the pre-settlement step (§4) that tops up credit for future payments.
+                    OFI initiates a USDT transfer from their whitelisted wallet to the Payout
+                    Provider's whitelisted wallet. This is the pre-settlement step (§4) that tops up
+                    credit for future payments.
                   </p>
                   <div className="flex flex-wrap items-end gap-3">
                     <div>
-                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      <Label
+                        className="font-mono text-muted-foreground"
+                        style={{ fontSize: "11px" }}
+                      >
                         Amount (USD)
                       </Label>
                       <Input
@@ -504,7 +529,10 @@ function OfiPage() {
                       />
                     </div>
                     <div>
-                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      <Label
+                        className="font-mono text-muted-foreground"
+                        style={{ fontSize: "11px" }}
+                      >
                         Chain
                       </Label>
                       <Select
@@ -522,7 +550,10 @@ function OfiPage() {
                       </Select>
                     </div>
                     <div className="flex-1 min-w-[180px]">
-                      <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      <Label
+                        className="font-mono text-muted-foreground"
+                        style={{ fontSize: "11px" }}
+                      >
                         txHash (optional)
                       </Label>
                       <Input
@@ -533,12 +564,7 @@ function OfiPage() {
                         className="w-full font-mono"
                       />
                     </div>
-                    <Button
-                      size="sm"
-                      className="btn-glow"
-                      onClick={onFund}
-                      disabled={busy}
-                    >
+                    <Button size="sm" className="btn-glow" onClick={onFund} disabled={busy}>
                       <PiggyBank className="w-4 h-4" />
                       Submit settlement
                     </Button>
@@ -554,7 +580,9 @@ function OfiPage() {
                         Available credit
                       </p>
                       <p className="text-foreground">
-                        <span className="tabular">${data.settlementState.ofiCredit.available.toLocaleString()}</span>
+                        <span className="tabular">
+                          ${data.settlementState.ofiCredit.available.toLocaleString()}
+                        </span>
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -562,13 +590,18 @@ function OfiPage() {
                         Reserved credit
                       </p>
                       <p className="text-foreground">
-                        <span className="tabular">${data.settlementState.ofiCredit.reserved.toLocaleString()}</span>
+                        <span className="tabular">
+                          ${data.settlementState.ofiCredit.reserved.toLocaleString()}
+                        </span>
                       </p>
                     </div>
                   </div>
 
                   {data.settlementState.ledger.length === 0 ? (
-                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
+                    <p
+                      className="font-mono text-muted-foreground text-center py-8"
+                      style={{ fontSize: "11px" }}
+                    >
                       No ledger entries yet. Submit a USDT settlement to see credit changes.
                     </p>
                   ) : (
@@ -620,16 +653,27 @@ function OfiPage() {
               <PanelCard step="06b" title="Credit Usage Notifications (to OFI)">
                 <div className="space-y-4">
                   <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                    Notifications from the network regarding credit usage against published quotes, including settlement confirmation and payment settlement details.
+                    Notifications from the network regarding credit usage against published quotes,
+                    including settlement confirmation and payment settlement details.
                   </p>
-                  {data.events.filter((e): e is NetworkEvent & { type: "CreditUsageNotification" } => e.type === "CreditUsageNotification" && e.counterparty === "ofi").length === 0 ? (
-                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
-                      No credit usage notifications yet. Submit a settlement or create a payment to trigger the flow.
+                  {data.events.filter(
+                    (e): e is NetworkEvent & { type: "CreditUsageNotification" } =>
+                      e.type === "CreditUsageNotification" && e.counterparty === "ofi",
+                  ).length === 0 ? (
+                    <p
+                      className="font-mono text-muted-foreground text-center py-8"
+                      style={{ fontSize: "11px" }}
+                    >
+                      No credit usage notifications yet. Submit a settlement or create a payment to
+                      trigger the flow.
                     </p>
                   ) : (
                     <List
                       items={data.events
-                        .filter((e): e is NetworkEvent & { type: "CreditUsageNotification" } => e.type === "CreditUsageNotification" && e.counterparty === "ofi")
+                        .filter(
+                          (e): e is NetworkEvent & { type: "CreditUsageNotification" } =>
+                            e.type === "CreditUsageNotification" && e.counterparty === "ofi",
+                        )
                         .map((e) => ({
                           id: `${e.counterparty}-${e.at}`,
                           counterparty: e.counterparty,
@@ -650,7 +694,9 @@ function OfiPage() {
                             <div className="flex items-center gap-2 min-w-0">
                               <StatusDot status="received" />
                               <span className="font-mono tabular text-caption text-foreground truncate">
-                                {item.paymentId ? `Payment ${item.paymentId.slice(0, 20)}…` : `Credit used: ${item.used.toLocaleString()}`}
+                                {item.paymentId
+                                  ? `Payment ${item.paymentId.slice(0, 20)}…`
+                                  : `Credit used: ${item.used.toLocaleString()}`}
                               </span>
                             </div>
                             <span className="font-mono text-caption text-muted-foreground shrink-0">
@@ -746,14 +792,21 @@ function OfiPage() {
                   <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
                     Network callbacks: Payout Accepted → Payout Success → Payment Confirmed.
                   </p>
-                  {data.events.filter((e) => ["PayoutAccepted", "PayoutSuccess", "PaymentConfirmed"].includes(e.type)).length === 0 ? (
-                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
+                  {data.events.filter((e) =>
+                    ["PayoutAccepted", "PayoutSuccess", "PaymentConfirmed"].includes(e.type),
+                  ).length === 0 ? (
+                    <p
+                      className="font-mono text-muted-foreground text-center py-8"
+                      style={{ fontSize: "11px" }}
+                    >
                       No lifecycle callbacks yet. Create a payment to trigger the flow.
                     </p>
                   ) : (
                     <List
                       items={data.events
-                        .filter((e) => ["PayoutAccepted", "PayoutSuccess", "PaymentConfirmed"].includes(e.type))
+                        .filter((e) =>
+                          ["PayoutAccepted", "PayoutSuccess", "PaymentConfirmed"].includes(e.type),
+                        )
                         .map((e) => ({
                           id: `${e.type}-${e.at}`,
                           type: e.type,
@@ -800,14 +853,25 @@ function OfiPage() {
           }
           paymentManualAmlContent={
             <>
+              <OfiManualAmlPanel
+                payments={data.payments}
+                busy={busy}
+                onTriggerAml={onTriggerAml}
+              />
               <PanelCard step="09" title="Payout Requests">
                 <div className="space-y-4">
                   <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                    Payout requests from the Provider awaiting OFI's "Last Look" quote approval. After the Provider completes manual AML review, the Network sends a refreshed quote for the OFI to approve or reject before payout execution proceeds.
+                    Payout requests from the Provider awaiting OFI's "Last Look" quote approval.
+                    After the Provider completes manual AML review, the Network sends a refreshed
+                    quote for the OFI to approve or reject before payout execution proceeds.
                   </p>
                   {data.payments.filter((p) => p.status === "accepted").length === 0 ? (
-                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
-                      No payout requests awaiting approval. Create a payment and wait for the Provider to complete AML review.
+                    <p
+                      className="font-mono text-muted-foreground text-center py-8"
+                      style={{ fontSize: "11px" }}
+                    >
+                      No payout requests awaiting approval. Create a payment and wait for the
+                      Provider to complete AML review.
                     </p>
                   ) : (
                     <List
@@ -822,7 +886,8 @@ function OfiPage() {
                             <div className="flex items-center gap-2 min-w-0">
                               <StatusDot status={p.status} />
                               <span className="font-mono tabular text-caption text-foreground truncate">
-                                {p.id} · {p.currency} {p.localAmount.toFixed(2)} · {p.beneficiaryRef}
+                                {p.id} · {p.currency} {p.localAmount.toFixed(2)} ·{" "}
+                                {p.beneficiaryRef}
                               </span>
                             </div>
                             <div className="flex gap-1.5 shrink-0">
@@ -869,16 +934,27 @@ function OfiPage() {
               <PanelCard step="10" title="Quote Confirmations">
                 <div className="space-y-4">
                   <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                    Quote confirmations sent by the OFI during the Last Look approval step. These represent the OFI's approval or rejection of the refreshed quote rates after the Provider's manual AML review.
+                    Quote confirmations sent by the OFI during the Last Look approval step. These
+                    represent the OFI's approval or rejection of the refreshed quote rates after the
+                    Provider's manual AML review.
                   </p>
-                  {data.events.filter((e): e is NetworkEvent & { type: "OfiAmlEvent" } => e.type === "OfiAmlEvent").length === 0 ? (
-                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
-                      No quote confirmations yet. Approve or reject a payout request to trigger the Last Look flow.
+                  {data.events.filter(
+                    (e): e is NetworkEvent & { type: "OfiAmlEvent" } => e.type === "OfiAmlEvent",
+                  ).length === 0 ? (
+                    <p
+                      className="font-mono text-muted-foreground text-center py-8"
+                      style={{ fontSize: "11px" }}
+                    >
+                      No quote confirmations yet. Approve or reject a payout request to trigger the
+                      Last Look flow.
                     </p>
                   ) : (
                     <List
                       items={data.events
-                        .filter((e): e is NetworkEvent & { type: "OfiAmlEvent" } => e.type === "OfiAmlEvent")
+                        .filter(
+                          (e): e is NetworkEvent & { type: "OfiAmlEvent" } =>
+                            e.type === "OfiAmlEvent",
+                        )
                         .map((e) => ({
                           id: `${e.type}-${e.at}`,
                           type: e.type,
@@ -898,9 +974,12 @@ function OfiPage() {
                               status={item.action === "approved" ? "confirmed" : "rejected"}
                             />
                             <span className="font-mono tabular text-caption text-foreground truncate">
-                              Payment {item.paymentId.slice(0, 20)}… · Quote {item.quoteId.slice(0, 16)}…
+                              Payment {item.paymentId.slice(0, 20)}… · Quote{" "}
+                              {item.quoteId.slice(0, 16)}…
                             </span>
-                            <span className={`font-mono text-caption ${item.action === "approved" ? "text-accent-green" : "text-[#ff453a]"}`}>
+                            <span
+                              className={`font-mono text-caption ${item.action === "approved" ? "text-accent-green" : "text-[#ff453a]"}`}
+                            >
                               {item.action === "approved" ? "Approved" : "Rejected"}
                             </span>
                           </div>
@@ -917,11 +996,16 @@ function OfiPage() {
               <PanelCard step="11" title="Payment Confirmed">
                 <div className="space-y-4">
                   <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                    Payments that have been fully confirmed by the Network after successful payout execution. The complete manual AML flow is finished.
+                    Payments that have been fully confirmed by the Network after successful payout
+                    execution. The complete manual AML flow is finished.
                   </p>
                   {data.payments.filter((p) => p.status === "confirmed").length === 0 ? (
-                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
-                      No confirmed payments yet. Approve a quote, then wait for the Provider to execute the payout.
+                    <p
+                      className="font-mono text-muted-foreground text-center py-8"
+                      style={{ fontSize: "11px" }}
+                    >
+                      No confirmed payments yet. Approve a quote, then wait for the Provider to
+                      execute the payout.
                     </p>
                   ) : (
                     <List
@@ -938,12 +1022,15 @@ function OfiPage() {
                               <div className="flex items-center gap-2 min-w-0">
                                 <StatusDot status="confirmed" />
                                 <span className="font-mono tabular text-caption text-foreground truncate">
-                                  {p.id} · {p.currency} {p.localAmount.toFixed(2)} · {p.beneficiaryRef}
+                                  {p.id} · {p.currency} {p.localAmount.toFixed(2)} ·{" "}
+                                  {p.beneficiaryRef}
                                 </span>
                               </div>
                               <div className="flex gap-1.5 shrink-0">
                                 {payout && (
-                                  <span className={`font-mono text-caption ${payout.status === "success" ? "text-accent-green" : payout.status === "failed" ? "text-[#ff453a]" : "text-muted-foreground"}`}>
+                                  <span
+                                    className={`font-mono text-caption ${payout.status === "success" ? "text-accent-green" : payout.status === "failed" ? "text-[#ff453a]" : "text-muted-foreground"}`}
+                                  >
                                     Payout: {payout.status}
                                   </span>
                                 )}
@@ -1130,7 +1217,9 @@ function OfiPage() {
                         Ref: {p.beneficiaryRef}
                       </span>
                       {payout && (
-                        <span className={`font-mono text-caption ${payout.status === "success" ? "text-accent-green" : payout.status === "failed" ? "text-[#ff453a]" : "text-muted-foreground"}`}>
+                        <span
+                          className={`font-mono text-caption ${payout.status === "success" ? "text-accent-green" : payout.status === "failed" ? "text-[#ff453a]" : "text-muted-foreground"}`}
+                        >
                           Payout: {payout.status}
                           {payout.fee !== undefined && ` · Fee: $${payout.fee.toFixed(2)}`}
                         </span>

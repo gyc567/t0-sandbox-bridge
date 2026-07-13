@@ -15,7 +15,10 @@ export function FlowHero() {
   return (
     <section className="relative overflow-hidden">
       {/* Floor grid */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[40vh] opacity-40" aria-hidden>
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[40vh] opacity-40"
+        aria-hidden
+      >
         <div
           className="absolute inset-0"
           style={{
@@ -45,9 +48,9 @@ export function FlowHero() {
               two <span className="text-accent-cyan">roles</span>.
             </h1>
             <p className="max-w-xl text-tagline text-muted-foreground">
-              T-0 Network 是 Tether 战略支持的机构级 USDT 清结算网络。
-              BAXS 在此扮演双重角色 —— 既是发起换币的 OFI，也是执行法币付款的 Provider。
-              全部基于 Connect RPC，签名验证在公网上可独立完成。
+              T-0 Network 是 Tether 战略支持的机构级 USDT 清结算网络。 BAXS 在此扮演双重角色 ——
+              既是发起换币的 OFI，也是执行法币付款的 Provider。 全部基于 Connect
+              RPC，签名验证在公网上可独立完成。
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Link
@@ -86,10 +89,7 @@ export function FlowHero() {
                 >
                   SETTLEMENT
                 </div>
-                <div
-                  className="font-mono text-foreground tabular"
-                  style={{ fontSize: "15px" }}
-                >
+                <div className="font-mono text-foreground tabular" style={{ fontSize: "15px" }}>
                   ~25s
                 </div>
               </div>
@@ -100,10 +100,7 @@ export function FlowHero() {
                 >
                   CURRENCIES
                 </div>
-                <div
-                  className="font-mono text-foreground tabular"
-                  style={{ fontSize: "15px" }}
-                >
+                <div className="font-mono text-foreground tabular" style={{ fontSize: "15px" }}>
                   {currencyCount} · CAD/USD/HKD/SGD
                 </div>
               </div>
@@ -114,10 +111,7 @@ export function FlowHero() {
                 >
                   STABLECOIN
                 </div>
-                <div
-                  className="font-mono text-foreground tabular"
-                  style={{ fontSize: "15px" }}
-                >
+                <div className="font-mono text-foreground tabular" style={{ fontSize: "15px" }}>
                   {STABLECOIN.code} · {chainList}
                 </div>
               </div>

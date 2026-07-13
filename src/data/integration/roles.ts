@@ -37,7 +37,14 @@ export const ROLES: readonly RoleSpec[] = [
     abbreviation: "Provider",
     responsibility: "在目标国家执行本地法币付款",
     baxsPosition: "BAXS 接收 T-0 付款指令，通过本地银行系统执行 CAD/USD/HKD/SGD 付款",
-    methods: ["PayOut", "UpdatePayment", "UpdateLimit", "AppendLedgerEntries", "ApprovePaymentQuotes", "UpdateQuote"],
+    methods: [
+      "PayOut",
+      "UpdatePayment",
+      "UpdateLimit",
+      "AppendLedgerEntries",
+      "ApprovePaymentQuotes",
+      "UpdateQuote",
+    ],
     accent: "violet",
   },
 ] as const;

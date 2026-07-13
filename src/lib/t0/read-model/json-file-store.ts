@@ -15,16 +15,8 @@
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import type {
-  InboxRecord,
-  LedgerEntry,
-  LimitSnapshot,
-  SettlementProjection,
-} from "./types";
-import {
-  InMemoryStore,
-  type ReadModelStore,
-} from "./store";
+import type { InboxRecord, LedgerEntry, LimitSnapshot, SettlementProjection } from "./types";
+import { InMemoryStore, type ReadModelStore } from "./store";
 
 /**
  * Schema version written to the file. Bumped when the on-disk shape
@@ -89,9 +81,7 @@ export class JsonFileStore implements ReadModelStore {
     try {
       parsed = JSON.parse(raw, bigintReviver);
     } catch (err) {
-      throw new Error(
-        `JsonFileStore: corrupt file at ${path}: ${(err as Error).message}`,
-      );
+      throw new Error(`JsonFileStore: corrupt file at ${path}: ${(err as Error).message}`);
     }
 
     if (!isPersisted(parsed)) {
@@ -214,7 +204,9 @@ export class JsonFileStore implements ReadModelStore {
     this.persist();
   }
 
-  listCreditUsage(counterparty: string): readonly import("./types").CreditUsageNotificationRecord[] {
+  listCreditUsage(
+    counterparty: string,
+  ): readonly import("./types").CreditUsageNotificationRecord[] {
     return this.inner.listCreditUsage(counterparty);
   }
 

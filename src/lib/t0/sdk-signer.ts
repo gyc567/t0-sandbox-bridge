@@ -18,7 +18,9 @@ export class SignerConfigError extends Error {
 export function normalisePrivateKey(privateKey: string): string {
   const trimmed = privateKey.trim();
   if (!/^(0x)?[0-9a-fA-F]{64}$/.test(trimmed)) {
-    throw new SignerConfigError("Provider private key must be 64 hex characters (with optional 0x prefix)");
+    throw new SignerConfigError(
+      "Provider private key must be 64 hex characters (with optional 0x prefix)",
+    );
   }
   return trimmed.startsWith("0x") ? trimmed : `0x${trimmed}`;
 }

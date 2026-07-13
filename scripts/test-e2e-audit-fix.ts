@@ -138,7 +138,11 @@ async function main() {
       };
     }
   }
-  const expNet = new SandboxNetwork(providerService, new ExpiringExternalClient(), "PAYMENT_METHOD_TYPE_SEPA");
+  const expNet = new SandboxNetwork(
+    providerService,
+    new ExpiringExternalClient(),
+    "PAYMENT_METHOD_TYPE_SEPA",
+  );
   const t4 = await expNet.getQuote({ usdAmount: 1_000, currency: "EUR" });
   assert("success" in t4, "expiring getQuote should succeed");
   // Wait past TTL.
@@ -187,7 +191,9 @@ async function main() {
   //    tests above already exercise the same module.
   console.log("\n=== Summary ===\n");
   console.log(JSON.stringify(results, null, 2));
-  console.log(`\n${results.filter((r) => r.status === "PASS").length} passed, ${results.filter((r) => r.status === "FAIL").length} failed`);
+  console.log(
+    `\n${results.filter((r) => r.status === "PASS").length} passed, ${results.filter((r) => r.status === "FAIL").length} failed`,
+  );
   process.exit(exitCode);
 }
 

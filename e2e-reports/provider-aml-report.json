@@ -1,0 +1,48 @@
+{
+  "baseUrl": "http://127.0.0.1:8080",
+  "passed": 1,
+  "results": [
+    {
+      "name": "provider-aml-panel",
+      "path": "/provider",
+      "status": "PASS",
+      "durationMs": 1650,
+      "checks": [
+        {
+          "name": "page title",
+          "pass": true
+        },
+        {
+          "name": "Payment-Manual AML tab exists",
+          "pass": true
+        },
+        {
+          "name": "AML panel title visible",
+          "pass": true
+        },
+        {
+          "name": "AML content rendered (empty state or upload UI)",
+          "pass": true,
+          "details": {
+            "emptyState": true,
+            "fileInput": false
+          }
+        },
+        {
+          "name": "Empty state text correct",
+          "pass": true,
+          "details": {
+            "text": "No payments pending AML review. Trigger AML from the OFI console or wait for network-driven manual AML checks."
+          }
+        },
+        {
+          "name": "AML description paragraph visible",
+          "pass": true
+        }
+      ],
+      "consoleMessages": [],
+      "failedRequests": [],
+      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/provider-aml-panel.png"
+    }
+  ]
+}

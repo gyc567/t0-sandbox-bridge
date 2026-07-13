@@ -19,7 +19,10 @@ const successResp = (rate: number) =>
       case: "success",
       value: create(GetQuoteResponse_SuccessSchema, {
         rate: create(DecimalSchema, { unscaled: BigInt(Math.round(rate * 100)), exponent: 2 }),
-        payOutAmount: create(DecimalSchema, { unscaled: BigInt(Math.round(rate * 1000)), exponent: 2 }),
+        payOutAmount: create(DecimalSchema, {
+          unscaled: BigInt(Math.round(rate * 1000)),
+          exponent: 2,
+        }),
         settlementAmount: create(DecimalSchema, { unscaled: BigInt(1000), exponent: 2 }),
         quoteId: { quoteId: BigInt(99), providerId: 1 },
       }),
@@ -35,11 +38,13 @@ const acceptedPaymentResp = (id: bigint) =>
     },
   });
 
-const mkSdk = (overrides: Partial<{
-  updateQuote: (req: unknown) => Promise<unknown>;
-  getQuote: (req: unknown) => Promise<unknown>;
-  createPayment: (req: unknown) => Promise<unknown>;
-}> = {}): Client<typeof NetworkService> => {
+const mkSdk = (
+  overrides: Partial<{
+    updateQuote: (req: unknown) => Promise<unknown>;
+    getQuote: (req: unknown) => Promise<unknown>;
+    createPayment: (req: unknown) => Promise<unknown>;
+  }> = {},
+): Client<typeof NetworkService> => {
   return {
     updateQuote: overrides.updateQuote ?? (async () => create(UpdateQuoteResponseSchema, {})),
     getQuote: overrides.getQuote ?? (async () => successResp(0.9)),
@@ -50,9 +55,14 @@ const mkSdk = (overrides: Partial<{
 describe("wrapSdkClient.updateQuote", () => {
   it("calls the SDK with a proto request and returns an internal Quote", async () => {
     let captured: unknown = null;
-    const client = wrapSdkClient(mkSdk({
-      updateQuote: async (req) => { captured = req; return {}; },
-    }));
+    const client = wrapSdkClient(
+      mkSdk({
+        updateQuote: async (req) => {
+          captured = req;
+          return {};
+        },
+      }),
+    );
     const quote = await client.updateQuote({
       currency: "EUR",
       band: 1000,
@@ -92,9 +102,11 @@ describe("wrapSdkClient.getQuote", () => {
 
 describe("wrapSdkClient.createPayment", () => {
   it("returns the network-assigned paymentId on accept", async () => {
-    const client = wrapSdkClient(mkSdk({
-      createPayment: async () => acceptedPaymentResp(BigInt(12345)),
-    }));
+    const client = wrapSdkClient(
+      mkSdk({
+        createPayment: async () => acceptedPaymentResp(BigInt(12345)),
+      }),
+    );
     const r = await client.createPayment({
       paymentClientId: "baxs_test",
       quoteId: "42",
@@ -107,12 +119,15 @@ describe("wrapSdkClient.createPayment", () => {
   });
 
   it("falls back to the client id when paymentId is absent", async () => {
-    const client = wrapSdkClient(mkSdk({
-      createPayment: async () => create(CreatePaymentResponseSchema, {
-        paymentClientId: "fallback_id",
-        result: { case: "settlementRequired", value: {} },
+    const client = wrapSdkClient(
+      mkSdk({
+        createPayment: async () =>
+          create(CreatePaymentResponseSchema, {
+            paymentClientId: "fallback_id",
+            result: { case: "settlementRequired", value: {} },
+          }),
       }),
-    }));
+    );
     const r = await client.createPayment({
       paymentClientId: "fallback_id",
       quoteId: "42",
@@ -125,12 +140,15 @@ describe("wrapSdkClient.createPayment", () => {
   });
 
   it("handles a number paymentId (non-bigint variant)", async () => {
-    const client = wrapSdkClient(mkSdk({
-      createPayment: async () => create(CreatePaymentResponseSchema, {
-        paymentClientId: "c",
-        result: { case: "accepted", value: { paymentId: BigInt(42) } },
+    const client = wrapSdkClient(
+      mkSdk({
+        createPayment: async () =>
+          create(CreatePaymentResponseSchema, {
+            paymentClientId: "c",
+            result: { case: "accepted", value: { paymentId: BigInt(42) } },
+          }),
       }),
-    }));
+    );
     const r = await client.createPayment({
       paymentClientId: "c",
       quoteId: "42",
@@ -143,15 +161,18 @@ describe("wrapSdkClient.createPayment", () => {
   });
 
   it("returns failure reason when the network rejects a createPayment", async () => {
-    const client = wrapSdkClient(mkSdk({
-      createPayment: async () => create(CreatePaymentResponseSchema, {
-        paymentClientId: "c",
-        result: {
-          case: "failure",
-          value: { reason: CreatePaymentResponse_Failure_Reason.QUOTE_NOT_FOUND },
-        },
+    const client = wrapSdkClient(
+      mkSdk({
+        createPayment: async () =>
+          create(CreatePaymentResponseSchema, {
+            paymentClientId: "c",
+            result: {
+              case: "failure",
+              value: { reason: CreatePaymentResponse_Failure_Reason.QUOTE_NOT_FOUND },
+            },
+          }),
       }),
-    }));
+    );
     const r = await client.createPayment({
       paymentClientId: "c",
       quoteId: "42",
@@ -173,12 +194,21 @@ describe("asLegacyT0Client", () => {
         expect(input.currency).toBe("USD");
         return {} as never;
       },
-      async getQuote() { return { failureReason: "OTHER" as const }; },
-      async createPayment() { return { created: false, paymentId: "" }; },
+      async getQuote() {
+        return { failureReason: "OTHER" as const };
+      },
+      async createPayment() {
+        return { created: false, paymentId: "" };
+      },
     };
     const legacy = asLegacyT0Client(sdk);
     const out = await legacy.updateQuote({
-      id: "q1", currency: "USD", band: 1000, rate: 1, createdAt: 0, expiresAt: 1,
+      id: "q1",
+      currency: "USD",
+      band: 1000,
+      rate: 1,
+      createdAt: 0,
+      expiresAt: 1,
     });
     expect(called).toBe(true);
     expect(out).toEqual({ ok: true });
@@ -186,9 +216,15 @@ describe("asLegacyT0Client", () => {
 
   it("returns ok on emit (no-op in SDK mode)", async () => {
     const sdk = {
-      async updateQuote() { return {} as never; },
-      async getQuote() { return { failureReason: "OTHER" as const }; },
-      async createPayment() { return { created: false, paymentId: "" }; },
+      async updateQuote() {
+        return {} as never;
+      },
+      async getQuote() {
+        return { failureReason: "OTHER" as const };
+      },
+      async createPayment() {
+        return { created: false, paymentId: "" };
+      },
     };
     const legacy = asLegacyT0Client(sdk);
     const out = await legacy.emit({ type: "PaymentAccepted", paymentId: "p", at: 0 });

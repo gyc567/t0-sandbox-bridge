@@ -106,61 +106,68 @@ describe("JsonFileStore construction", () => {
   });
 
   it("throws on schema version mismatch", () => {
-    writeFileSync(path, JSON.stringify({ schemaVersion: 999, limits: {}, ledgerEntries: {}, projections: {}, inbox: {} }));
+    writeFileSync(
+      path,
+      JSON.stringify({
+        schemaVersion: 999,
+        limits: {},
+        ledgerEntries: {},
+        projections: {},
+        inbox: {},
+      }),
+    );
     expect(() => new JsonFileStore(path)).toThrow(/schema version 999/);
   });
 
   it("replays all records on load", () => {
     writeFileSync(
       path,
-      JSON.stringify(
-        {
-          schemaVersion: 1,
-          limits: {
-            "1:2": [
-              {
-                providerId: 1,
-                counterpartyId: 2,
-                version: 5,
-                payoutLimit: { unscaled: "500", exponent: 0 },
-                receivedAt: 5000,
-              },
-            ],
-          },
-          ledgerEntries: {
-            "10:1:BALANCE": {
-              transactionId: 10,
-              accountOwnerId: 1,
-              accountType: "BALANCE",
-              credit: { unscaled: "99", exponent: 0 },
-              context: { kind: "payout", paymentId: 7 },
+      JSON.stringify({
+        schemaVersion: 1,
+        limits: {
+          "1:2": [
+            {
+              providerId: 1,
+              counterpartyId: 2,
+              version: 5,
+              payoutLimit: { unscaled: "500", exponent: 0 },
               receivedAt: 5000,
             },
-          },
-          projections: {
-            "TRON:0xdead": {
-              id: "p_z",
-              chain: "TRON",
-              txHash: "0xdead",
-              amount: { unscaled: "200", exponent: 0 },
-              chainStatus: "CONFIRMING",
-              accountingStatus: "NOT_APPLIED",
-              detectedAt: 5000,
-              lastEventAt: 5000,
-            },
-          },
-          inbox: {
-            evt_old: {
-              eventKey: "evt_old",
-              method: "UPDATE_LIMIT",
-              payload: { x: 1 },
-              receivedAt: 5000,
-              processedAt: 5500,
-              attemptCount: 0,
-            },
+          ],
+        },
+        ledgerEntries: {
+          "10:1:BALANCE": {
+            transactionId: 10,
+            accountOwnerId: 1,
+            accountType: "BALANCE",
+            credit: { unscaled: "99", exponent: 0 },
+            context: { kind: "payout", paymentId: 7 },
+            receivedAt: 5000,
           },
         },
-      ),
+        projections: {
+          "TRON:0xdead": {
+            id: "p_z",
+            chain: "TRON",
+            txHash: "0xdead",
+            amount: { unscaled: "200", exponent: 0 },
+            chainStatus: "CONFIRMING",
+            accountingStatus: "NOT_APPLIED",
+            detectedAt: 5000,
+            lastEventAt: 5000,
+          },
+        },
+        inbox: {
+          evt_old: {
+            eventKey: "evt_old",
+            method: "UPDATE_LIMIT",
+            payload: { x: 1 },
+            receivedAt: 5000,
+            processedAt: 5500,
+            attemptCount: 0,
+          },
+        },
+      }),
     );
     const store = new JsonFileStore(path);
     expect(store.latestLimit(1, 2)?.payoutLimit).toEqual({ unscaled: "500", exponent: 0 });

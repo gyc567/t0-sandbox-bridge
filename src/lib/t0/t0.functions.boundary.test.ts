@@ -34,9 +34,7 @@ describe("t0.functions server-fn wiring", () => {
   it("the source routes orchestrator-touched flows through sandboxNetwork", () => {
     const src = readFileSync(resolve(__dirname, "./t0.functions.ts"), "utf-8");
     // requestPayoutFn → sandboxNetwork.requestPayout (Network-driven)
-    expect(src).toMatch(
-      /export const requestPayoutFn[\s\S]*?sandboxNetwork\.requestPayout/,
-    );
+    expect(src).toMatch(/export const requestPayoutFn[\s\S]*?sandboxNetwork\.requestPayout/);
     // completeManualAmlFn → sandboxNetwork.completeManualAml
     expect(src).toMatch(
       /export const completeManualAmlFn[\s\S]*?sandboxNetwork\.completeManualAml/,
@@ -50,17 +48,11 @@ describe("t0.functions server-fn wiring", () => {
       /export const createPaymentIntentFn[\s\S]*?sandboxNetwork\.createPaymentIntent/,
     );
     // confirmFundsFn → sandboxNetwork.confirmFunds
-    expect(src).toMatch(
-      /export const confirmFundsFn[\s\S]*?sandboxNetwork\.confirmFunds/,
-    );
+    expect(src).toMatch(/export const confirmFundsFn[\s\S]*?sandboxNetwork\.confirmFunds/);
     // triggerManualAmlFn → sandboxNetwork.triggerManualAml
-    expect(src).toMatch(
-      /export const triggerManualAmlFn[\s\S]*?sandboxNetwork\.triggerManualAml/,
-    );
+    expect(src).toMatch(/export const triggerManualAmlFn[\s\S]*?sandboxNetwork\.triggerManualAml/);
     // publishQuoteFn → providerService.publishQuote (Provider-side)
-    expect(src).toMatch(
-      /export const publishQuoteFn[\s\S]*?providerService\.publishQuote/,
-    );
+    expect(src).toMatch(/export const publishQuoteFn[\s\S]*?providerService\.publishQuote/);
   });
 
   it("does not expose a Provider-driven accept server function", async () => {

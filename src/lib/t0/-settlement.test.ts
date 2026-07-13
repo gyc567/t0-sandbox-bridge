@@ -19,7 +19,12 @@ function newRegistry(opts?: { pendingTtlMs?: number; now?: () => number }) {
     pendingTtlMs: opts?.pendingTtlMs ?? 30 * 60 * 1000,
     now: () => holder.t(),
   });
-  return { r, setNow: (t: number) => { holder.t = () => t; } };
+  return {
+    r,
+    setNow: (t: number) => {
+      holder.t = () => t;
+    },
+  };
 }
 
 function makeInput(overrides: Partial<SubmitSettlementInput> = {}): SubmitSettlementInput {
@@ -41,9 +46,7 @@ describe("SettlementRegistry.submitSettlement", () => {
   });
 
   it("creates a PENDING settlement with the supplied fields", () => {
-    const s = registry.submitSettlement(
-      makeInput({ txHash: "0xabc", intentRefs: ["pi-1"] }),
-    );
+    const s = registry.submitSettlement(makeInput({ txHash: "0xabc", intentRefs: ["pi-1"] }));
     expect(s).toMatchObject({
       txHash: "0xabc",
       blockchain: "TRON",
@@ -69,8 +72,12 @@ describe("SettlementRegistry.submitSettlement", () => {
 
   it("throws on non-positive usdAmount", () => {
     expect(() => registry.submitSettlement(makeInput({ usdAmount: 0 }))).toThrow(/finite positive/);
-    expect(() => registry.submitSettlement(makeInput({ usdAmount: -1 }))).toThrow(/finite positive/);
-    expect(() => registry.submitSettlement(makeInput({ usdAmount: NaN }))).toThrow(/finite positive/);
+    expect(() => registry.submitSettlement(makeInput({ usdAmount: -1 }))).toThrow(
+      /finite positive/,
+    );
+    expect(() => registry.submitSettlement(makeInput({ usdAmount: NaN }))).toThrow(
+      /finite positive/,
+    );
   });
 
   it("does not write ledger entries until confirmByChain", () => {
@@ -282,9 +289,7 @@ describe("SettlementRegistry snapshots", () => {
     r.confirmByChain("0xa");
     r.confirmByChain("0xb");
     const ledger = r.listLedger();
-    const ids = ledger
-      .filter((e) => e.reason === "SETTLEMENT_CREDIT")
-      .map((e) => e.note);
+    const ids = ledger.filter((e) => e.reason === "SETTLEMENT_CREDIT").map((e) => e.note);
     expect(ids[0]).not.toBe(ids[2]);
   });
 });

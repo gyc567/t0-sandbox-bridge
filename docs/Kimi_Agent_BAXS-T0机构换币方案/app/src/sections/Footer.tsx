@@ -1,4 +1,4 @@
-import { Cpu, ExternalLink } from 'lucide-react';
+import { Cpu, ExternalLink } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -13,20 +13,36 @@ export default function Footer() {
               <span className="font-bold text-sm">BAXS × T-0 Network</span>
             </div>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed max-w-sm">
-              基于 T-0 Network 官方 Onboarding 文档与 BAXS 业务体系的深度集成方案。
-              覆盖 KYB 准入、密钥管理、信用额度、报价引擎、Payment Flow 全流程。
+              基于 T-0 Network 官方 Onboarding 文档与 BAXS 业务体系的深度集成方案。 覆盖 KYB
+              准入、密钥管理、信用额度、报价引擎、Payment Flow 全流程。
             </p>
           </div>
           <div>
-            <h4 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-4">文档</h4>
+            <h4 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-4">
+              文档
+            </h4>
             <ul className="space-y-2">
               {[
-                { label: 'T-0 Onboarding', href: 'https://docs.t-0.network/docs/network/onboarding/' },
-                { label: 'T-0 Payment Flow', href: 'https://docs.t-0.network/docs/network/payment-flow/' },
-                { label: 'T-0 Integration', href: 'https://docs.t-0.network/docs/integration-guidance/introduction/' },
-              ].map(link => (
+                {
+                  label: "T-0 Onboarding",
+                  href: "https://docs.t-0.network/docs/network/onboarding/",
+                },
+                {
+                  label: "T-0 Payment Flow",
+                  href: "https://docs.t-0.network/docs/network/payment-flow/",
+                },
+                {
+                  label: "T-0 Integration",
+                  href: "https://docs.t-0.network/docs/integration-guidance/introduction/",
+                },
+              ].map((link) => (
                 <li key={link.label}>
-                  <a href={link.href} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--text-muted)] hover:text-[var(--gold)] transition-colors inline-flex items-center gap-1">
+                  <a
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-[var(--text-muted)] hover:text-[var(--gold)] transition-colors inline-flex items-center gap-1"
+                  >
                     {link.label} <ExternalLink className="w-3 h-3" />
                   </a>
                 </li>
@@ -34,15 +50,22 @@ export default function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-4">参考</h4>
+            <h4 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-4">
+              参考
+            </h4>
             <ul className="space-y-2">
               {[
-                { label: 'BAXS 官网', href: 'https://www.baxs.ca' },
-                { label: 'T-0 Network', href: 'https://t-0.network' },
-                { label: 'Connect RPC', href: 'https://connectrpc.com' },
-              ].map(link => (
+                { label: "BAXS 官网", href: "https://www.baxs.ca" },
+                { label: "T-0 Network", href: "https://t-0.network" },
+                { label: "Connect RPC", href: "https://connectrpc.com" },
+              ].map((link) => (
                 <li key={link.label}>
-                  <a href={link.href} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--text-muted)] hover:text-[var(--gold)] transition-colors inline-flex items-center gap-1">
+                  <a
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-[var(--text-muted)] hover:text-[var(--gold)] transition-colors inline-flex items-center gap-1"
+                  >
                     {link.label} <ExternalLink className="w-3 h-3" />
                   </a>
                 </li>

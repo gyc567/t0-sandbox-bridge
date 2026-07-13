@@ -10,7 +10,9 @@ import {
   providerCounterpartiesFn,
   callbackInboxStateFn,
   providerLedgerFn,
+  uploadAmlFileFn,
 } from "@/lib/t0/t0.functions";
+import { ManualAmlPanel } from "@/components/provider/ManualAmlPanel";
 // (auth removed — sandbox console is open access; no login required)
 import type { Currency, Payment, Payout, Quote, VolumeBand } from "@/lib/t0/types";
 import type { NetworkEvent } from "@/lib/t0/types";
@@ -66,6 +68,7 @@ function ProviderPage() {
   const notifyUsdt = useServerFn(notifyUsdtFn);
   const notifyCredit = useServerFn(notifyCreditFn);
   const snapshot = useServerFn(snapshotFn);
+  const uploadAmlFile = useServerFn(uploadAmlFileFn);
 
   // ── Phase 3: Provider read-model views ─────────────────────────────
   // Provider role is providerId 0 in this sandbox. Production would
@@ -77,7 +80,12 @@ function ProviderPage() {
 
   type CounterpartyRow = { counterpartyId: number; latest: LimitSnapshot | null };
   const [counterparties, setCounterparties] = useState<CounterpartyRow[]>([]);
-  const [inboxCounts, setInboxCounts] = useState<{ processed: number; failed: number; pending: number; total: number }>({
+  const [inboxCounts, setInboxCounts] = useState<{
+    processed: number;
+    failed: number;
+    pending: number;
+    total: number;
+  }>({
     processed: 0,
     failed: 0,
     pending: 0,
@@ -128,8 +136,20 @@ function ProviderPage() {
     }
   };
 
-  const onExecutePayout = (paymentId: string) =>
-    run(() => processPayout({ data: { paymentId } }));
+  const onExecutePayout = (paymentId: string) => run(() => processPayout({ data: { paymentId } }));
+
+  const onUploadAndReview = async (paymentId: string, file: File) => {
+    await run(async () => {
+      await uploadAmlFile({
+        data: {
+          paymentId,
+          filename: file.name,
+          fileSize: file.size,
+          fileType: file.type || "application/octet-stream",
+        },
+      });
+    });
+  };
 
   return (
     <SiteLayout>
@@ -164,7 +184,13 @@ function ProviderPage() {
                     <SelectTrigger className="w-32 font-mono">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent position="popper" side="bottom" sideOffset={4} avoidCollisions={false} className="z-[999]">
+                    <SelectContent
+                      position="popper"
+                      side="bottom"
+                      sideOffset={4}
+                      avoidCollisions={false}
+                      className="z-[999]"
+                    >
                       {CURRENCIES.map((c) => (
                         <SelectItem key={c} value={c}>
                           {c}
@@ -177,11 +203,20 @@ function ProviderPage() {
                   <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
                     Band
                   </Label>
-                  <Select value={String(band)} onValueChange={(v) => setBand(Number(v) as VolumeBand)}>
+                  <Select
+                    value={String(band)}
+                    onValueChange={(v) => setBand(Number(v) as VolumeBand)}
+                  >
                     <SelectTrigger className="w-36 font-mono">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent position="popper" side="bottom" sideOffset={4} avoidCollisions={false} className="z-[999]">
+                    <SelectContent
+                      position="popper"
+                      side="bottom"
+                      sideOffset={4}
+                      avoidCollisions={false}
+                      className="z-[999]"
+                    >
                       {BANDS.map((b) => (
                         <SelectItem key={b} value={String(b)}>
                           ${b.toLocaleString()}
@@ -219,16 +254,28 @@ function ProviderPage() {
               <PanelCard step="02" title="Credit Usage Notifications (to Payout Provider)">
                 <div className="space-y-4">
                   <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                    Notifications from the network regarding credit usage and settlement confirmations for this provider. Includes settlement confirmations and payment settlement details with quote context.
+                    Notifications from the network regarding credit usage and settlement
+                    confirmations for this provider. Includes settlement confirmations and payment
+                    settlement details with quote context.
                   </p>
-                  {data.events.filter((e): e is NetworkEvent & { type: "CreditUsageNotification" } => e.type === "CreditUsageNotification" && e.counterparty === "provider").length === 0 ? (
-                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
-                      No credit usage notifications yet. Confirm a settlement or execute a payout to trigger the flow.
+                  {data.events.filter(
+                    (e): e is NetworkEvent & { type: "CreditUsageNotification" } =>
+                      e.type === "CreditUsageNotification" && e.counterparty === "provider",
+                  ).length === 0 ? (
+                    <p
+                      className="font-mono text-muted-foreground text-center py-8"
+                      style={{ fontSize: "11px" }}
+                    >
+                      No credit usage notifications yet. Confirm a settlement or execute a payout to
+                      trigger the flow.
                     </p>
                   ) : (
                     <List
                       items={data.events
-                        .filter((e): e is NetworkEvent & { type: "CreditUsageNotification" } => e.type === "CreditUsageNotification" && e.counterparty === "provider")
+                        .filter(
+                          (e): e is NetworkEvent & { type: "CreditUsageNotification" } =>
+                            e.type === "CreditUsageNotification" && e.counterparty === "provider",
+                        )
                         .map((e) => ({
                           id: `${e.counterparty}-${e.at}`,
                           counterparty: e.counterparty,
@@ -249,7 +296,9 @@ function ProviderPage() {
                             <div className="flex items-center gap-2 min-w-0">
                               <StatusDot status="received" />
                               <span className="font-mono tabular text-caption text-foreground truncate">
-                                {item.paymentId ? `Payment ${item.paymentId.slice(0, 20)}…` : `Credit used: ${item.used.toLocaleString()}`}
+                                {item.paymentId
+                                  ? `Payment ${item.paymentId.slice(0, 20)}…`
+                                  : `Credit used: ${item.used.toLocaleString()}`}
                               </span>
                             </div>
                             <span className="font-mono text-caption text-muted-foreground shrink-0">
@@ -286,11 +335,17 @@ function ProviderPage() {
               <PanelCard step="03" title="Payout Execution">
                 <div className="space-y-4">
                   <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                    Payments accepted by the OFI that are ready for payout execution. Click "Execute Payout" to trigger the Provider payout flow (Payout Accepted → Payout Success → Payment Confirmed).
+                    Payments accepted by the OFI that are ready for payout execution. Click "Execute
+                    Payout" to trigger the Provider payout flow (Payout Accepted → Payout Success →
+                    Payment Confirmed).
                   </p>
                   {data.payments.length === 0 ? (
-                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
-                      No payments yet. Wait for an OFI to create a payment against your published quote.
+                    <p
+                      className="font-mono text-muted-foreground text-center py-8"
+                      style={{ fontSize: "11px" }}
+                    >
+                      No payments yet. Wait for an OFI to create a payment against your published
+                      quote.
                     </p>
                   ) : (
                     <List
@@ -307,7 +362,8 @@ function ProviderPage() {
                               <div className="flex items-center gap-2 min-w-0">
                                 <StatusDot status={p.status} />
                                 <span className="font-mono tabular text-caption text-foreground truncate">
-                                  {p.id} · {p.currency} {p.localAmount.toFixed(2)} · {p.beneficiaryRef}
+                                  {p.id} · {p.currency} {p.localAmount.toFixed(2)} ·{" "}
+                                  {p.beneficiaryRef}
                                 </span>
                               </div>
                               <div className="flex gap-1.5 shrink-0">
@@ -331,7 +387,9 @@ function ProviderPage() {
                                 USD: ${p.usdAmount.toLocaleString()}
                               </span>
                               {payout && (
-                                <span className={`font-mono text-caption ${payout.status === "success" ? "text-accent-green" : payout.status === "failed" ? "text-[#ff453a]" : "text-muted-foreground"}`}>
+                                <span
+                                  className={`font-mono text-caption ${payout.status === "success" ? "text-accent-green" : payout.status === "failed" ? "text-[#ff453a]" : "text-muted-foreground"}`}
+                                >
                                   Payout: {payout.status}
                                 </span>
                               )}
@@ -350,7 +408,10 @@ function ProviderPage() {
                     All payouts executed by the Provider. Each payout is linked to a payment.
                   </p>
                   {data.payouts.length === 0 ? (
-                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
+                    <p
+                      className="font-mono text-muted-foreground text-center py-8"
+                      style={{ fontSize: "11px" }}
+                    >
                       No payouts yet. Execute a payout to see it here.
                     </p>
                   ) : (
@@ -388,19 +449,33 @@ function ProviderPage() {
               <PanelCard step="04" title="Payout & Credit Notifications">
                 <div className="space-y-4">
                   <p className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
-                    Event log for Payout Accepted, Payout Success, Payment Confirmed, and Credit Usage Notification callbacks received from the network.
+                    Event log for Payout Accepted, Payout Success, Payment Confirmed, and Credit
+                    Usage Notification callbacks received from the network.
                   </p>
                   {data.events.filter((e) =>
-                    ["PayoutAccepted", "PayoutSuccess", "PaymentConfirmed", "CreditUsageNotification"].includes(e.type)
+                    [
+                      "PayoutAccepted",
+                      "PayoutSuccess",
+                      "PaymentConfirmed",
+                      "CreditUsageNotification",
+                    ].includes(e.type),
                   ).length === 0 ? (
-                    <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
+                    <p
+                      className="font-mono text-muted-foreground text-center py-8"
+                      style={{ fontSize: "11px" }}
+                    >
                       No payout or credit notifications yet. Execute a payout to trigger the flow.
                     </p>
                   ) : (
                     <List
                       items={data.events
                         .filter((e) =>
-                          ["PayoutAccepted", "PayoutSuccess", "PaymentConfirmed", "CreditUsageNotification"].includes(e.type)
+                          [
+                            "PayoutAccepted",
+                            "PayoutSuccess",
+                            "PaymentConfirmed",
+                            "CreditUsageNotification",
+                          ].includes(e.type),
                         )
                         .map((e) => ({
                           id: `${e.type}-${e.at}`,
@@ -449,13 +524,11 @@ function ProviderPage() {
             </>
           }
           paymentManualAmlContent={
-            <PanelCard step="04" title="Payment-Manual AML (Provider view)">
-              <p className="font-mono text-muted-foreground text-center py-8" style={{ fontSize: "11px" }}>
-                OFI handles Manual AML on the OFI console. The Provider view
-                is reactive only — inbound approvals and rejections from OFI
-                surface in the Event Log below.
-              </p>
-            </PanelCard>
+            <ManualAmlPanel
+              payments={data.payments}
+              busy={busy}
+              onUploadAndReview={onUploadAndReview}
+            />
           }
         />
 

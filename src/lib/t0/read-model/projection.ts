@@ -18,9 +18,7 @@
 //     The read model mandates *string* `unscaled` (no float drift). The
 //     parsers below always normalize to the read-model shape.
 
-import type {
-  UpdateLimitRequest_Limit as ProtoLimit,
-} from "@t-0/provider-sdk";
+import type { UpdateLimitRequest_Limit as ProtoLimit } from "@t-0/provider-sdk";
 import {
   DECIMAL_ZERO,
   isDecimal,
@@ -52,10 +50,7 @@ function bigintSafeStringify(value: unknown): string {
  * from the full `Message<...>` envelope that the protobuf runtime
  * attaches. Tests pass plain objects without `$typeName` and it works.
  */
-export function parseLimit(
-  limit: ProtoLimitShape,
-  receivedAt: number,
-): LimitSnapshot {
+export function parseLimit(limit: ProtoLimitShape, receivedAt: number): LimitSnapshot {
   if (typeof limit.version !== "bigint") {
     throw new Error("parseLimit: limit.version must be a bigint");
   }
@@ -164,9 +159,7 @@ export type ProtoLedgerEntryShape = {
   debit?: unknown;
 };
 
-function parseTransactionContext(
-  tx: ProtoTransactionShape,
-): LedgerEntry["context"] {
+function parseTransactionContext(tx: ProtoTransactionShape): LedgerEntry["context"] {
   const details = tx.transactionDetails;
   const v = details.value as Record<string, unknown> | undefined;
   switch (details.case) {
@@ -318,7 +311,9 @@ export function linkProjection(
   };
 }
 
-function upgradeAccounting(status: SettlementProjection["accountingStatus"]): SettlementProjection["accountingStatus"] {
+function upgradeAccounting(
+  status: SettlementProjection["accountingStatus"],
+): SettlementProjection["accountingStatus"] {
   switch (status) {
     case "NOT_APPLIED":
       return "LIMIT_RECEIVED";

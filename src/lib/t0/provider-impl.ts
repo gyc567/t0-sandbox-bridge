@@ -73,7 +73,9 @@ export async function payOut(
     return create(PayoutResponseSchema, {
       result: {
         case: "failed",
-        value: create(PayoutResponse_FailedSchema, { reason: PayoutResponse_Failed_Reason.UNSPECIFIED }),
+        value: create(PayoutResponse_FailedSchema, {
+          reason: PayoutResponse_Failed_Reason.UNSPECIFIED,
+        }),
       },
     });
   }
@@ -123,7 +125,9 @@ export async function updateLimit(
   // storage. Parsing failures are caught here so the RPC still ACKs
   // — the inbox records the failure for later inspection.
   try {
-    callbackInbox().handleUpdateLimit(req as unknown as { limits: readonly import("./read-model/projection").ProtoLimitShape[] });
+    callbackInbox().handleUpdateLimit(
+      req as unknown as { limits: readonly import("./read-model/projection").ProtoLimitShape[] },
+    );
   } catch {
     // Defensive: the inbox itself doesn't throw for well-formed proto
     // payloads. A throw here means a malformed payload or a bug;
@@ -166,7 +170,11 @@ export async function appendLedgerEntries(
   // Forward the payload to the CallbackInbox for durable, idempotent
   // storage. See updateLimit for the defensive ACK policy.
   try {
-    callbackInbox().handleAppendLedgerEntries(req as unknown as { transactions: readonly import("./read-model/projection").ProtoTransactionShape[] });
+    callbackInbox().handleAppendLedgerEntries(
+      req as unknown as {
+        transactions: readonly import("./read-model/projection").ProtoTransactionShape[];
+      },
+    );
   } catch {
     // See updateLimit for rationale.
   }
@@ -188,9 +196,12 @@ export async function appendLedgerEntries(
 export function createProviderServiceImpl(network: SandboxNetwork) {
   return {
     payOut: (req: PayoutRequest, ctx: HandlerContext) => payOut(req, ctx, network),
-    updatePayment: (req: UpdatePaymentRequest, ctx: HandlerContext) => updatePayment(req, ctx, network),
+    updatePayment: (req: UpdatePaymentRequest, ctx: HandlerContext) =>
+      updatePayment(req, ctx, network),
     updateLimit: (req: UpdateLimitRequest, ctx: HandlerContext) => updateLimit(req, ctx, network),
-    approvePaymentQuote: (req: ApprovePaymentQuoteRequest, ctx: HandlerContext) => approvePaymentQuote(req, ctx, network),
-    appendLedgerEntries: (req: AppendLedgerEntriesRequest, ctx: HandlerContext) => appendLedgerEntries(req, ctx, network),
+    approvePaymentQuote: (req: ApprovePaymentQuoteRequest, ctx: HandlerContext) =>
+      approvePaymentQuote(req, ctx, network),
+    appendLedgerEntries: (req: AppendLedgerEntriesRequest, ctx: HandlerContext) =>
+      appendLedgerEntries(req, ctx, network),
   };
 }

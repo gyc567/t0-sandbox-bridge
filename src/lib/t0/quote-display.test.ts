@@ -35,7 +35,10 @@ describe("formatQuoteForDisplay — pair (off-ramp invariant)", () => {
   });
 
   it("reflects the target currency on the buy side", () => {
-    const eur = formatQuoteForDisplay(payload({ quote: { ...payload().quote, currency: "EUR" } }), NOW);
+    const eur = formatQuoteForDisplay(
+      payload({ quote: { ...payload().quote, currency: "EUR" } }),
+      NOW,
+    );
     expect(eur.buy).toBe("EUR");
     expect(eur.pair).toBe("Sell USDT → Buy EUR");
 
@@ -97,7 +100,10 @@ describe("formatQuoteForDisplay — money formatting", () => {
 
   it("formats IDR with Rp and 0 decimals", () => {
     const d = formatQuoteForDisplay(
-      payload({ quote: { ...payload().quote, currency: "IDR" as never }, payoutAmount: 15_200_000 }),
+      payload({
+        quote: { ...payload().quote, currency: "IDR" as never },
+        payoutAmount: 15_200_000,
+      }),
       NOW,
     );
     expect(d.payout).toBe("Rp15,200,000");

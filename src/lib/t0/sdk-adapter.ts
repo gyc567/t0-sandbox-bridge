@@ -35,6 +35,7 @@ import type { Currency, Quote, VolumeBand } from "./types";
 
 const AMOUNT_EXPONENT = 2;
 const AMOUNT_SCALE = 100; // 10 ** exponent
+const RATE_MAX_FRACTION_DIGITS = 10;
 
 // Sandbox default: SEPA. Real T-0 sandbox negotiates this out-of-band;
 // we hard-code it here per the integration plan.
@@ -44,6 +45,25 @@ function toDecimal(value: number): Decimal {
   // Round to 2 decimal places (cents) to avoid floating-point drift.
   const cents = Math.round(value * AMOUNT_SCALE);
   return create(DecimalSchema, { unscaled: BigInt(cents), exponent: AMOUNT_EXPONENT });
+}
+
+function toRateDecimal(value: number): Decimal {
+  if (!Number.isFinite(value)) {
+    throw new Error(`invalid rate: ${value}`);
+  }
+  // Preserve the caller's fractional precision instead of collapsing rates
+  // to cents. The provider API accepts Decimal, and rate is an exchange rate,
+  // not a money amount.
+  const rounded = Math.round(value * 10 ** RATE_MAX_FRACTION_DIGITS) / 10 ** RATE_MAX_FRACTION_DIGITS;
+  const s = String(rounded);
+  const negative = s.startsWith("-");
+  const normalized = negative ? s.slice(1) : s;
+  const [intPart, fracPart = ""] = normalized.split(".");
+  const trimmedFrac = fracPart.replace(/0+$/, "");
+  const exponent = trimmedFrac.length;
+  const digits = `${intPart}${trimmedFrac}`;
+  const unscaled = BigInt(negative ? `-${digits}` : digits);
+  return create(DecimalSchema, { unscaled, exponent });
 }
 
 function fromDecimal(value: Decimal | undefined): number {
@@ -66,7 +86,7 @@ function toBand(band: number, rate: number, clientQuoteId: string): UpdateQuoteR
   return create(UpdateQuoteRequest_Quote_BandSchema, {
     clientQuoteId,
     maxAmount: toDecimal(band),
-    rate: toDecimal(rate),
+    rate: toRateDecimal(rate),
   });
 }
 
@@ -110,10 +130,7 @@ export function toUpdateQuoteRequest(input: OutboundQuoteInput): UpdateQuoteRequ
  * we synthesize an internal id since the server's quote id only lives
  * on its side.
  */
-export function fromUpdateQuoteResponse(
-  _response: unknown,
-  input: OutboundQuoteInput,
-): Quote {
+export function fromUpdateQuoteResponse(_response: unknown, input: OutboundQuoteInput): Quote {
   return {
     id: `qt_${input.currency}_${input.band}_${Date.now().toString(36)}`,
     currency: input.currency,
@@ -132,7 +149,10 @@ export interface OutboundGetQuoteInput {
 export function toGetQuoteRequest(input: OutboundGetQuoteInput): GetQuoteRequest {
   // The oneof `amount` field needs explicit `{ case, value }` shape; TS infers
   // the wider `MessageInit` union which doesn't accept `case` directly.
-  const amount = { case: "payOutAmount", value: toDecimal(input.usdAmount) } as unknown as NonNullable<GetQuoteRequest["amount"]>["amount"];
+  const amount = {
+    case: "payOutAmount",
+    value: toDecimal(input.usdAmount),
+  } as unknown as NonNullable<GetQuoteRequest["amount"]>["amount"];
   return create(GetQuoteRequestSchema, {
     amount: { amount },
     payOutCurrency: input.currency,
@@ -151,7 +171,14 @@ export interface InboundQuote {
 
 export interface QuoteResult {
   success?: InboundQuote;
-  failureReason?: "NO_QUOTE_AVAILABLE" | "LIMIT_EXCEEDED" | "CURRENCY_NOT_SUPPORTED" | "INVALID_AMOUNT" | "INVALID_QUOTE_ID" | "QUOTE_EXPIRED" | "OTHER";
+  failureReason?:
+    | "NO_QUOTE_AVAILABLE"
+    | "LIMIT_EXCEEDED"
+    | "CURRENCY_NOT_SUPPORTED"
+    | "INVALID_AMOUNT"
+    | "INVALID_QUOTE_ID"
+    | "QUOTE_EXPIRED"
+    | "OTHER";
 }
 
 export function fromGetQuoteResponse(response: GetQuoteResponse): QuoteResult {
@@ -184,7 +211,10 @@ export interface OutboundCreatePaymentInput {
 }
 
 export function toCreatePaymentRequest(input: OutboundCreatePaymentInput) {
-  const amount = { case: "payOutAmount", value: toDecimal(input.usdAmount) } as unknown as NonNullable<CreatePaymentRequest["amount"]>["amount"];
+  const amount = {
+    case: "payOutAmount",
+    value: toDecimal(input.usdAmount),
+  } as unknown as NonNullable<CreatePaymentRequest["amount"]>["amount"];
   return create(CreatePaymentRequestSchema, {
     paymentClientId: input.paymentClientId,
     quoteId: create(QuoteIdSchema, { quoteId: BigInt(input.quoteId), providerId: 0 }),

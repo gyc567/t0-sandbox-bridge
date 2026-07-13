@@ -71,7 +71,11 @@ async function testProviderPage(context) {
 
     // 3. Currency dropdown exists - find by label text then navigate to parent div
     const currencyLabel = page.locator("label", { hasText: "Currency" }).first();
-    const currencyTrigger = currencyLabel.locator("xpath=..").first().locator('button[role="combobox"]').first();
+    const currencyTrigger = currencyLabel
+      .locator("xpath=..")
+      .first()
+      .locator('button[role="combobox"]')
+      .first();
     checks.push({ name: "currency dropdown trigger", pass: (await currencyTrigger.count()) > 0 });
     if ((await currencyTrigger.count()) === 0) {
       throw new Error("Missing Currency dropdown trigger");
@@ -79,7 +83,11 @@ async function testProviderPage(context) {
 
     // 4. Band dropdown exists
     const bandLabel = page.locator("label", { hasText: "Band" }).first();
-    const bandTrigger = bandLabel.locator("xpath=..").first().locator('button[role="combobox"]').first();
+    const bandTrigger = bandLabel
+      .locator("xpath=..")
+      .first()
+      .locator('button[role="combobox"]')
+      .first();
     checks.push({ name: "band dropdown trigger", pass: (await bandTrigger.count()) > 0 });
     if ((await bandTrigger.count()) === 0) {
       throw new Error("Missing Band dropdown trigger");
@@ -99,10 +107,12 @@ async function testProviderPage(context) {
 
     // Get all option text contents
     const options = await page.$$('[role="option"]');
-    const optionTexts = await Promise.all(options.map(async (opt) => {
-      const text = await opt.textContent();
-      return text?.trim();
-    }));
+    const optionTexts = await Promise.all(
+      options.map(async (opt) => {
+        const text = await opt.textContent();
+        return text?.trim();
+      }),
+    );
 
     const expectedCurrencies = SUPPORTED_CURRENCIES.map((c) => c.code);
     const missingCurrencies = expectedCurrencies.filter((c) => !optionTexts.includes(c));
@@ -145,10 +155,12 @@ async function testProviderPage(context) {
     }
 
     const bandOptions = await page.$$('[role="option"]');
-    const bandOptionTexts = await Promise.all(bandOptions.map(async (opt) => {
-      const text = await opt.textContent();
-      return text?.trim();
-    }));
+    const bandOptionTexts = await Promise.all(
+      bandOptions.map(async (opt) => {
+        const text = await opt.textContent();
+        return text?.trim();
+      }),
+    );
 
     const expectedBands = ["$1,000", "$5,000", "$10,000", "$25,000", "$250,000", "$1,000,000"];
     const missingBands = expectedBands.filter((b) => !bandOptionTexts.includes(b));
@@ -279,7 +291,9 @@ async function main() {
         const icon = c.pass ? "✓" : "✗";
         console.log(`    ${icon} ${c.name}`);
         if (c.details && !c.pass) {
-          console.log(`      Details: ${JSON.stringify(c.details, null, 2).replace(/\n/g, "\n      ")}`);
+          console.log(
+            `      Details: ${JSON.stringify(c.details, null, 2).replace(/\n/g, "\n      ")}`,
+          );
         }
       }
     }

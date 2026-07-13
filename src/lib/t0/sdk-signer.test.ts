@@ -14,7 +14,7 @@ describe("normalisePrivateKey", () => {
   });
 
   it("accepts uppercase hex", () => {
-    const upper = ("A".repeat(32) + "B".repeat(32));
+    const upper = "A".repeat(32) + "B".repeat(32);
     expect(normalisePrivateKey(upper)).toBe("0x" + upper);
   });
 

@@ -92,10 +92,7 @@ export interface QuoteSuccessPayload {
   settlementAmount: number;
 }
 
-export function formatQuoteForDisplay(
-  result: QuoteSuccessPayload,
-  now: number,
-): QuoteDisplay {
+export function formatQuoteForDisplay(result: QuoteSuccessPayload, now: number): QuoteDisplay {
   const { quote, payoutAmount, settlementAmount } = result;
   return {
     sell: SELL,

@@ -454,7 +454,12 @@ export class SandboxNetwork {
 
   getSettlementState(): SettlementState {
     if (!this.settlementRegistry) {
-      return { pending: [], ledger: [], ofiCredit: { available: 0, reserved: 0 }, providerCredit: { available: 0, reserved: 0 } };
+      return {
+        pending: [],
+        ledger: [],
+        ofiCredit: { available: 0, reserved: 0 },
+        providerCredit: { available: 0, reserved: 0 },
+      };
     }
     return this.settlementRegistry.snapshot();
   }

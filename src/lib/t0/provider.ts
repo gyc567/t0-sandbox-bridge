@@ -9,8 +9,22 @@
 // execution lifecycle in response to network-driven PayoutRequests.
 
 import type { T0Client } from "./client";
-import type { Currency, NetworkEvent, Payment, PaymentStatus, Payout, Quote, SettlementState, VolumeBand } from "./types";
-import { DEFAULT_OFI_WALLET, DEFAULT_PROVIDER_WALLET, type SettlementRegistry, type SubmitSettlementInput } from "./settlement";
+import type {
+  Currency,
+  NetworkEvent,
+  Payment,
+  PaymentStatus,
+  Payout,
+  Quote,
+  SettlementState,
+  VolumeBand,
+} from "./types";
+import {
+  DEFAULT_OFI_WALLET,
+  DEFAULT_PROVIDER_WALLET,
+  type SettlementRegistry,
+  type SubmitSettlementInput,
+} from "./settlement";
 
 import type { ReadModelStore } from "./read-model/store";
 
@@ -63,7 +77,12 @@ export class PayoutProviderService {
   }
 
   /** Restore state from a persisted snapshot (idempotent). */
-  loadSnapshot(state: { quotes: Quote[]; payments: Payment[]; payouts: Payout[]; events: NetworkEvent[] }): void {
+  loadSnapshot(state: {
+    quotes: Quote[];
+    payments: Payment[];
+    payouts: Payout[];
+    events: NetworkEvent[];
+  }): void {
     for (const q of state.quotes) this.quotes.set(q.id, q);
     for (const p of state.payments) this.payments.set(p.id, p);
     for (const po of state.payouts) this.payouts.set(po.id, po);

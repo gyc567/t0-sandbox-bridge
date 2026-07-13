@@ -40,7 +40,9 @@ describe("HttpT0Client", () => {
     expect(body1.groups[0]).toMatchObject({
       currency: quote.currency,
       payment_method: "SEPA",
-      bands: [{ client_quote_id: quote.id, max_amount_usd: String(quote.band), rate: String(quote.rate) }],
+      bands: [
+        { client_quote_id: quote.id, max_amount_usd: String(quote.band), rate: String(quote.rate) },
+      ],
     });
     expect((init1 as RequestInit).headers).toMatchObject({
       authorization: "Bearer key123",

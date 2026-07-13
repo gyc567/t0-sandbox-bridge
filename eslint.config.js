@@ -54,7 +54,7 @@ export default tseslint.config(
       // code review + the contract tests instead.
       // Magic numbers in financial / crypto code are how AI introduces bugs.
       // Use named constants from src/shared/contracts instead.
-      "no-magic-numbers": ["warn", { ignore: [-1, 0, 1, 2], ignoreArrayIndexes: true }],
+      "no-magic-numbers": ["warn", { ignore: [-1, 0, 1, 2, 1_024], ignoreArrayIndexes: true }],
       // Drift toward `// eslint-disable` — never acceptable in production.
       "no-warning-comments": [
         "warn",

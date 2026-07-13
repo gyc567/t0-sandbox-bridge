@@ -1,10 +1,68 @@
 import { HttpT0Client, MockT0Client } from "./client";
 import { PayoutProviderService } from "./provider";
 import { SandboxNetwork } from "./network";
-import { HttpOfiT0Client, MockOfiT0Client } from "./ofi-client";
+import { HttpOfiT0Client, MockOfiT0Client, type OfiQuoteRequest } from "./ofi-client";
 import type { OfiT0Client } from "./ofi-client";
 import { SettlementRegistry } from "./settlement";
 import { sharedCallbackInbox, sharedStore } from "./read-model/instance";
+
+// ── External rate fallback (plan §4.2 + §8) ───────────────────────────
+//
+// Used by MockOfiT0Client when the Provider quote book has no candidate.
+// Single source: jsDelivr CDN hosting @fawazahmed0/currency-api (no API key,
+// no rate limit, daily refresh). Returns null on any failure so callers
+// surface a clean NO_QUOTE rather than forging a quote (plan §7).
+
+const FALLBACK_USDT_URL =
+  "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usdt.json";
+const FALLBACK_TIMEOUT_MS = 4_000;
+const FALLBACK_TTL_MS = 5 * 60_000;
+
+export interface JsDelivrFallbackOptions {
+  /** Injectable for tests; defaults to globalThis.fetch */
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}
+
+/**
+ * Build a `MockOfiT0Client` fallback provider that pulls USDT-based rates
+ * from the public currency-api (plan §4.2). 1 USDT ≈ 1 USD, so the rate
+ * keyed by `usdt[targetCurrency]` is consumed directly with no scaling.
+ */
+export function jsDelivrCurrencyApiFallback(
+  opts: JsDelivrFallbackOptions = {},
+): (
+  req: OfiQuoteRequest,
+  now: () => number,
+) => Promise<{ rate: number; expiresAt: number } | null> {
+  const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+  const timeoutMs = opts.timeoutMs ?? FALLBACK_TIMEOUT_MS;
+  return async (req, now) => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetchImpl(FALLBACK_USDT_URL, {
+          method: "GET",
+          signal: controller.signal,
+        });
+        if (!res.ok) return null;
+        const json = (await res.json()) as unknown;
+        if (!json || typeof json !== "object") return null;
+        const usdt = (json as Record<string, unknown>).usdt;
+        if (!usdt || typeof usdt !== "object") return null;
+        const raw = (usdt as Record<string, unknown>)[req.currency.toLowerCase()];
+        const rate = typeof raw === "number" ? raw : Number(raw);
+        if (!Number.isFinite(rate) || rate <= 0) return null;
+        return { rate, expiresAt: now() + FALLBACK_TTL_MS };
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch {
+      return null;
+    }
+  };
+}
 
 // ── Provider → Network push client (unchanged) ─────────────────────
 const ngrokUrl = process.env.T0_NGROK_URL;
@@ -76,7 +134,6 @@ export function validateOfiEnv(cfg: OfiEnvConfig = readOfiEnv()): void {
       throw new Error(`T0_OFI_TIMEOUT_MS must be a finite positive number, got "${cfg.timeoutMs}"`);
     }
     try {
-      // eslint-disable-next-line no-new
       new URL(cfg.baseUrl);
     } catch {
       throw new Error(`T0_OFI_API_BASE_URL is not a valid URL: "${cfg.baseUrl}"`);
@@ -100,6 +157,8 @@ function buildOfiClient(providerService: PayoutProviderService): OfiT0Client {
   // Mock: re-use the in-memory provider's quote book so dev/CI keep working
   // without an external service. "Best" = lowest rate among live quotes that
   // cover the requested USD amount — preserved from pre-refactor semantics.
+  // When the provider has no candidate, fall back to a public USDT rate
+  // (plan §4.1) so /ofi can still surface a usable quote in dev.
   return new MockOfiT0Client({
     pickBestQuote: (usdAmount, currency, now) => {
       const candidates = providerService
@@ -114,6 +173,7 @@ function buildOfiClient(providerService: PayoutProviderService): OfiT0Client {
         quoteId: best.id,
       };
     },
+    fallbackQuoteProvider: jsDelivrCurrencyApiFallback(),
   });
 }
 
@@ -126,7 +186,12 @@ validateOfiEnv();
 // receive the same instance so OFI + Provider see one consistent ledger.
 
 // Create provider first (registry needs it for onConfirm callback).
-export const providerService = new PayoutProviderService(t0Client, Date.now, undefined, sharedStore);
+export const providerService = new PayoutProviderService(
+  t0Client,
+  Date.now,
+  undefined,
+  sharedStore,
+);
 
 const confirmDelayMs = Number(process.env.T0_SETTLEMENT_CONFIRM_DELAY_MS ?? 0);
 export const settlementRegistry = new SettlementRegistry({

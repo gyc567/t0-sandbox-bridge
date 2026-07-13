@@ -128,9 +128,7 @@ describe("decimalToNumber", () => {
   });
 
   it("throws when unscaled is not finite", () => {
-    expect(() =>
-      decimalToNumber({ unscaled: "1".repeat(400), exponent: 0 }),
-    ).toThrow(/finite/);
+    expect(() => decimalToNumber({ unscaled: "1".repeat(400), exponent: 0 })).toThrow(/finite/);
   });
 });
 
@@ -163,9 +161,7 @@ describe("decimalToString", () => {
 
 describe("decimalCompare", () => {
   it("compares equal integers", () => {
-    expect(
-      decimalCompare({ unscaled: "5", exponent: 0 }, { unscaled: "5", exponent: 0 }),
-    ).toBe(0);
+    expect(decimalCompare({ unscaled: "5", exponent: 0 }, { unscaled: "5", exponent: 0 })).toBe(0);
   });
 
   it("orders same-exponent integers by magnitude", () => {
@@ -196,9 +192,9 @@ describe("decimalCompare", () => {
   });
 
   it("scales exponents before comparing", () => {
-    expect(
-      decimalCompare({ unscaled: "1", exponent: 0 }, { unscaled: "100", exponent: -2 }),
-    ).toBe(0);
+    expect(decimalCompare({ unscaled: "1", exponent: 0 }, { unscaled: "100", exponent: -2 })).toBe(
+      0,
+    );
     expect(
       decimalCompare({ unscaled: "1", exponent: 0 }, { unscaled: "99", exponent: -2 }),
     ).toBeGreaterThan(0);
@@ -217,12 +213,12 @@ describe("decimalCompare", () => {
   });
 
   it("treats leading zeros correctly", () => {
-    expect(
-      decimalCompare({ unscaled: "005", exponent: 0 }, { unscaled: "5", exponent: 0 }),
-    ).toBe(0);
-    expect(
-      decimalCompare({ unscaled: "0000", exponent: 0 }, { unscaled: "0", exponent: 0 }),
-    ).toBe(0);
+    expect(decimalCompare({ unscaled: "005", exponent: 0 }, { unscaled: "5", exponent: 0 })).toBe(
+      0,
+    );
+    expect(decimalCompare({ unscaled: "0000", exponent: 0 }, { unscaled: "0", exponent: 0 })).toBe(
+      0,
+    );
   });
 });
 
@@ -270,21 +266,15 @@ describe("decimalAdd", () => {
   });
 
   it("scales exponents before addition", () => {
-    expect(
-      decimalAdd({ unscaled: "50", exponent: -2 }, { unscaled: "25", exponent: -2 }),
-    ).toEqual({
+    expect(decimalAdd({ unscaled: "50", exponent: -2 }, { unscaled: "25", exponent: -2 })).toEqual({
       unscaled: "75",
       exponent: -2,
     });
-    expect(
-      decimalAdd({ unscaled: "1", exponent: 0 }, { unscaled: "50", exponent: -2 }),
-    ).toEqual({
+    expect(decimalAdd({ unscaled: "1", exponent: 0 }, { unscaled: "50", exponent: -2 })).toEqual({
       unscaled: "150",
       exponent: -2,
     });
-    expect(
-      decimalAdd({ unscaled: "5", exponent: -2 }, { unscaled: "1", exponent: 0 }),
-    ).toEqual({
+    expect(decimalAdd({ unscaled: "5", exponent: -2 }, { unscaled: "1", exponent: 0 })).toEqual({
       unscaled: "105",
       exponent: -2,
     });
@@ -339,15 +329,11 @@ describe("decimalSub", () => {
   });
 
   it("scales exponents before subtraction", () => {
-    expect(
-      decimalSub({ unscaled: "1", exponent: 0 }, { unscaled: "50", exponent: -2 }),
-    ).toEqual({
+    expect(decimalSub({ unscaled: "1", exponent: 0 }, { unscaled: "50", exponent: -2 })).toEqual({
       unscaled: "50",
       exponent: -2,
     });
-    expect(
-      decimalSub({ unscaled: "5", exponent: -2 }, { unscaled: "1", exponent: 0 }),
-    ).toEqual({
+    expect(decimalSub({ unscaled: "5", exponent: -2 }, { unscaled: "1", exponent: 0 })).toEqual({
       unscaled: "-95",
       exponent: -2,
     });

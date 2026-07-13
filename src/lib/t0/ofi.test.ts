@@ -22,9 +22,7 @@ beforeEach(() => {
     pickBestQuote: (usdAmount, currency, now) => {
       const candidates = provider
         .snapshot()
-        .quotes.filter(
-          (q) => q.currency === currency && q.expiresAt > now && q.band >= usdAmount,
-        );
+        .quotes.filter((q) => q.currency === currency && q.expiresAt > now && q.band >= usdAmount);
       if (candidates.length === 0) return null;
       const best = candidates.reduce((a, b) => (a.rate <= b.rate ? a : b));
       return {
@@ -113,7 +111,9 @@ describe("SandboxNetwork.getQuoteById", () => {
   it("returns success for a live quote", async () => {
     const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
     const r = ofi.getQuoteById(q.id);
-    expect(r).toMatchObject({ success: { quote: { id: q.id }, payoutAmount: 900, settlementAmount: 1_000 } });
+    expect(r).toMatchObject({
+      success: { quote: { id: q.id }, payoutAmount: 900, settlementAmount: 1_000 },
+    });
   });
 });
 
@@ -121,7 +121,12 @@ describe("SandboxNetwork.createPayment (idempotent on paymentClientId)", () => {
   it("skip rekey when ids already match (defensive branch)", async () => {
     // Set paymentClientId to match the provider-generated prefix pattern.
     const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
-    const r = await ofi.createPayment({ paymentClientId: "baxs_rekey_skip", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 });
+    const r = await ofi.createPayment({
+      paymentClientId: "baxs_rekey_skip",
+      quoteId: q.id,
+      beneficiaryRef: "B",
+      usdAmount: 1_000,
+    });
     expect("success" in r).toBe(true);
     if ("success" in r) {
       // r.success.payment.id was overwritten by the rekeyPayment call path,
@@ -132,7 +137,12 @@ describe("SandboxNetwork.createPayment (idempotent on paymentClientId)", () => {
 
   it("creates a payment against a live quote and routes the payout to the provider", async () => {
     const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
-    const r = await ofi.createPayment({ paymentClientId: "baxs_001", quoteId: q.id, beneficiaryRef: "BEN-1", usdAmount: 1_000 });
+    const r = await ofi.createPayment({
+      paymentClientId: "baxs_001",
+      quoteId: q.id,
+      beneficiaryRef: "BEN-1",
+      usdAmount: 1_000,
+    });
     expect("success" in r).toBe(true);
     if ("success" in r) {
       expect(r.success.created).toBe(true);
@@ -147,8 +157,18 @@ describe("SandboxNetwork.createPayment (idempotent on paymentClientId)", () => {
 
   it("returns the same payment on duplicate paymentClientId (idempotency rule 1)", async () => {
     const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
-    const r1 = await ofi.createPayment({ paymentClientId: "baxs_001", quoteId: q.id, beneficiaryRef: "BEN-1", usdAmount: 1_000 });
-    const r2 = await ofi.createPayment({ paymentClientId: "baxs_001", quoteId: q.id, beneficiaryRef: "BEN-DIFF", usdAmount: 1_000 });
+    const r1 = await ofi.createPayment({
+      paymentClientId: "baxs_001",
+      quoteId: q.id,
+      beneficiaryRef: "BEN-1",
+      usdAmount: 1_000,
+    });
+    const r2 = await ofi.createPayment({
+      paymentClientId: "baxs_001",
+      quoteId: q.id,
+      beneficiaryRef: "BEN-DIFF",
+      usdAmount: 1_000,
+    });
     expect("success" in r1 && "success" in r2).toBe(true);
     if ("success" in r1 && "success" in r2) {
       expect(r1.success.created).toBe(true);
@@ -158,14 +178,24 @@ describe("SandboxNetwork.createPayment (idempotent on paymentClientId)", () => {
   });
 
   it("returns failure INVALID_QUOTE_ID for unknown quote", async () => {
-    const r = await ofi.createPayment({ paymentClientId: "baxs_002", quoteId: "nope", beneficiaryRef: "X", usdAmount: 1_000 });
+    const r = await ofi.createPayment({
+      paymentClientId: "baxs_002",
+      quoteId: "nope",
+      beneficiaryRef: "X",
+      usdAmount: 1_000,
+    });
     expect(r).toEqual({ failure: { reason: "REASON_INVALID_QUOTE_ID" } });
   });
 
   it("returns failure QUOTE_EXPIRED for stale quote", async () => {
     const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9, ttlMs: 10 });
     clock += 11;
-    const r = await ofi.createPayment({ paymentClientId: "baxs_003", quoteId: q.id, beneficiaryRef: "X", usdAmount: 1_000 });
+    const r = await ofi.createPayment({
+      paymentClientId: "baxs_003",
+      quoteId: q.id,
+      beneficiaryRef: "X",
+      usdAmount: 1_000,
+    });
     expect(r).toEqual({ failure: { reason: "REASON_QUOTE_EXPIRED" } });
   });
 });
@@ -196,7 +226,12 @@ describe("OFIService.snapshot", () => {
 
   it("returns payments in the snapshot", async () => {
     const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
-    await ofi.createPayment({ paymentClientId: "baxs_snap_1", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 });
+    await ofi.createPayment({
+      paymentClientId: "baxs_snap_1",
+      quoteId: q.id,
+      beneficiaryRef: "B",
+      usdAmount: 1_000,
+    });
     expect(ofi.snapshot().payments.length).toBe(1);
   });
 });
@@ -204,7 +239,12 @@ describe("OFIService.snapshot", () => {
 describe("Manual AML (OFI side)", () => {
   it("approve moves payment to accepted", async () => {
     const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
-    const r = await ofi.createPayment({ paymentClientId: "baxs_aml_1", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 });
+    const r = await ofi.createPayment({
+      paymentClientId: "baxs_aml_1",
+      quoteId: q.id,
+      beneficiaryRef: "B",
+      usdAmount: 1_000,
+    });
     expect("success" in r).toBe(true);
     if (!("success" in r)) return;
     // createPayment drives payout to success, so payment is "confirmed".
@@ -216,7 +256,12 @@ describe("Manual AML (OFI side)", () => {
 
   it("reject moves payment to rejected", async () => {
     const q = await provider.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
-    const r = await ofi.createPayment({ paymentClientId: "baxs_aml_2", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 });
+    const r = await ofi.createPayment({
+      paymentClientId: "baxs_aml_2",
+      quoteId: q.id,
+      beneficiaryRef: "B",
+      usdAmount: 1_000,
+    });
     expect("success" in r).toBe(true);
     if (!("success" in r)) return;
     provider.markPaymentStatus(r.success.payment.id, "pending_aml");

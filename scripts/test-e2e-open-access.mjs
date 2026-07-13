@@ -56,7 +56,10 @@ const legacyPost = await fetch(`${BASE}/api/login`, {
 if (legacyPost.status === 303 && legacyPost.headers.get("location") === "/login") {
   pass("/api/login POST → /login", { status: 303 });
 } else {
-  fail("/api/login POST → /login", `got ${legacyPost.status} location=${legacyPost.headers.get("location")}`);
+  fail(
+    "/api/login POST → /login",
+    `got ${legacyPost.status} location=${legacyPost.headers.get("location")}`,
+  );
 }
 
 // Legacy /api/login GET should be 200 with notice.

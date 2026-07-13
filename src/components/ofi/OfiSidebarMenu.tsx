@@ -22,7 +22,13 @@ type OfiSidebarMenuProps = {
   paymentManualAmlContent: ReactNode;
 };
 
-export function OfiSidebarMenu({ children, fundingContent, paymentPreSettlementContent, paymentContinuedContent, paymentManualAmlContent }: OfiSidebarMenuProps) {
+export function OfiSidebarMenu({
+  children,
+  fundingContent,
+  paymentPreSettlementContent,
+  paymentContinuedContent,
+  paymentManualAmlContent,
+}: OfiSidebarMenuProps) {
   return (
     <Tabs
       defaultValue="quote-management"

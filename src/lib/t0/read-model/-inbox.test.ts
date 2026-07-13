@@ -3,10 +3,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { CallbackInbox } from "./inbox";
 import { InMemoryStore } from "./store";
-import {
-  ledgerEventKey,
-  limitEventKey,
-} from "./store";
+import { ledgerEventKey, limitEventKey } from "./store";
 
 const NOW = 1_700_000_000_000;
 
@@ -52,9 +49,7 @@ function makeLimit(overrides: Partial<LimitFields> = {}): LimitFields {
   };
 }
 
-function makeTransaction(
-  overrides: Partial<TransactionFields> = {},
-): TransactionFields {
+function makeTransaction(overrides: Partial<TransactionFields> = {}): TransactionFields {
   return {
     transactionId: 1n,
     entries: [
@@ -98,8 +93,12 @@ describe("CallbackInbox.handleUpdateLimit", () => {
 
   it("is idempotent on duplicate (counterparty, version)", () => {
     const { inbox, store } = newInbox();
-    inbox.handleUpdateLimit({ limits: [makeLimit({ version: 1n, payoutLimit: { unscaled: "100", exponent: 0 } })] });
-    const second = inbox.handleUpdateLimit({ limits: [makeLimit({ version: 1n, payoutLimit: { unscaled: "999", exponent: 0 } })] });
+    inbox.handleUpdateLimit({
+      limits: [makeLimit({ version: 1n, payoutLimit: { unscaled: "100", exponent: 0 } })],
+    });
+    const second = inbox.handleUpdateLimit({
+      limits: [makeLimit({ version: 1n, payoutLimit: { unscaled: "999", exponent: 0 } })],
+    });
     expect(second.snapshots).toHaveLength(0);
     expect(second.alreadyProcessed).toBe(true);
     // Original amount preserved.
@@ -150,7 +149,13 @@ describe("CallbackInbox.handleAppendLedgerEntries", () => {
     const { inbox, store } = newInbox();
     inbox.handleAppendLedgerEntries({ transactions: [makeTransaction()] });
     const second = inbox.handleAppendLedgerEntries({
-      transactions: [makeTransaction({ entries: [{ accountOwnerId: 1, accountType: 20, credit: { unscaled: "999", exponent: 0 } }] })],
+      transactions: [
+        makeTransaction({
+          entries: [
+            { accountOwnerId: 1, accountType: 20, credit: { unscaled: "999", exponent: 0 } },
+          ],
+        }),
+      ],
     });
     expect(second.entries).toHaveLength(0);
     expect(second.duplicateTransactionIds).toEqual([1n]);
@@ -161,7 +166,10 @@ describe("CallbackInbox.handleAppendLedgerEntries", () => {
   it("handles multiple transactions in one request", () => {
     const { inbox, store } = newInbox();
     inbox.handleAppendLedgerEntries({
-      transactions: [makeTransaction({ transactionId: 1n }), makeTransaction({ transactionId: 2n })],
+      transactions: [
+        makeTransaction({ transactionId: 1n }),
+        makeTransaction({ transactionId: 2n }),
+      ],
     });
     expect(store.getLedgerTransaction(1n)).toHaveLength(1);
     expect(store.getLedgerTransaction(2n)).toHaveLength(1);
@@ -170,7 +178,10 @@ describe("CallbackInbox.handleAppendLedgerEntries", () => {
   it("records an inbox entry per transaction", () => {
     const { inbox, store } = newInbox();
     inbox.handleAppendLedgerEntries({
-      transactions: [makeTransaction({ transactionId: 1n }), makeTransaction({ transactionId: 2n })],
+      transactions: [
+        makeTransaction({ transactionId: 1n }),
+        makeTransaction({ transactionId: 2n }),
+      ],
     });
     expect(store.getInbox(ledgerEventKey(1n))?.processedAt).toBe(NOW);
     expect(store.getInbox(ledgerEventKey(2n))?.processedAt).toBe(NOW);
@@ -186,7 +197,9 @@ describe("CallbackInbox.handleAppendLedgerEntries", () => {
 
   it("handles a request with zero transactions", () => {
     const { inbox } = newInbox();
-    const { entries, duplicateTransactionIds } = inbox.handleAppendLedgerEntries({ transactions: [] });
+    const { entries, duplicateTransactionIds } = inbox.handleAppendLedgerEntries({
+      transactions: [],
+    });
     expect(entries).toEqual([]);
     expect(duplicateTransactionIds).toEqual([]);
   });

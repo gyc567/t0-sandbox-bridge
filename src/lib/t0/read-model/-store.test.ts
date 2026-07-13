@@ -205,12 +205,24 @@ describe("InMemoryStore.putProjection / getProjection / listActiveProjections", 
   });
 
   it("listActiveProjections excludes terminal statuses", () => {
-    store.putProjection(makeProjection({ id: "p1", txHash: "0xa", chainStatus: "DETECTED", detectedAt: 100 }));
-    store.putProjection(makeProjection({ id: "p2", txHash: "0xb", chainStatus: "CONFIRMING", detectedAt: 200 }));
-    store.putProjection(makeProjection({ id: "p3", txHash: "0xc", chainStatus: "CONFIRMED", detectedAt: 300 }));
-    store.putProjection(makeProjection({ id: "p4", txHash: "0xd", chainStatus: "REORGED", detectedAt: 400 }));
-    store.putProjection(makeProjection({ id: "p5", txHash: "0xe", chainStatus: "INVALID", detectedAt: 500 }));
-    store.putProjection(makeProjection({ id: "p6", txHash: "0xf", chainStatus: "UNKNOWN", detectedAt: 600 }));
+    store.putProjection(
+      makeProjection({ id: "p1", txHash: "0xa", chainStatus: "DETECTED", detectedAt: 100 }),
+    );
+    store.putProjection(
+      makeProjection({ id: "p2", txHash: "0xb", chainStatus: "CONFIRMING", detectedAt: 200 }),
+    );
+    store.putProjection(
+      makeProjection({ id: "p3", txHash: "0xc", chainStatus: "CONFIRMED", detectedAt: 300 }),
+    );
+    store.putProjection(
+      makeProjection({ id: "p4", txHash: "0xd", chainStatus: "REORGED", detectedAt: 400 }),
+    );
+    store.putProjection(
+      makeProjection({ id: "p5", txHash: "0xe", chainStatus: "INVALID", detectedAt: 500 }),
+    );
+    store.putProjection(
+      makeProjection({ id: "p6", txHash: "0xf", chainStatus: "UNKNOWN", detectedAt: 600 }),
+    );
     const active = store.listActiveProjections();
     expect(active.map((p) => p.id)).toEqual(["p1", "p2", "p6"]);
   });
@@ -300,8 +312,12 @@ describe("InMemoryStore snapshot helpers", () => {
   });
 
   it("snapshotLedgerEntries indexes by dedupe key", () => {
-    store.putLedgerEntry(makeLedgerEntry({ transactionId: 1n, accountOwnerId: 1, accountType: "BALANCE" }));
-    store.putLedgerEntry(makeLedgerEntry({ transactionId: 1n, accountOwnerId: 1, accountType: "PAY_IN" }));
+    store.putLedgerEntry(
+      makeLedgerEntry({ transactionId: 1n, accountOwnerId: 1, accountType: "BALANCE" }),
+    );
+    store.putLedgerEntry(
+      makeLedgerEntry({ transactionId: 1n, accountOwnerId: 1, accountType: "PAY_IN" }),
+    );
     const snap = store.snapshotLedgerEntries();
     expect(snap.size).toBe(2);
     expect(snap.get("1:1:BALANCE")?.transactionId).toBe(1n);
@@ -309,9 +325,15 @@ describe("InMemoryStore snapshot helpers", () => {
   });
 
   it("snapshotLedgerByTx groups entries by transactionId", () => {
-    store.putLedgerEntry(makeLedgerEntry({ transactionId: 1n, accountOwnerId: 1, accountType: "BALANCE" }));
-    store.putLedgerEntry(makeLedgerEntry({ transactionId: 1n, accountOwnerId: 1, accountType: "PAY_IN" }));
-    store.putLedgerEntry(makeLedgerEntry({ transactionId: 2n, accountOwnerId: 1, accountType: "BALANCE" }));
+    store.putLedgerEntry(
+      makeLedgerEntry({ transactionId: 1n, accountOwnerId: 1, accountType: "BALANCE" }),
+    );
+    store.putLedgerEntry(
+      makeLedgerEntry({ transactionId: 1n, accountOwnerId: 1, accountType: "PAY_IN" }),
+    );
+    store.putLedgerEntry(
+      makeLedgerEntry({ transactionId: 2n, accountOwnerId: 1, accountType: "BALANCE" }),
+    );
     const snap = store.snapshotLedgerByTx();
     expect(snap.size).toBe(2);
     expect(snap.get("1")?.length).toBe(2);

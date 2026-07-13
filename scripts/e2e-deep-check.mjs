@@ -129,7 +129,6 @@ record("sandbox console loads", "PASS", Date.now() - t0);
 async function waitForCount(predicate, timeoutMs = 15000) {
   await page.waitForFunction(
     (body) => {
-      // eslint-disable-next-line no-new-func
       const fn = new Function("text", body);
       return fn(document.body.textContent || "");
     },

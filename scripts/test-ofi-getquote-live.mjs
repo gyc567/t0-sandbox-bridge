@@ -105,11 +105,8 @@ function parseConnectRpcResponse(json, req) {
   }
 
   const providerId =
-    typeof quoteIdRaw.providerId === "number"
-      ? quoteIdRaw.providerId
-      : quoteIdRaw.provider_id;
-  const quoteId =
-    typeof quoteIdRaw.quoteId === "number" ? quoteIdRaw.quoteId : quoteIdRaw.quote_id;
+    typeof quoteIdRaw.providerId === "number" ? quoteIdRaw.providerId : quoteIdRaw.provider_id;
+  const quoteId = typeof quoteIdRaw.quoteId === "number" ? quoteIdRaw.quoteId : quoteIdRaw.quote_id;
   if (typeof providerId !== "number" || typeof quoteId !== "number") {
     return { failure: { reason: "UPSTREAM", message: "invalid quoteId object" } };
   }

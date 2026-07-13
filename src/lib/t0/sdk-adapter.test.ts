@@ -36,18 +36,34 @@ describe("toUpdateQuoteRequest", () => {
     expect(q.expiration!.seconds).toBe(BigInt(1_700_000_000));
   });
 
+  it("preserves four-decimal rates instead of collapsing them to cents", () => {
+    const req = toUpdateQuoteRequest({
+      currency: "EUR",
+      band: 1000,
+      rate: 0.9203,
+      expiresAt: 1_700_000_000_000,
+    });
+    const band = req.payOut![0]!.bands![0]!;
+    expect(band.rate!.unscaled).toBe(BigInt(9203));
+    expect(band.rate!.exponent).toBe(4);
+  });
+
   it("rounds floating-point amounts to cents", () => {
     const req = toUpdateQuoteRequest({ currency: "USD", band: 1234, rate: 1.0051, expiresAt: 1 });
     const band = req.payOut![0]!.bands![0]!;
-    // 1234 * 100 = 123400; 1.0051 * 100 = 100.51 -> rounds to 101
+    // 1234 * 100 = 123400; rate precision is tested separately below.
     expect(band.maxAmount!.unscaled).toBe(BigInt(123400));
-    expect(band.rate!.unscaled).toBe(BigInt(101));
+    expect(band.rate!.unscaled).toBe(BigInt(10051));
+    expect(band.rate!.exponent).toBe(4);
   });
 });
 
 describe("fromUpdateQuoteResponse", () => {
   it("synthesizes a Quote from the original input", () => {
-    const quote = fromUpdateQuoteResponse({}, { currency: "GBP", band: 5000, rate: 0.85, expiresAt: 12345 });
+    const quote = fromUpdateQuoteResponse(
+      {},
+      { currency: "GBP", band: 5000, rate: 0.85, expiresAt: 12345 },
+    );
     expect(quote.currency).toBe("GBP");
     expect(quote.band).toBe(5000);
     expect(quote.rate).toBe(0.85);
@@ -83,6 +99,19 @@ describe("fromGetQuoteResponse", () => {
     expect(out.success!.rate).toBe(0.92);
     expect(out.success!.payoutAmount).toBe(9.2);
     expect(out.success!.settlementAmount).toBe(10);
+  });
+
+  it("decodes a higher-precision rate without dropping fractional digits", () => {
+    const success = create(GetQuoteResponse_SuccessSchema, {
+      rate: create(DecimalSchema, { unscaled: BigInt(9203), exponent: 4 }),
+      payOutAmount: create(DecimalSchema, { unscaled: BigInt(920), exponent: 2 }),
+      settlementAmount: create(DecimalSchema, { unscaled: BigInt(1000), exponent: 2 }),
+    });
+    const response = create(GetQuoteResponseSchema, {
+      result: { case: "success", value: success },
+    });
+    const out = fromGetQuoteResponse(response);
+    expect(out.success!.rate).toBe(0.9203);
   });
 
   it("extracts reason from a Failure response", () => {
@@ -131,7 +160,9 @@ describe("fromGetQuoteResponse", () => {
   it("returns OTHER when the result case is neither success nor failure", () => {
     // Manually construct an unrecognised result — protobuf guarantees oneof
     // is always set, but defensiveness matters at the adapter boundary.
-    const response = { result: { case: "unknown", value: {} } } as unknown as Parameters<typeof fromGetQuoteResponse>[0];
+    const response = { result: { case: "unknown", value: {} } } as unknown as Parameters<
+      typeof fromGetQuoteResponse
+    >[0];
     const out = fromGetQuoteResponse(response);
     expect(out.failureReason).toBe("OTHER");
   });

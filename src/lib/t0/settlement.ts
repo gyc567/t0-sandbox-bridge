@@ -38,16 +38,9 @@ export interface Settlement {
   readonly status: "PENDING" | "CONFIRMED" | "EXPIRED";
 }
 
-export type LedgerAccount =
-  | "OFI_AVAILABLE"
-  | "PROVIDER_AVAILABLE"
-  | "OFI_RESERVED";
+export type LedgerAccount = "OFI_AVAILABLE" | "PROVIDER_AVAILABLE" | "OFI_RESERVED";
 
-export type LedgerReason =
-  | "SETTLEMENT_CREDIT"
-  | "RESERVATION"
-  | "RELEASE"
-  | "SETTLEMENT";
+export type LedgerReason = "SETTLEMENT_CREDIT" | "RESERVATION" | "RELEASE" | "SETTLEMENT";
 
 export interface LedgerEntry {
   /** Server-side unique id — stable across the lifetime of one process.

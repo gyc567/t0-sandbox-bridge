@@ -1,10 +1,10 @@
-import Navigation from './sections/Navigation';
-import HeroSection from './sections/HeroSection';
-import ArchitectureSection from './sections/ArchitectureSection';
-import FlowSection from './sections/FlowSection';
-import OnboardingSection from './sections/OnboardingSection';
-import IntegrationSection from './sections/IntegrationSection';
-import Footer from './sections/Footer';
+import Navigation from "./sections/Navigation";
+import HeroSection from "./sections/HeroSection";
+import ArchitectureSection from "./sections/ArchitectureSection";
+import FlowSection from "./sections/FlowSection";
+import OnboardingSection from "./sections/OnboardingSection";
+import IntegrationSection from "./sections/IntegrationSection";
+import Footer from "./sections/Footer";
 
 function App() {
   return (

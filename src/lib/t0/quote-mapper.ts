@@ -164,7 +164,8 @@ export function findSettlementBreakdown(
     if (s.amount !== undefined) breakdown.amount = decimalToNumber(s.amount);
     if (s.creditLimit !== undefined) breakdown.creditLimit = decimalToNumber(s.creditLimit);
     if (s.totalUsed !== undefined) breakdown.totalUsed = decimalToNumber(s.totalUsed);
-    if (s.prefundingAmount !== undefined) breakdown.prefundingAmount = decimalToNumber(s.prefundingAmount);
+    if (s.prefundingAmount !== undefined)
+      breakdown.prefundingAmount = decimalToNumber(s.prefundingAmount);
     if (s.providerId !== undefined) breakdown.providerId = s.providerId;
     return breakdown;
   }

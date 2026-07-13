@@ -1,5 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
-import { providerService, sandboxNetwork, settlementRegistry, readModelStore, callbackInbox } from "./index";
+import {
+  providerService,
+  sandboxNetwork,
+  settlementRegistry,
+  readModelStore,
+  callbackInbox,
+} from "./index";
+import { validateAmlFile, sandboxAmlReviewer } from "./aml";
 import type { Currency, VolumeBand } from "./types";
 import { SUPPORTED_CURRENCIES } from "./currencies";
 import type { CreatePaymentInput } from "./network";
@@ -35,9 +42,7 @@ export const snapshotFn = createServerFn({ method: "GET" }).handler(async () =>
 // The Network orchestrator now owns payout routing (Provider only reacts).
 export const requestPayoutFn = createServerFn({ method: "POST" })
   .validator((d: { paymentId: string; fail?: boolean }) => d)
-  .handler(async ({ data }) =>
-    sandboxNetwork.requestPayout(data.paymentId, { fail: data.fail }),
-  );
+  .handler(async ({ data }) => sandboxNetwork.requestPayout(data.paymentId, { fail: data.fail }));
 
 // Phase 8 — orchestrator-owned (Last Look / Manual AML / Payment Intent)
 export const completeManualAmlFn = createServerFn({ method: "POST" })
@@ -50,9 +55,7 @@ export const triggerManualAmlFn = createServerFn({ method: "POST" })
 
 export const approvePaymentQuoteFn = createServerFn({ method: "POST" })
   .validator((d: { paymentId: string; quoteId: string }) => d)
-  .handler(async ({ data }) =>
-    sandboxNetwork.approvePaymentQuote(data.paymentId, data.quoteId),
-  );
+  .handler(async ({ data }) => sandboxNetwork.approvePaymentQuote(data.paymentId, data.quoteId));
 
 export const ofiApprovePaymentQuoteFn = createServerFn({ method: "POST" })
   .validator((d: { paymentId: string; quoteId: string }) => d)
@@ -70,6 +73,35 @@ export const createPaymentIntentFn = createServerFn({ method: "POST" })
 export const confirmFundsFn = createServerFn({ method: "POST" })
   .validator((d: { paymentId: string }) => d)
   .handler(async ({ data }) => sandboxNetwork.confirmFunds(data.paymentId));
+
+// ── AML File Upload & Review ──────────────────────────────────────────
+
+export const uploadAmlFileFn = createServerFn({ method: "POST" })
+  .validator((d: { paymentId: string; filename: string; fileSize: number; fileType: string }) => d)
+  .handler(async ({ data }) => {
+    const validation = validateAmlFile(data.filename, data.fileSize, data.fileType);
+    if (!validation.valid) {
+      throw new Error(validation.reason);
+    }
+    const reviewResult = await sandboxAmlReviewer.review({
+      paymentId: data.paymentId,
+      filename: data.filename,
+      fileSize: data.fileSize,
+      fileType: data.fileType,
+    });
+    if (reviewResult.status === "approved") {
+      // Step 9: CompleteManualAmlCheck (Approved) → T0 Network
+      sandboxNetwork.completeManualAml(data.paymentId, true);
+      // Step 10: ApprovePaymentQuotes → OFI (Last Look)
+      // Find the payment to get its quoteId for the approval
+      const payment = sandboxNetwork.listPayments().find((p) => p.id === data.paymentId);
+      if (payment) {
+        sandboxNetwork.approvePaymentQuote(data.paymentId, payment.quoteId);
+        providerService.logOfiAmlEvent(data.paymentId, payment.quoteId, "approved");
+      }
+    }
+    return reviewResult;
+  });
 
 // ── OFI-side server functions ────────────────────────────────────────
 export const ofiSnapshotFn = createServerFn({ method: "GET" }).handler(async () => ({
@@ -130,8 +162,8 @@ export const providerConfirmSettlementFn = createServerFn({ method: "POST" })
   .validator((d: { txHash: string }) => d)
   .handler(async ({ data }) => providerService.receiveSettlementConfirmation(data.txHash));
 
-export const settlementStateFn = createServerFn({ method: "GET" }).handler(
-  async () => sandboxNetwork.getSettlementState(),
+export const settlementStateFn = createServerFn({ method: "GET" }).handler(async () =>
+  sandboxNetwork.getSettlementState(),
 );
 
 // ── Phase 1: Read-model view fns (OFI Funding Workspace + Provider) ──
@@ -159,10 +191,13 @@ export function readOfiReadModel(input: { counterpartyId: number }): {
 
 export const ofiReadModelFn = createServerFn({ method: "GET" })
   .validator((d: { counterpartyId: number }) => d)
-  .handler(async ({ data }) => readOfiReadModel(data) as {
-    latestLimit: LimitSnapshot | null;
-    activeProjections: SettlementProjection[];
-  });
+  .handler(
+    async ({ data }) =>
+      readOfiReadModel(data) as {
+        latestLimit: LimitSnapshot | null;
+        activeProjections: SettlementProjection[];
+      },
+  );
 
 /** Provider view: history of all recorded UpdateLimit snapshots for a
  *  given counterparty, oldest first. */
@@ -247,8 +282,8 @@ export function readCallbackInboxState(): {
   return { processed, failed, pending, total: inboxMap.size };
 }
 
-export const callbackInboxStateFn = createServerFn({ method: "GET" }).handler(
-  async () => readCallbackInboxState(),
+export const callbackInboxStateFn = createServerFn({ method: "GET" }).handler(async () =>
+  readCallbackInboxState(),
 );
 
 // ── Credit Usage Notifications ────────────────────────────────────────

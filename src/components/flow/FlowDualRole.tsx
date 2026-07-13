@@ -55,10 +55,7 @@ export function FlowDualRole() {
                 style={{ fontSize: "9px", letterSpacing: "0.06em" }}
               >
                 {role.methods.map((m) => (
-                  <span
-                    key={m}
-                    className="rounded-sm border border-hairline px-1.5 py-0.5"
-                  >
+                  <span key={m} className="rounded-sm border border-hairline px-1.5 py-0.5">
                     {m}
                   </span>
                 ))}
@@ -91,10 +88,7 @@ export function FlowDualRole() {
               style={{ fontSize: "9px", letterSpacing: "0.06em" }}
             >
               {IDEMPOTENCY_LEVELS.map((l) => (
-                <span
-                  key={l.level}
-                  className="rounded-sm border border-hairline px-1.5 py-0.5"
-                >
+                <span key={l.level} className="rounded-sm border border-hairline px-1.5 py-0.5">
                   {l.level}
                 </span>
               ))}

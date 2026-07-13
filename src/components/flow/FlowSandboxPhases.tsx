@@ -17,8 +17,8 @@ export function FlowSandboxPhases() {
           4 个阶段 · {TEST_CASES.length} 个测试用例
         </h2>
         <p className="max-w-2xl text-tagline text-muted-foreground">
-          端到端目标：3 分钟内完成 USDT → {CHAINS.length > 0 ? "CAD/HKD/USD" : ""} 任意币种的换币流程，
-          全部用例在 api-sandbox.t-0.network 上验证。
+          端到端目标：3 分钟内完成 USDT → {CHAINS.length > 0 ? "CAD/HKD/USD" : ""}{" "}
+          任意币种的换币流程， 全部用例在 api-sandbox.t-0.network 上验证。
         </p>
       </div>
 
@@ -53,10 +53,7 @@ export function FlowSandboxPhases() {
             >
               {phase.title}
             </h3>
-            <p
-              className="text-muted-foreground mt-2"
-              style={{ fontSize: "12px", lineHeight: 1.5 }}
-            >
+            <p className="text-muted-foreground mt-2" style={{ fontSize: "12px", lineHeight: 1.5 }}>
               {phase.description}
             </p>
             <div
@@ -85,31 +82,28 @@ export function FlowSandboxPhases() {
           </span>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {casesByPhase("E2E").concat(casesByPhase("PRO")).filter((c) => c.priority === "P0").map((c) => (
-            <div
-              key={c.id}
-              className="rounded border border-hairline bg-[rgba(255,255,255,0.02)] p-2.5"
-            >
+          {casesByPhase("E2E")
+            .concat(casesByPhase("PRO"))
+            .filter((c) => c.priority === "P0")
+            .map((c) => (
               <div
-                className="font-mono text-accent-cyan"
-                style={{ fontSize: "10px", letterSpacing: "0.08em" }}
+                key={c.id}
+                className="rounded border border-hairline bg-[rgba(255,255,255,0.02)] p-2.5"
               >
-                {c.id}
+                <div
+                  className="font-mono text-accent-cyan"
+                  style={{ fontSize: "10px", letterSpacing: "0.08em" }}
+                >
+                  {c.id}
+                </div>
+                <div className="text-foreground mt-0.5" style={{ fontSize: "11px" }}>
+                  {c.description}
+                </div>
+                <div className="font-mono text-muted-canvas mt-1" style={{ fontSize: "9px" }}>
+                  → {c.expected}
+                </div>
               </div>
-              <div
-                className="text-foreground mt-0.5"
-                style={{ fontSize: "11px" }}
-              >
-                {c.description}
-              </div>
-              <div
-                className="font-mono text-muted-canvas mt-1"
-                style={{ fontSize: "9px" }}
-              >
-                → {c.expected}
-              </div>
-            </div>
-          ))}
+            ))}
         </div>
       </div>
 

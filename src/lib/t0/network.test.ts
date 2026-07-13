@@ -173,7 +173,12 @@ describe("SandboxNetwork.completeManualAml", () => {
   it("throws when payment is not in pending_aml state", async () => {
     const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
     const p = await network.createPayment(
-      { paymentClientId: "baxs_aml_bad_state", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      {
+        paymentClientId: "baxs_aml_bad_state",
+        quoteId: q.id,
+        beneficiaryRef: "B",
+        usdAmount: 1_000,
+      },
       clock,
     );
     if (!("success" in p)) throw new Error("setup");
@@ -589,6 +594,106 @@ describe("SandboxNetwork external quote registry (audit A1)", () => {
   });
 });
 
+// ── Fallback path: MockOfiT0Client fallback → external cache → createPayment
+// (plan §4.1, §8 #1-#4) ────────────────────────────────────────────────
+
+describe("SandboxNetwork with MockOfiT0Client fallback (plan §4.1)", () => {
+  it("uses Provider quote when available; ignores fallback", async () => {
+    const fallbackQuoteProvider = vi.fn().mockResolvedValue({
+      rate: 0.5,
+      expiresAt: clock + 300_000,
+    });
+    const networkWithFallback = new SandboxNetwork(
+      svc,
+      new MockOfiT0Client({
+        pickBestQuote: (_u, _c, n) => ({
+          rate: 0.92,
+          expiresAt: n + 60_000,
+          createdAt: n,
+          quoteId: "qt_provider_priority",
+        }),
+        fallbackQuoteProvider,
+      }),
+      "PAYMENT_METHOD_TYPE_SEPA",
+      now,
+    );
+    const r = await networkWithFallback.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    if (!("success" in r)) throw new Error("expected success");
+    expect(r.success.quote.id).toBe("qt_provider_priority");
+    expect(r.success.quote.rate).toBe(0.92);
+    expect(fallbackQuoteProvider).not.toHaveBeenCalled();
+  });
+
+  it("falls back when Provider has no quote; preserves rate precision", async () => {
+    const networkWithFallback = new SandboxNetwork(
+      svc,
+      new MockOfiT0Client({
+        pickBestQuote: () => null,
+        fallbackQuoteProvider: vi.fn().mockResolvedValue({
+          rate: 0.9203456,
+          expiresAt: clock + 300_000,
+        }),
+      }),
+      "PAYMENT_METHOD_TYPE_SEPA",
+      now,
+    );
+    const r = await networkWithFallback.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    if (!("success" in r)) throw new Error("expected success");
+    expect(r.success.quote.id).toMatch(/^fb_quote-1000-EUR-/);
+    expect(r.success.quote.rate).toBe(0.9203456); // plan §5.2: preserve upstream precision
+    expect(r.success.payoutAmount).toBeCloseTo(920.3456, 4);
+  });
+
+  it("registers fallback quote in external cache so createPayment succeeds (plan §8 #4)", async () => {
+    const networkWithFallback = new SandboxNetwork(
+      svc,
+      new MockOfiT0Client({
+        pickBestQuote: () => null,
+        fallbackQuoteProvider: vi.fn().mockResolvedValue({
+          rate: 0.92,
+          expiresAt: clock + 300_000,
+        }),
+      }),
+      "PAYMENT_METHOD_TYPE_SEPA",
+      now,
+    );
+    const getR = await networkWithFallback.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    if (!("success" in getR)) throw new Error("setup: getQuote should succeed");
+    expect(networkWithFallback.externalQuoteCount()).toBe(1);
+
+    // Now createPayment against the fallback id — must succeed end-to-end.
+    const cpR = await networkWithFallback.createPayment(
+      {
+        paymentClientId: "baxs_fallback_1",
+        quoteId: getR.success.quote.id,
+        beneficiaryRef: "BEN-FALLBACK",
+        usdAmount: 1_000,
+      },
+      clock,
+    );
+    if (!("success" in cpR)) {
+      throw new Error("createPayment failed: " + JSON.stringify(cpR.failure));
+    }
+    expect(cpR.success.created).toBe(true);
+    expect(cpR.success.payment.quoteId).toBe(getR.success.quote.id);
+    expect(cpR.success.payment.status).toBe("confirmed");
+  });
+
+  it("returns NO_QUOTE when both Provider and fallback have no quote", async () => {
+    const networkWithFallback = new SandboxNetwork(
+      svc,
+      new MockOfiT0Client({
+        pickBestQuote: () => null,
+        fallbackQuoteProvider: vi.fn().mockResolvedValue(null),
+      }),
+      "PAYMENT_METHOD_TYPE_SEPA",
+      now,
+    );
+    const r = await networkWithFallback.getQuote({ usdAmount: 1_000, currency: "EUR" });
+    expect(r).toEqual({ failure: { reason: "REASON_NO_QUOTE_AVAILABLE" } });
+  });
+});
+
 // ── Pre-Settlement (audit §4–§7) ─────────────────────────────────────
 //
 // SandboxNetwork wires the SettlementRegistry into createPayment:
@@ -604,9 +709,7 @@ describe("SandboxNetwork Pre-Settlement credit gate (audit §4–§7)", () => {
       pickBestQuote: (usdAmount, currency, n) => {
         const candidates = p
           .snapshot()
-          .quotes.filter(
-            (q) => q.currency === currency && q.expiresAt > n && q.band >= usdAmount,
-          );
+          .quotes.filter((q) => q.currency === currency && q.expiresAt > n && q.band >= usdAmount);
         if (candidates.length === 0) return null;
         const best = candidates.reduce((a, b) => (a.rate <= b.rate ? a : b));
         return {
@@ -617,13 +720,7 @@ describe("SandboxNetwork Pre-Settlement credit gate (audit §4–§7)", () => {
         };
       },
     });
-    const n = new SandboxNetwork(
-      p,
-      ofiClient,
-      "PAYMENT_METHOD_TYPE_SEPA",
-      now,
-      registry,
-    );
+    const n = new SandboxNetwork(p, ofiClient, "PAYMENT_METHOD_TYPE_SEPA", now, registry);
     return { registry, provider: p, network: n };
   }
 

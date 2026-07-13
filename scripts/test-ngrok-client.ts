@@ -2,7 +2,7 @@ import { HttpT0Client } from "../src/lib/t0/client";
 
 const client = new HttpT0Client(
   "https://absurd-payphone-hankie.ngrok-free.dev",
-  "419fd08e039e5e1e5b11d29f57ad0d7b299ce0094d457ff582441d5dee53e4f4"
+  "419fd08e039e5e1e5b11d29f57ad0d7b299ce0094d457ff582441d5dee53e4f4",
 );
 
 async function main() {

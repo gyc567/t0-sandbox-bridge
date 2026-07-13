@@ -54,13 +54,28 @@ export interface Payout {
 export type NetworkEvent =
   | { type: "QuotePublished"; quoteId: string; at: number }
   | { type: "USDTTransactionNotification"; txHash: string; usd: number; at: number }
-  | { type: "CreditUsageNotification"; counterparty: string; used: number; at: number; paymentId?: string; quoteId?: string; rate?: number; expiresAt?: number }
+  | {
+      type: "CreditUsageNotification";
+      counterparty: string;
+      used: number;
+      at: number;
+      paymentId?: string;
+      quoteId?: string;
+      rate?: number;
+      expiresAt?: number;
+    }
   | { type: "PaymentAccepted"; paymentId: string; at: number }
   | { type: "PayoutAccepted"; payoutId: string; at: number }
   | { type: "PayoutSuccess"; payoutId: string; at: number }
   | { type: "PaymentConfirmed"; paymentId: string; at: number }
   | { type: "QuoteConfirmation"; paymentId: string; quoteId: string; approved: boolean; at: number }
-  | { type: "OfiAmlEvent"; paymentId: string; quoteId: string; action: "approved" | "rejected"; at: number };
+  | {
+      type: "OfiAmlEvent";
+      paymentId: string;
+      quoteId: string;
+      action: "approved" | "rejected";
+      at: number;
+    };
 
 // ── Pre-Settlement (audit §4–§7) ──────────────────────────────────────
 //

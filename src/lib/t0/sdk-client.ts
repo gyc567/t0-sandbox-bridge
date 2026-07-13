@@ -47,9 +47,7 @@ export function createSdkNetworkClient(
  * stub `NetworkService.updateQuote` / `.getQuote` / `.createPayment` without
  * needing a real network.
  */
-export function wrapSdkClient(
-  sdk: Client<typeof NetworkService>,
-): OutboundNetworkClient {
+export function wrapSdkClient(sdk: Client<typeof NetworkService>): OutboundNetworkClient {
   return {
     async updateQuote(input: OutboundQuoteInput): Promise<Quote> {
       const req = toUpdateQuoteRequest(input);
@@ -83,7 +81,9 @@ export function wrapSdkClient(
 export interface OutboundNetworkClient {
   updateQuote(input: OutboundQuoteInput): Promise<Quote>;
   getQuote(input: OutboundGetQuoteInput): Promise<QuoteResult>;
-  createPayment(input: OutboundCreatePaymentInput): Promise<{ created: boolean; paymentId: string }>;
+  createPayment(
+    input: OutboundCreatePaymentInput,
+  ): Promise<{ created: boolean; paymentId: string }>;
 }
 
 /**

@@ -33,8 +33,7 @@ const MESSAGES: Record<QuoteFailureReason, QuoteFailureMessage> = {
   },
   REASON_INVALID_QUOTE_ID: {
     title: "Quote not found",
-    detail:
-      "The referenced quote id is unknown. Run Get Quote again to obtain a fresh id.",
+    detail: "The referenced quote id is unknown. Run Get Quote again to obtain a fresh id.",
   },
   REASON_QUOTE_EXPIRED: {
     title: "Quote expired",
@@ -49,13 +48,11 @@ const MESSAGES: Record<QuoteFailureReason, QuoteFailureMessage> = {
   },
   REASON_UNAUTHORIZED: {
     title: "API key rejected",
-    detail:
-      "T0_OFI_API_KEY is missing or invalid. Check your .env configuration.",
+    detail: "T0_OFI_API_KEY is missing or invalid. Check your .env configuration.",
   },
   REASON_BAD_REQUEST: {
     title: "Invalid quote request",
-    detail:
-      "The request to agtpay was malformed. Verify currency, amount, and payment method.",
+    detail: "The request to agtpay was malformed. Verify currency, amount, and payment method.",
   },
   REASON_NO_CREDIT_AVAILABLE: {
     title: "Insufficient USDT credit",

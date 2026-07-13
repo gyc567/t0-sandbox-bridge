@@ -49,7 +49,9 @@ async function main() {
     assert(r3.failure.reason === "REASON_INVALID_AMOUNT", `reason=${r3.failure.reason}`);
   }
 
-  console.log("\n=== Test 5: GetQuote for unsupported currency — should fail CURRENCY_NOT_SUPPORTED ===");
+  console.log(
+    "\n=== Test 5: GetQuote for unsupported currency — should fail CURRENCY_NOT_SUPPORTED ===",
+  );
   const r4 = await sandboxNetwork.getQuote({ usdAmount: 1000, currency: "ZWL" as never });
   assert("failure" in r4, "returns failure");
   if ("failure" in r4) {
@@ -66,7 +68,7 @@ async function main() {
   console.log("\n=== Test 7: Pick best of 3 quotes (EUR) — lowest rate wins ===");
   await providerService.publishQuote({ currency: "EUR", band: 1000, rate: 0.95 });
   await providerService.publishQuote({ currency: "EUR", band: 1000, rate: 0.85 }); // best
-  await providerService.publishQuote({ currency: "EUR", band: 1000, rate: 0.90 });
+  await providerService.publishQuote({ currency: "EUR", band: 1000, rate: 0.9 });
   const r6 = await sandboxNetwork.getQuote({ usdAmount: 500, currency: "EUR" });
   assert("success" in r6, "returns success");
   if ("success" in r6) {

@@ -5,8 +5,8 @@
 // Env:   AGTPAY_API_KEY (optional override; defaults to the documented sandbox key)
 
 const BASE_URL = "https://api.agtpay.xyz";
-const API_KEY = process.env.AGTPAY_API_KEY
-  || "419fd08e039e5e1e5b11d29f57ad0d7b299ce0094d457ff582441d5dee53e4f4";
+const API_KEY =
+  process.env.AGTPAY_API_KEY || "419fd08e039e5e1e5b11d29f57ad0d7b299ce0094d457ff582441d5dee53e4f4";
 
 const results = [];
 
@@ -46,7 +46,14 @@ async function call(method, path, body) {
   } catch {
     // not JSON
   }
-  return { status: res.status, ok: res.ok, headers: Object.fromEntries(res.headers), body: parsed, raw, elapsedMs: elapsed };
+  return {
+    status: res.status,
+    ok: res.ok,
+    headers: Object.fromEntries(res.headers),
+    body: parsed,
+    raw,
+    elapsedMs: elapsed,
+  };
 }
 
 // ISO 8601 timestamps: now + 60s expiration, now timestamp
@@ -123,8 +130,7 @@ async function main() {
   };
   const r2 = await call("PUT", "/api/v1/quotes/pay-out", payOutBody);
   if (r2.status === 200) {
-    const validPublish =
-      r2.body && typeof r2.body.published === "boolean";
+    const validPublish = r2.body && typeof r2.body.published === "boolean";
     if (validPublish) {
       pass("02-put-pay-out", {
         published: r2.body.published,
@@ -241,7 +247,9 @@ async function main() {
     ["05b", "GBP SWIFT", networkGbp],
   ]) {
     if (resp.status !== 200) {
-      fail(`05-${name}-network-quote-${label}`, `status=${resp.status}`, { raw: resp.raw?.slice(0, 300) });
+      fail(`05-${name}-network-quote-${label}`, `status=${resp.status}`, {
+        raw: resp.raw?.slice(0, 300),
+      });
       continue;
     }
     const success = findSuccess(resp.body);
@@ -257,7 +265,9 @@ async function main() {
         expiration: exp,
         payOutAmount: success.pay_out_amount ?? success.payOutAmount,
         settlementAmount: success.settlement_amount ?? success.settlementAmount,
-        allQuotesCount: Array.isArray(findAllQuotes(resp.body)) ? findAllQuotes(resp.body).length : null,
+        allQuotesCount: Array.isArray(findAllQuotes(resp.body))
+          ? findAllQuotes(resp.body).length
+          : null,
         elapsedMs: resp.elapsedMs,
       });
     } else if (failure) {
@@ -395,10 +405,7 @@ async function main() {
     md += `### ${r.name}\n`;
     md += `\`\`\`json\n${JSON.stringify(r, null, 2)}\n\`\`\`\n\n`;
   }
-  await fs.writeFile(
-    path.join(REPORT_DIR, "agtpay-quote-endpoints-report.md"),
-    md,
-  );
+  await fs.writeFile(path.join(REPORT_DIR, "agtpay-quote-endpoints-report.md"), md);
 
   console.log("\n=========== AGTPAY LIVE API REPORT ===========");
   console.log(`Overall: ${passed ? "✅ PASS" : "❌ FAIL"}`);

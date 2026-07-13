@@ -36,7 +36,10 @@ export interface SubmitSettlementViewInput {
  * source of truth for both views.
  */
 export class OFIService {
-  constructor(private readonly network: SandboxNetwork, private readonly now: () => number = Date.now) {}
+  constructor(
+    private readonly network: SandboxNetwork,
+    private readonly now: () => number = Date.now,
+  ) {}
 
   getQuote(input: GetQuoteInput): Promise<GetQuoteResult> {
     return this.network.getQuote({

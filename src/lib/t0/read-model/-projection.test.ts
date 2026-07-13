@@ -126,7 +126,9 @@ describe("parseLimit", () => {
   it("throws when version is missing", () => {
     expect(() =>
       parseLimit(
-        { counterpartId: 1, payoutLimit: { unscaled: "1", exponent: 0 } } as unknown as Parameters<typeof parseLimit>[0],
+        { counterpartId: 1, payoutLimit: { unscaled: "1", exponent: 0 } } as unknown as Parameters<
+          typeof parseLimit
+        >[0],
         NOW,
       ),
     ).toThrow(/version/);
@@ -135,16 +137,16 @@ describe("parseLimit", () => {
   it("throws when counterpartId is missing", () => {
     expect(() =>
       parseLimit(
-        { version: 1n, payoutLimit: { unscaled: "1", exponent: 0 } } as unknown as Parameters<typeof parseLimit>[0],
+        { version: 1n, payoutLimit: { unscaled: "1", exponent: 0 } } as unknown as Parameters<
+          typeof parseLimit
+        >[0],
         NOW,
       ),
     ).toThrow(/counterpartId/);
   });
 
   it("throws when payoutLimit is missing", () => {
-    expect(() =>
-      parseLimit({ version: 1n, counterpartId: 1 }, NOW),
-    ).toThrow(/payoutLimit/);
+    expect(() => parseLimit({ version: 1n, counterpartId: 1 }, NOW)).toThrow(/payoutLimit/);
   });
 });
 
@@ -227,9 +229,7 @@ describe("parseLedgerTransaction", () => {
   it("parses providerSettlement context", () => {
     const tx = {
       transactionId: 1n,
-      entries: [
-        { accountOwnerId: 2, accountType: 80, credit: { unscaled: "5", exponent: 0 } },
-      ],
+      entries: [{ accountOwnerId: 2, accountType: 80, credit: { unscaled: "5", exponent: 0 } }],
       transactionDetails: {
         case: "providerSettlement",
         value: { settlementId: 5n },
@@ -243,9 +243,7 @@ describe("parseLedgerTransaction", () => {
   it("parses feeSettlement context", () => {
     const tx = {
       transactionId: 1n,
-      entries: [
-        { accountOwnerId: 1, accountType: 60, debit: { unscaled: "1", exponent: 0 } },
-      ],
+      entries: [{ accountOwnerId: 1, accountType: 60, debit: { unscaled: "1", exponent: 0 } }],
       transactionDetails: {
         case: "feeSettlement",
         value: { feeSettlementId: 7n },
@@ -259,9 +257,7 @@ describe("parseLedgerTransaction", () => {
   it("parses piFundsReceived context", () => {
     const tx = {
       transactionId: 1n,
-      entries: [
-        { accountOwnerId: 1, accountType: 100, credit: { unscaled: "50", exponent: 0 } },
-      ],
+      entries: [{ accountOwnerId: 1, accountType: 100, credit: { unscaled: "50", exponent: 0 } }],
       transactionDetails: {
         case: "piFundsReceived",
         value: {
@@ -278,9 +274,7 @@ describe("parseLedgerTransaction", () => {
   it("handles missing transactionDetails (unknown context)", () => {
     const tx = {
       transactionId: 1n,
-      entries: [
-        { accountOwnerId: 1, accountType: 20, credit: { unscaled: "1", exponent: 0 } },
-      ],
+      entries: [{ accountOwnerId: 1, accountType: 20, credit: { unscaled: "1", exponent: 0 } }],
       transactionDetails: { case: "undefined" },
     } as unknown as ProtoTransactionShape;
     const out = parseLedgerTransaction(tx, NOW);
@@ -290,9 +284,7 @@ describe("parseLedgerTransaction", () => {
   it("maps unknown AccountType to UNKNOWN", () => {
     const tx = {
       transactionId: 1n,
-      entries: [
-        { accountOwnerId: 1, accountType: 999, credit: { unscaled: "1", exponent: 0 } },
-      ],
+      entries: [{ accountOwnerId: 1, accountType: 999, credit: { unscaled: "1", exponent: 0 } }],
       transactionDetails: { case: "undefined" },
     } as unknown as ProtoTransactionShape;
     const out = parseLedgerTransaction(tx, NOW);
@@ -302,7 +294,11 @@ describe("parseLedgerTransaction", () => {
   it("throws when transactionId is not a bigint", () => {
     expect(() =>
       parseLedgerTransaction(
-        { transactionId: 1, entries: [], transactionDetails: { case: undefined } } as unknown as ProtoTransactionShape,
+        {
+          transactionId: 1,
+          entries: [],
+          transactionDetails: { case: undefined },
+        } as unknown as ProtoTransactionShape,
         NOW,
       ),
     ).toThrow(/transactionId/);
@@ -315,9 +311,7 @@ describe("parseAppendLedgerEntriesRequest", () => {
       transactions: [
         {
           transactionId: 1n,
-          entries: [
-            { accountOwnerId: 1, accountType: 20, credit: { unscaled: "1", exponent: 0 } },
-          ],
+          entries: [{ accountOwnerId: 1, accountType: 20, credit: { unscaled: "1", exponent: 0 } }],
           transactionDetails: { case: "undefined" },
         },
         {

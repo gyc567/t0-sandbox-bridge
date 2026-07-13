@@ -1,54 +1,42 @@
 {
   "baseUrl": "http://127.0.0.1:8080",
-  "passed": 0,
+  "passed": 1,
   "results": [
     {
       "name": "landing",
       "path": "/",
-      "status": "FAIL",
-      "durationMs": 15377,
-      "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"networkidle\"\u001b[22m\n",
-      "consoleMessages": [],
-      "failedRequests": [],
-      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/landing-failure.png"
-    },
-    {
-      "name": "sandbox",
-      "path": "/sandbox",
-      "status": "FAIL",
-      "durationMs": 15073,
-      "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/sandbox\", waiting until \"networkidle\"\u001b[22m\n",
-      "consoleMessages": [],
-      "failedRequests": [],
-      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/sandbox-failure.png"
-    },
-    {
-      "name": "playground-route-returns-404",
-      "path": "/playground",
       "status": "PASS",
-      "durationMs": 0,
+      "durationMs": 1793,
       "consoleMessages": [],
-      "failedRequests": []
+      "failedRequests": [],
+      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/landing.png"
     },
     {
       "name": "sandbox",
       "path": "/sandbox",
-      "status": "FAIL",
-      "durationMs": 15074,
-      "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/sandbox\", waiting until \"networkidle\"\u001b[22m\n",
+      "status": "PASS",
+      "durationMs": 1595,
       "consoleMessages": [],
       "failedRequests": [],
-      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/sandbox-failure.png"
+      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/sandbox.png"
+    },
+    {
+      "name": "sandbox",
+      "path": "/sandbox",
+      "status": "PASS",
+      "durationMs": 748,
+      "consoleMessages": [],
+      "failedRequests": [],
+      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/sandbox.png"
     },
     {
       "name": "docs",
       "path": "/docs",
-      "status": "FAIL",
-      "durationMs": 15091,
-      "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/docs\", waiting until \"networkidle\"\u001b[22m\n",
+      "status": "PASS",
+      "durationMs": 874,
       "consoleMessages": [],
       "failedRequests": [],
-      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/docs-failure.png"
+      "screenshot": "/Users/eric/dreame/code/t0-sandbox-bridge/e2e-reports/docs.png"
     }
   ]
 }

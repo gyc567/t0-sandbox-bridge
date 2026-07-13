@@ -42,10 +42,9 @@ class BrowserAsyncLocalStorage implements AsyncLocalStorageLike<unknown> {
   }
 }
 
-const AsyncLocalStorageImpl: new <T>() => AsyncLocalStorageLike<T> =
-  isBrowser
-    ? (BrowserAsyncLocalStorage as unknown as new <T>() => AsyncLocalStorageLike<T>)
-    : (NodeAsyncHooks.AsyncLocalStorage as unknown as new <T>() => AsyncLocalStorageLike<T>);
+const AsyncLocalStorageImpl: new <T>() => AsyncLocalStorageLike<T> = isBrowser
+  ? (BrowserAsyncLocalStorage as unknown as new <T>() => AsyncLocalStorageLike<T>)
+  : (NodeAsyncHooks.AsyncLocalStorage as unknown as new <T>() => AsyncLocalStorageLike<T>);
 
 export const AsyncLocalStorage = AsyncLocalStorageImpl;
 export const asyncLocalStorage = new AsyncLocalStorageImpl<unknown>();

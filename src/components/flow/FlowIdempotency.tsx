@@ -13,8 +13,8 @@ export function FlowIdempotency() {
           重复请求不是错误
         </h2>
         <p className="max-w-2xl text-tagline text-muted-foreground">
-          网络采用 at-least-once delivery + idempotent receivers = exactly-once
-          processing。BAXS 作为 Provider 实现时必须遵守以下三条核心规则。
+          网络采用 at-least-once delivery + idempotent receivers = exactly-once processing。BAXS
+          作为 Provider 实现时必须遵守以下三条核心规则。
         </p>
       </div>
 
@@ -49,10 +49,7 @@ export function FlowIdempotency() {
                     >
                       WRONG
                     </div>
-                    <div
-                      className="text-muted-foreground"
-                      style={{ fontSize: "12px" }}
-                    >
+                    <div className="text-muted-foreground" style={{ fontSize: "12px" }}>
                       {rule.wrong}
                     </div>
                   </div>
@@ -66,10 +63,7 @@ export function FlowIdempotency() {
                     >
                       RIGHT
                     </div>
-                    <div
-                      className="text-foreground"
-                      style={{ fontSize: "12px" }}
-                    >
+                    <div className="text-foreground" style={{ fontSize: "12px" }}>
                       {rule.right}
                     </div>
                   </div>
@@ -96,16 +90,10 @@ export function FlowIdempotency() {
               >
                 {lvl.level}
               </div>
-              <div
-                className="text-foreground"
-                style={{ fontSize: "13px" }}
-              >
+              <div className="text-foreground" style={{ fontSize: "13px" }}>
                 {lvl.description}
               </div>
-              <div
-                className="font-mono text-muted-canvas"
-                style={{ fontSize: "10px" }}
-              >
+              <div className="font-mono text-muted-canvas" style={{ fontSize: "10px" }}>
                 {lvl.examples}
               </div>
             </div>

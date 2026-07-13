@@ -48,7 +48,9 @@ describe("List", () => {
   });
 
   it("uses custom empty message", () => {
-    render(<List items={[]} emptyMessage="Nothing here" render={(x: number) => <span>{x}</span>} />);
+    render(
+      <List items={[]} emptyMessage="Nothing here" render={(x: number) => <span>{x}</span>} />,
+    );
     expect(screen.getByText("Nothing here")).toBeTruthy();
   });
 

@@ -10,8 +10,7 @@ type ServiceFilter = "ALL" | RpcMethod["service"];
 export function FlowApiSurface() {
   const [filter, setFilter] = useState<ServiceFilter>("ALL");
 
-  const filtered =
-    filter === "ALL" ? RPC_METHODS : RPC_METHODS.filter((m) => m.service === filter);
+  const filtered = filter === "ALL" ? RPC_METHODS : RPC_METHODS.filter((m) => m.service === filter);
 
   const counts = {
     ofi: RPC_METHODS.filter((m) => m.service === "NetworkService").length,
@@ -26,8 +25,8 @@ export function FlowApiSurface() {
           Connect RPC · {RPC_METHODS.length} 个方法
         </h2>
         <p className="max-w-2xl text-tagline text-muted-foreground">
-          BAXS 调用 {counts.ofi} 个 NetworkService 方法作为 OFI，实现 {counts.provider}{" "}
-          个 ProviderService 回调作为 Provider（其中 UpdateQuote 是 streaming 推送报价）。
+          BAXS 调用 {counts.ofi} 个 NetworkService 方法作为 OFI，实现 {counts.provider} 个
+          ProviderService 回调作为 Provider（其中 UpdateQuote 是 streaming 推送报价）。
           所有方法均支持 gRPC 和 REST/JSON 双编码。
         </p>
       </div>
@@ -72,10 +71,8 @@ function FilterPill({
   label: string;
   accent?: "cyan" | "violet";
 }) {
-  const activeBg =
-    accent === "cyan" ? "rgba(0,212,255,0.08)" : "rgba(124,92,255,0.08)";
-  const activeColor =
-    accent === "cyan" ? "text-accent-cyan" : "text-accent-violet";
+  const activeBg = accent === "cyan" ? "rgba(0,212,255,0.08)" : "rgba(124,92,255,0.08)";
+  const activeColor = accent === "cyan" ? "text-accent-cyan" : "text-accent-violet";
 
   return (
     <button
@@ -98,12 +95,9 @@ function FilterPill({
 }
 
 function FlowApiMethodCard({ method }: { method: RpcMethod }) {
-  const accentColor =
-    method.accent === "cyan" ? "text-accent-cyan" : "text-accent-violet";
-  const accentBg =
-    method.accent === "cyan" ? "rgba(0,212,255,0.06)" : "rgba(124,92,255,0.06)";
-  const accentBorder =
-    method.accent === "cyan" ? "rgba(0,212,255,0.2)" : "rgba(124,92,255,0.2)";
+  const accentColor = method.accent === "cyan" ? "text-accent-cyan" : "text-accent-violet";
+  const accentBg = method.accent === "cyan" ? "rgba(0,212,255,0.06)" : "rgba(124,92,255,0.06)";
+  const accentBorder = method.accent === "cyan" ? "rgba(0,212,255,0.2)" : "rgba(124,92,255,0.2)";
 
   return (
     <article

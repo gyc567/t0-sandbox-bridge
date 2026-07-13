@@ -10,12 +10,7 @@
 // version ordering, "latest" pointer — live in CallbackInbox (inbox.ts),
 // not here. The store is dumb storage.
 
-import type {
-  InboxRecord,
-  LedgerEntry,
-  LimitSnapshot,
-  SettlementProjection,
-} from "./types";
+import type { InboxRecord, LedgerEntry, LimitSnapshot, SettlementProjection } from "./types";
 
 /**
  * Read/write contract for the durable read model.
@@ -127,7 +122,10 @@ export class InMemoryStore implements ReadModelStore {
   private readonly inbox = new Map<string, InboxRecord>();
 
   /** Key: counterparty → ordered list (newest first). */
-  private readonly creditUsage = new Map<string, import("./types").CreditUsageNotificationRecord[]>();
+  private readonly creditUsage = new Map<
+    string,
+    import("./types").CreditUsageNotificationRecord[]
+  >();
 
   // ── Limits ──────────────────────────────────────────────────────────
 
@@ -252,7 +250,9 @@ export class InMemoryStore implements ReadModelStore {
     this.creditUsage.set(record.counterparty, list);
   }
 
-  listCreditUsage(counterparty: string): readonly import("./types").CreditUsageNotificationRecord[] {
+  listCreditUsage(
+    counterparty: string,
+  ): readonly import("./types").CreditUsageNotificationRecord[] {
     return this.creditUsage.get(counterparty) ?? [];
   }
 
@@ -285,7 +285,10 @@ export class InMemoryStore implements ReadModelStore {
   }
 
   /** Every credit usage notification keyed by counterparty. */
-  snapshotCreditUsage(): ReadonlyMap<string, readonly import("./types").CreditUsageNotificationRecord[]> {
+  snapshotCreditUsage(): ReadonlyMap<
+    string,
+    readonly import("./types").CreditUsageNotificationRecord[]
+  > {
     return new Map(this.creditUsage);
   }
 }

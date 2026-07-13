@@ -148,7 +148,9 @@ export interface BuildReceiverOptions {
  * Returned handler is suitable to pass directly to TanStack Start's
  * `createFileRoute("/api/t0/provider/$").server.handlers.POST = ...`.
  */
-export function buildT0Receiver(opts: BuildReceiverOptions): (request: Request) => Promise<Response> {
+export function buildT0Receiver(
+  opts: BuildReceiverOptions,
+): (request: Request) => Promise<Response> {
   // Convert Uint8Array → Buffer so the SDK's `Buffer.compare` works.
   const networkPublicKey = Buffer.from(hexToBytes(opts.networkPublicKey));
   const network = opts.network ?? sandboxNetwork;
@@ -178,9 +180,7 @@ export function buildT0Receiver(opts: BuildReceiverOptions): (request: Request) 
       const fullUrl = new URL(req.url, "http://placeholder.invalid");
       const path = fullUrl.pathname;
       const prefix = "/api/t0/provider";
-      const stripped = path.startsWith(prefix)
-        ? path.slice(prefix.length) || "/"
-        : path;
+      const stripped = path.startsWith(prefix) ? path.slice(prefix.length) || "/" : path;
       const u = router.handlers.find((h) => stripped.startsWith(h.requestPath));
       if (!u) {
         const empty: AsyncIterable<Uint8Array> = {
@@ -210,7 +210,11 @@ export function buildT0Receiver(opts: BuildReceiverOptions): (request: Request) 
     const bodyBytes = new Uint8Array(await request.arrayBuffer());
 
     // 2. Verify signature headers BEFORE invoking the handler.
-    const verification = await verifyRequestSignature(request, bodyBytes, new Uint8Array(networkPublicKey));
+    const verification = await verifyRequestSignature(
+      request,
+      bodyBytes,
+      new Uint8Array(networkPublicKey),
+    );
     if (verification !== null) {
       return new Response(verification.body, { status: verification.status });
     }

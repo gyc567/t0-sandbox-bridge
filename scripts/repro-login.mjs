@@ -5,9 +5,10 @@ const URL = "http://localhost:8080/login?redirect=%2Fprovider";
 
 const browser = await chromium.launch({
   headless: true,
-  executablePath: process.platform === "darwin"
-    ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-    : undefined,
+  executablePath:
+    process.platform === "darwin"
+      ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+      : undefined,
 });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
@@ -46,7 +47,7 @@ await page.locator('input[name="email"]').fill("provider@baxs.demo");
 await page.locator('input[name="password"]').fill("demo-provider-2026");
 
 const formInfo = await page.evaluate(() => {
-  const f = document.querySelector('form');
+  const f = document.querySelector("form");
   if (!f) return null;
   return {
     action: f.getAttribute("action"),
@@ -62,7 +63,10 @@ console.log("\n--- Submitting ---");
 const reqsBefore = allRequests.length;
 const respsBefore = allResponses.length;
 
-await page.locator('button[type="submit"]').click({ noWaitAfter: true, timeout: 5000 }).catch(e => console.log("click err:", e.message));
+await page
+  .locator('button[type="submit"]')
+  .click({ noWaitAfter: true, timeout: 5000 })
+  .catch((e) => console.log("click err:", e.message));
 await page.waitForTimeout(8000);
 
 console.log("\n--- New requests after click ---");

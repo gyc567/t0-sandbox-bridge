@@ -7,8 +7,7 @@ export function FlowHeroDiagram() {
     <div
       className="relative mx-auto aspect-[4/3] w-full max-w-lg overflow-hidden rounded-[var(--radius-2xl)] border border-hairline bg-glass backdrop-blur-xl"
       style={{
-        boxShadow:
-          "0 0 40px rgba(0,212,255,0.08), inset 0 1px 0 rgba(255,255,255,0.04)",
+        boxShadow: "0 0 40px rgba(0,212,255,0.08), inset 0 1px 0 rgba(255,255,255,0.04)",
       }}
     >
       <div className="flex items-center justify-between border-b border-hairline px-4 py-2.5">
@@ -21,10 +20,7 @@ export function FlowHeroDiagram() {
             LIVE PLAYBACK
           </span>
         </div>
-        <span
-          className="font-mono text-muted-canvas"
-          style={{ fontSize: "10px" }}
-        >
+        <span className="font-mono text-muted-canvas" style={{ fontSize: "10px" }}>
           Connect RPC · gRPC / REST-JSON
         </span>
       </div>
@@ -56,11 +52,7 @@ export function FlowHeroDiagram() {
             fill="#00d4ff"
             style={{ filter: "drop-shadow(0 0 6px rgba(0,212,255,0.8))" }}
           >
-            <animateMotion
-              dur="4s"
-              repeatCount="indefinite"
-              path="M80,140 L200,140 L320,140"
-            />
+            <animateMotion dur="4s" repeatCount="indefinite" path="M80,140 L200,140 L320,140" />
           </circle>
           <line
             x1="80"
@@ -142,10 +134,7 @@ export function FlowHeroDiagram() {
           >
             T-0 NETWORK
           </div>
-          <div
-            className="font-mono text-muted-canvas"
-            style={{ fontSize: "8px" }}
-          >
+          <div className="font-mono text-muted-canvas" style={{ fontSize: "8px" }}>
             Orchestrator
           </div>
         </div>
@@ -178,10 +167,7 @@ export function FlowHeroDiagram() {
           >
             BANK RAIL
           </div>
-          <div
-            className="font-mono text-muted-canvas"
-            style={{ fontSize: "8px" }}
-          >
+          <div className="font-mono text-muted-canvas" style={{ fontSize: "8px" }}>
             Local fiat
           </div>
         </div>

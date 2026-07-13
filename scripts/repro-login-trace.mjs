@@ -5,9 +5,10 @@ const URL = "http://localhost:8080/login?redirect=%2Fprovider";
 
 const browser = await chromium.launch({
   headless: true,
-  executablePath: process.platform === "darwin"
-    ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-    : undefined,
+  executablePath:
+    process.platform === "darwin"
+      ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+      : undefined,
   args: ["--disable-features=IsolateOrigins,site-per-process"],
 });
 const ctx = await browser.newContext({ ignoreHTTPSErrors: true });

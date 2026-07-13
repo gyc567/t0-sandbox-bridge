@@ -125,7 +125,10 @@ describe("updatePayment", () => {
     const req = create(UpdatePaymentRequestSchema, {
       paymentId,
       paymentClientId: paymentId.toString(),
-      result: { case: "manualAmlCheck", value: create(UpdatePaymentRequest_ManualAmlCheckSchema, {}) },
+      result: {
+        case: "manualAmlCheck",
+        value: create(UpdatePaymentRequest_ManualAmlCheckSchema, {}),
+      },
     });
     const res = await updatePayment(req, ctx, network);
     expect(res.$typeName).toBe("tzero.v1.payment.UpdatePaymentResponse");
@@ -291,7 +294,11 @@ describe("createProviderServiceImpl", () => {
     svc.rekeyQuote(q.id, "1");
 
     // payOut
-    const payOutReq = create(PayoutRequestSchema, { paymentId: BigInt(1), currency: "EUR", clientQuoteId: "1" });
+    const payOutReq = create(PayoutRequestSchema, {
+      paymentId: BigInt(1),
+      currency: "EUR",
+      clientQuoteId: "1",
+    });
     const payOutRes = await impl.payOut(payOutReq, ctx);
     expect(payOutRes.result.case).toBe("accepted");
 

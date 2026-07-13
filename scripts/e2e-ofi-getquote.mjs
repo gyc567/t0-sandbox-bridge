@@ -134,7 +134,10 @@ async function main() {
   // ── Phase 2: HTTP smoke on key routes ──────────────────────────
   log("routes", "GET /, /login, /provider, /ofi (redirect: manual)");
   const fetchNoFollow = (url) =>
-    fetch(url, { redirect: "manual" }).then((r) => ({ path: new URL(url).pathname, status: r.status }));
+    fetch(url, { redirect: "manual" }).then((r) => ({
+      path: new URL(url).pathname,
+      status: r.status,
+    }));
   const smoke = await Promise.all([
     fetchNoFollow(`${BASE_URL}/`),
     fetchNoFollow(`${BASE_URL}/login`),
@@ -157,11 +160,18 @@ async function main() {
   // The credentialed flow was removed; /api/login now resolves any POST
   // to a 303 → /login so legacy callers don't get a 404.
   log("auth", `POST /api/login (legacy credentialed flow removed)`);
-  const provLogin = await loginViaCurlForm(`${BASE_URL}/api/login`, PROVIDER_EMAIL, PROVIDER_PASSWORD);
+  const provLogin = await loginViaCurlForm(
+    `${BASE_URL}/api/login`,
+    PROVIDER_EMAIL,
+    PROVIDER_PASSWORD,
+  );
   if (provLogin.status === 303 && provLogin.location === "/login") {
     pass("02-legacy-api-login-provider", { location: provLogin.location });
   } else {
-    fail("02-legacy-api-login-provider", `expected 303 /login, got ${provLogin.status} ${provLogin.location}`);
+    fail(
+      "02-legacy-api-login-provider",
+      `expected 303 /login, got ${provLogin.status} ${provLogin.location}`,
+    );
   }
 
   // ── Phase 4: Same probe with OFI credentials ───────────────────
@@ -170,13 +180,17 @@ async function main() {
   if (ofiLogin.status === 303 && ofiLogin.location === "/login") {
     pass("03-legacy-api-login-ofi", { location: ofiLogin.location });
   } else {
-    fail("03-legacy-api-login-ofi", `expected 303 /login, got ${ofiLogin.status} ${ofiLogin.location}`);
+    fail(
+      "03-legacy-api-login-ofi",
+      `expected 303 /login, got ${ofiLogin.status} ${ofiLogin.location}`,
+    );
   }
 
   // ── Phase 5: Open-access route rendering (no cookie needed) ───
   log("routes", "Open-access GET /provider and /ofi");
   const provHtml = await fetch(`${BASE_URL}/provider`).then((r) => r.text());
-  const provHasQuoteUI = provHtml.includes("Publish Quote") && provHtml.includes('data-testid="publish-quote"');
+  const provHasQuoteUI =
+    provHtml.includes("Publish Quote") && provHtml.includes('data-testid="publish-quote"');
   if (provHasQuoteUI) {
     pass("04-provider-console-rendered", { size: provHtml.length });
   } else {
@@ -188,7 +202,8 @@ async function main() {
 
   // OFI console is open-access — no cookie required.
   const ofiHtml = await fetch(`${BASE_URL}/ofi`).then((r) => r.text());
-  const ofiHasQuoteUI = ofiHtml.includes("Get Quote") && ofiHtml.includes('data-testid="btn-quote"');
+  const ofiHasQuoteUI =
+    ofiHtml.includes("Get Quote") && ofiHtml.includes('data-testid="btn-quote"');
   if (ofiHasQuoteUI) {
     pass("05-ofi-console-rendered", { size: ofiHtml.length });
   } else {
@@ -209,7 +224,9 @@ async function main() {
   page.on("console", (m) => {
     if (m.type() === "error") consoleErrors.push({ url: page.url(), text: m.text() });
   });
-  page.on("pageerror", (e) => consoleErrors.push({ url: page.url(), text: e.message, pageError: true }));
+  page.on("pageerror", (e) =>
+    consoleErrors.push({ url: page.url(), text: e.message, pageError: true }),
+  );
   page.on("requestfailed", (r) =>
     networkErrors.push({ url: r.url(), failure: r.failure()?.errorText, method: r.method() }),
   );
@@ -261,7 +278,10 @@ async function main() {
       pass("07-ofi-get-quote-button-success-card");
     } else if (result === "no-response-received") {
       log("ui", "Get Quote button click did not elicit a UI response within 8s");
-      log("ui", "Root cause: known dev-server hydration timing issue (pre-existing, not refactor-related)");
+      log(
+        "ui",
+        "Root cause: known dev-server hydration timing issue (pre-existing, not refactor-related)",
+      );
       log("ui", "Workaround: integration script test-ofi-getquote.ts covers the runtime path");
       pass("07-ofi-get-quote-button-no-ui-response-with-known-cause", {
         cause: "TanStack Start client hydration timing on this dev environment",
@@ -303,7 +323,10 @@ async function main() {
       summary: "7/7 integration tests pass",
     });
   } else {
-    fail("08-runtime-get-quote-chain", `exit=${runtimeResult.code}, output=${runtimeResult.out.slice(-400)}`);
+    fail(
+      "08-runtime-get-quote-chain",
+      `exit=${runtimeResult.code}, output=${runtimeResult.out.slice(-400)}`,
+    );
   }
 
   // ── Phase 9: Stop dev server we own ────────────────────────────
@@ -326,10 +349,7 @@ async function writeReport() {
     networkErrors,
     screenshots,
   };
-  await fs.writeFile(
-    path.join(REPORT_DIR, "e2e-report.json"),
-    JSON.stringify(report, null, 2),
-  );
+  await fs.writeFile(path.join(REPORT_DIR, "e2e-report.json"), JSON.stringify(report, null, 2));
 
   // Markdown summary
   let md = `# E2E Test Report — OFI Get Quote REST Refactor\n\n`;

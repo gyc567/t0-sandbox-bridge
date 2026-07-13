@@ -209,7 +209,8 @@ export class HttpOfiT0Client implements OfiT0Client {
     // ── Optional: forward `allQuotes[]` to the mapper so the settlement
     //    breakdown is preserved (audit §1.2 #6). The mapper matches the
     //    selected composite quoteId against this array.
-    const allQuotes = (env.allQuotes as readonly RawProviderQuote[] | undefined) ??
+    const allQuotes =
+      (env.allQuotes as readonly RawProviderQuote[] | undefined) ??
       (env.AllQuotes as readonly RawProviderQuote[] | undefined);
 
     try {
@@ -278,6 +279,18 @@ export type PickBestQuoteFn = (
 
 export interface MockOfiT0ClientOptions {
   pickBestQuote: PickBestQuoteFn;
+  /**
+   * Optional external-rate fallback (plan §4.1). Invoked only when
+   * `pickBestQuote` returns null. Returning a non-null value produces an
+   * `OfiQuoteSuccess` with rate/expiresAt taken verbatim from the fallback
+   * (plan §5.2: preserve upstream precision). Returning null propagates
+   * the NO_QUOTE failure to the caller. Throwing propagates the error
+   * (plan §7: fallback failures must surface, not be silently swallowed).
+   */
+  fallbackQuoteProvider?: (
+    req: OfiQuoteRequest,
+    now: () => number,
+  ) => Promise<{ rate: number; expiresAt: number } | null>;
 }
 
 export class MockOfiT0Client implements OfiT0Client {
@@ -287,7 +300,21 @@ export class MockOfiT0Client implements OfiT0Client {
     if (req.usdAmount <= 0) {
       return { failure: { reason: "BAD_REQUEST", message: "usdAmount must be > 0" } };
     }
-    const picked = this.opts.pickBestQuote(req.usdAmount, req.currency, now());
+    let picked = this.opts.pickBestQuote(req.usdAmount, req.currency, now());
+    if (!picked && this.opts.fallbackQuoteProvider) {
+      const fb = await this.opts.fallbackQuoteProvider(req, now);
+      if (fb) {
+        // Deterministic-but-fresh quote id (plan §10): same request + same now
+        // ⇒ same id, so getQuoteById() can re-resolve it across the OFI flow.
+        // Prefix "fb_quote-" distinguishes fallback from Provider quotes in logs.
+        picked = {
+          rate: fb.rate,
+          expiresAt: fb.expiresAt,
+          createdAt: now(),
+          quoteId: `fb_quote-${req.usdAmount}-${req.currency}-${now()}`,
+        };
+      }
+    }
     if (!picked) {
       return { failure: { reason: "NO_QUOTE" } };
     }

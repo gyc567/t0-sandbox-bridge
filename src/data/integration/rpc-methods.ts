@@ -149,7 +149,7 @@ export const RPC_METHODS: readonly RpcMethod[] = [
     service: "ProviderService",
     role: "Provider",
     mode: "UNARY",
-    description: "\"Last Look\" 报价审批（人工 AML 后）",
+    description: '"Last Look" 报价审批（人工 AML 后）',
     idempotency: "IDEMPOTENT",
     accent: "violet",
   },

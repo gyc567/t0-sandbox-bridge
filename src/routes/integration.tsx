@@ -25,10 +25,7 @@ function IntegrationPage() {
       <AmbientGrid />
       <main className="flex-1">
         <div className="relative">
-          <div
-            aria-hidden
-            className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-          >
+          <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
             <div
               className="absolute inset-x-0 top-0 h-[60vh]"
               style={{
@@ -49,12 +46,7 @@ function IntegrationPage() {
               aria-hidden
             >
               <defs>
-                <pattern
-                  id="integration-dots"
-                  width="32"
-                  height="32"
-                  patternUnits="userSpaceOnUse"
-                >
+                <pattern id="integration-dots" width="32" height="32" patternUnits="userSpaceOnUse">
                   <circle cx="1" cy="1" r="1" fill="rgba(255,255,255,0.05)" />
                 </pattern>
               </defs>

@@ -144,9 +144,7 @@ describe("PayoutProviderService", () => {
       status: "pending",
       createdAt: clock,
     });
-    await expect(svc.executePayout(`pm_${clock}_pending`)).rejects.toThrow(
-      /not in accepted/,
-    );
+    await expect(svc.executePayout(`pm_${clock}_pending`)).rejects.toThrow(/not in accepted/);
   });
 
   it("executePayout computes network fee as 0.05% of usdAmount", async () => {

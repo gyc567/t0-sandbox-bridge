@@ -1,4 +1,9 @@
-import { AUTH_STEPS, AUTH_HEADERS, SIGN_REQUEST_SNIPPET, REPLAY_WINDOW_MS } from "@/data/integration/auth";
+import {
+  AUTH_STEPS,
+  AUTH_HEADERS,
+  SIGN_REQUEST_SNIPPET,
+  REPLAY_WINDOW_MS,
+} from "@/data/integration/auth";
 
 /**
  * Section 4 — ECDSA signing flow. Spec §2.
@@ -31,16 +36,10 @@ export function FlowAuthFlow() {
                   {s.index}
                 </span>
                 <div>
-                  <div
-                    className="font-mono text-foreground"
-                    style={{ fontSize: "13px" }}
-                  >
+                  <div className="font-mono text-foreground" style={{ fontSize: "13px" }}>
                     {s.title}
                   </div>
-                  <div
-                    className="font-mono text-muted-canvas"
-                    style={{ fontSize: "11px" }}
-                  >
+                  <div className="font-mono text-muted-canvas" style={{ fontSize: "11px" }}>
                     {s.detail}
                   </div>
                 </div>
@@ -70,10 +69,7 @@ export function FlowAuthFlow() {
                       style={{ fontSize: "11px" }}
                     >
                       <div>{h.format}</div>
-                      <div
-                        className="text-muted-canvas"
-                        style={{ fontSize: "10px" }}
-                      >
+                      <div className="text-muted-canvas" style={{ fontSize: "10px" }}>
                         {h.description}
                       </div>
                     </td>
@@ -101,9 +97,7 @@ export function FlowAuthFlow() {
             className="overflow-x-auto p-4 font-mono leading-relaxed"
             style={{ fontSize: "11.5px" }}
           >
-            <code>
-              {colorizeSignSnippet(SIGN_REQUEST_SNIPPET)}
-            </code>
+            <code>{colorizeSignSnippet(SIGN_REQUEST_SNIPPET)}</code>
           </pre>
         </div>
       </div>
@@ -117,18 +111,9 @@ function colorizeSignSnippet(src: string) {
   const lines = src.split("\n");
   return lines.map((line, i) => {
     let html = escapeHtml(line);
-    html = html.replace(
-      /(\/\/.*$)/g,
-      '<span class="text-muted-canvas">$1</span>',
-    );
-    html = html.replace(
-      /\b(const|return)\b/g,
-      '<span class="text-accent-violet">$1</span>',
-    );
-    html = html.replace(
-      /('X-[A-Za-z-]+')/g,
-      '<span class="text-accent-cyan">$1</span>',
-    );
+    html = html.replace(/(\/\/.*$)/g, '<span class="text-muted-canvas">$1</span>');
+    html = html.replace(/\b(const|return)\b/g, '<span class="text-accent-violet">$1</span>');
+    html = html.replace(/('X-[A-Za-z-]+')/g, '<span class="text-accent-cyan">$1</span>');
     html = html.replace(
       /('0x[^']*'|'[A-Za-z][A-Za-z0-9-]*')/g,
       '<span class="text-accent-usdt">$1</span>',
@@ -143,8 +128,5 @@ function colorizeSignSnippet(src: string) {
 }
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
