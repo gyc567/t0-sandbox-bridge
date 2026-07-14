@@ -191,6 +191,100 @@ describe("SandboxNetwork.completeManualAml", () => {
   });
 });
 
+// ── cancelManualAml (Phase 7 AML rewrite) ─────────────────────────────
+
+describe("SandboxNetwork.cancelManualAml", () => {
+  it("transitions pending_aml → rejected, equivalent to completeManualAml(false)", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: "baxs_aml_cancel", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
+
+    const updated = network.cancelManualAml(p.success.payment.id);
+    expect(updated.status).toBe("rejected");
+  });
+
+  it("throws on unknown payment", () => {
+    expect(() => network.cancelManualAml("ghost_pm")).toThrow(/unknown payment/);
+  });
+
+  it("throws when payment is not in pending_aml state", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: "baxs_aml_cancel_bad", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    // createPayment drives the payment all the way to "confirmed" in sandbox
+    expect(() => network.cancelManualAml(p.success.payment.id)).toThrow(/pending_aml/);
+  });
+});
+
+// ── recordAmlFile (Phase 7 AML rewrite) ───────────────────────────────
+
+describe("SandboxNetwork.recordAmlFile", () => {
+  it("writes amlFile metadata without changing status", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: "baxs_aml_file", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
+
+    const meta = {
+      filename: "report.pdf",
+      fileSize: 1024,
+      fileType: "application/pdf",
+      uploadedAt: clock,
+    };
+    const updated = network.recordAmlFile(p.success.payment.id, meta);
+    expect(updated.status).toBe("pending_aml");
+    expect(updated.amlFile).toEqual(meta);
+  });
+
+  it("overwrites existing amlFile metadata on second call", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: "baxs_aml_overwrite", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
+
+    network.recordAmlFile(p.success.payment.id, {
+      filename: "first.pdf",
+      fileSize: 100,
+      fileType: "application/pdf",
+      uploadedAt: clock,
+    });
+    network.recordAmlFile(p.success.payment.id, {
+      filename: "second.pdf",
+      fileSize: 200,
+      fileType: "application/pdf",
+      uploadedAt: clock + 1,
+    });
+
+    const updated = svc.snapshot().payments.find((pm) => pm.id === p.success.payment.id);
+    expect(updated?.amlFile?.filename).toBe("second.pdf");
+    expect(updated?.amlFile?.fileSize).toBe(200);
+  });
+
+  it("throws on unknown payment", () => {
+    expect(() =>
+      network.recordAmlFile("ghost_pm", {
+        filename: "x",
+        fileSize: 1,
+        fileType: "application/pdf",
+        uploadedAt: 0,
+      }),
+    ).toThrow(/unknown payment/);
+  });
+});
+
 // ── approvePaymentQuote (Last Look) ─────────────────────────────────
 
 describe("SandboxNetwork.approvePaymentQuote", () => {

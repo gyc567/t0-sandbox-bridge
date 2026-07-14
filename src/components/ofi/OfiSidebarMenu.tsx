@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type MenuItem = {
@@ -14,12 +14,22 @@ const MENU_ITEMS: MenuItem[] = [
   { value: "funding-capacity", label: "Funding & Capacity" },
 ];
 
+export type OfiTab =
+  | "quote-management"
+  | "payment-pre-settlement"
+  | "payment-continued"
+  | "payment-manual-aml"
+  | "funding-capacity";
+
 type OfiSidebarMenuProps = {
   children: ReactNode;
   fundingContent: ReactNode;
   paymentPreSettlementContent: ReactNode;
   paymentContinuedContent: ReactNode;
   paymentManualAmlContent: ReactNode;
+  /** Default tab on first render. If omitted, falls back to the
+   *  original "quote-management" behavior. */
+  defaultTab?: OfiTab;
 };
 
 export function OfiSidebarMenu({
@@ -28,10 +38,14 @@ export function OfiSidebarMenu({
   paymentPreSettlementContent,
   paymentContinuedContent,
   paymentManualAmlContent,
+  defaultTab,
 }: OfiSidebarMenuProps) {
+  const [activeTab, setActiveTab] = useState<OfiTab>(defaultTab ?? "quote-management");
+
   return (
     <Tabs
-      defaultValue="quote-management"
+      value={activeTab}
+      onValueChange={(v) => setActiveTab(v as OfiTab)}
       orientation="vertical"
       className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:items-start"
     >

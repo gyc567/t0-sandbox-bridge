@@ -10,7 +10,7 @@ import {
   providerCounterpartiesFn,
   callbackInboxStateFn,
   providerLedgerFn,
-  uploadAmlFileFn,
+  reviewAmlFileFn,
 } from "@/lib/t0/t0.functions";
 import { ManualAmlPanel } from "@/components/provider/ManualAmlPanel";
 // (auth removed — sandbox console is open access; no login required)
@@ -68,7 +68,7 @@ function ProviderPage() {
   const notifyUsdt = useServerFn(notifyUsdtFn);
   const notifyCredit = useServerFn(notifyCreditFn);
   const snapshot = useServerFn(snapshotFn);
-  const uploadAmlFile = useServerFn(uploadAmlFileFn);
+  const reviewAmlFile = useServerFn(reviewAmlFileFn);
 
   // ── Phase 3: Provider read-model views ─────────────────────────────
   // Provider role is providerId 0 in this sandbox. Production would
@@ -126,11 +126,12 @@ function ProviderPage() {
   const [rate, setRate] = useState(0.92);
   const [busy, setBusy] = useState(false);
 
-  const run = async (fn: () => Promise<unknown>) => {
+  const run = async <T,>(fn: () => Promise<T>): Promise<T> => {
     setBusy(true);
     try {
-      await fn();
+      const result = await fn();
       await refresh();
+      return result;
     } finally {
       setBusy(false);
     }
@@ -138,16 +139,12 @@ function ProviderPage() {
 
   const onExecutePayout = (paymentId: string) => run(() => processPayout({ data: { paymentId } }));
 
-  const onUploadAndReview = async (paymentId: string, file: File) => {
+  const onReviewAml = async (
+    paymentId: string,
+    decision: "approve" | "reject",
+  ): Promise<void> => {
     await run(async () => {
-      await uploadAmlFile({
-        data: {
-          paymentId,
-          filename: file.name,
-          fileSize: file.size,
-          fileType: file.type || "application/octet-stream",
-        },
-      });
+      await reviewAmlFile({ data: { paymentId, decision } });
     });
   };
 
@@ -527,7 +524,7 @@ function ProviderPage() {
             <ManualAmlPanel
               payments={data.payments}
               busy={busy}
-              onUploadAndReview={onUploadAndReview}
+              onReviewAml={onReviewAml}
             />
           }
         />

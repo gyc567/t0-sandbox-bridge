@@ -10,6 +10,7 @@
 
 import type { T0Client } from "./client";
 import type {
+  AmlFileMeta,
   Currency,
   NetworkEvent,
   Payment,
@@ -255,6 +256,17 @@ export class PayoutProviderService {
     const payment = this.payments.get(paymentId);
     if (!payment) throw new Error("unknown payment");
     payment.status = status;
+    return payment;
+  }
+
+  /** Record (or overwrite) the AML file metadata on a payment. Does NOT
+   *  change status — the file metadata is informational; the AML state
+   *  transition happens via `markPaymentStatus` separately. Throws on
+   *  unknown payment. */
+  recordAmlFile(paymentId: string, meta: AmlFileMeta): Payment {
+    const payment = this.payments.get(paymentId);
+    if (!payment) throw new Error("unknown payment");
+    payment.amlFile = meta;
     return payment;
   }
 

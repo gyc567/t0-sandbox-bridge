@@ -74,33 +74,81 @@ export const confirmFundsFn = createServerFn({ method: "POST" })
   .validator((d: { paymentId: string }) => d)
   .handler(async ({ data }) => sandboxNetwork.confirmFunds(data.paymentId));
 
-// ── AML File Upload & Review ──────────────────────────────────────────
+// ── AML File Upload & Review (Phase 7 rewrite) ─────────────────────────
+// KISS: split the AML flow into OFI-upload + Provider-review so each side
+// owns one responsibility. The "review" helper stays as a pure function
+// so unit tests can call it without AsyncLocalStorage context.
+//
+//   reviewAmlUpload   → pure validate + reviewer call, no state mutation.
+//   applyAmlReview    → applies an approve/reject decision to the network
+//                       state machine (Last Look on approve, terminal on reject).
+//
+// OFI uploads the file via ofiUploadAmlFileFn → recordAmlFile only.
+// Provider decides via reviewAmlFileFn → applyAmlReview(approved: bool).
 
-export const uploadAmlFileFn = createServerFn({ method: "POST" })
+/** Pure: validate the file, run the reviewer, return the result. Throws
+ *  on invalid file. Does NOT touch network state. */
+export async function reviewAmlUpload(input: {
+  paymentId: string;
+  filename: string;
+  fileSize: number;
+  fileType: string;
+}) {
+  const validation = validateAmlFile(input.filename, input.fileSize, input.fileType);
+  if (!validation.valid) {
+    throw new Error(validation.reason);
+  }
+  return sandboxAmlReviewer.review(input);
+}
+
+/** Apply an AML decision to network state. On approval: CompleteManualAmlCheck
+ *  (approved) → ApprovePaymentQuotes (Last Look) → log OFI AML event.
+ *  On rejection: CompleteManualAmlCheck (rejected) only — Last Look is
+ *  deliberately NOT called. Returns the resulting payment. The network +
+ *  provider arguments default to the singletons used by the server fn;
+ *  tests pass in a local instance for isolation. */
+export function applyAmlReview(
+  input: { paymentId: string; approved: boolean },
+  deps: {
+    network: Pick<typeof sandboxNetwork, "completeManualAml" | "approvePaymentQuote">;
+    provider: Pick<typeof providerService, "logOfiAmlEvent">;
+  } = { network: sandboxNetwork, provider: providerService },
+): ReturnType<typeof sandboxNetwork.completeManualAml> {
+  const payment = deps.network.completeManualAml(input.paymentId, input.approved);
+  if (input.approved) {
+    const quoteId = payment.quoteId;
+    deps.network.approvePaymentQuote(input.paymentId, quoteId);
+    deps.provider.logOfiAmlEvent(input.paymentId, quoteId, "approved");
+  }
+  return payment;
+}
+
+/** OFI-side: upload an AML document. Validates the file, runs the sandbox
+ *  reviewer for the binary accept/reject signal, then writes the file
+ *  metadata onto the payment. Does NOT change status — the Provider
+ *  separately approves / rejects / cancels AML. */
+export const ofiUploadAmlFileFn = createServerFn({ method: "POST" })
   .validator((d: { paymentId: string; filename: string; fileSize: number; fileType: string }) => d)
   .handler(async ({ data }) => {
-    const validation = validateAmlFile(data.filename, data.fileSize, data.fileType);
-    if (!validation.valid) {
-      throw new Error(validation.reason);
-    }
-    const reviewResult = await sandboxAmlReviewer.review({
-      paymentId: data.paymentId,
+    const reviewResult = await reviewAmlUpload(data);
+    sandboxNetwork.recordAmlFile(data.paymentId, {
       filename: data.filename,
       fileSize: data.fileSize,
       fileType: data.fileType,
+      uploadedAt: Date.now(),
     });
-    if (reviewResult.status === "approved") {
-      // Step 9: CompleteManualAmlCheck (Approved) → T0 Network
-      sandboxNetwork.completeManualAml(data.paymentId, true);
-      // Step 10: ApprovePaymentQuotes → OFI (Last Look)
-      // Find the payment to get its quoteId for the approval
-      const payment = sandboxNetwork.listPayments().find((p) => p.id === data.paymentId);
-      if (payment) {
-        sandboxNetwork.approvePaymentQuote(data.paymentId, payment.quoteId);
-        providerService.logOfiAmlEvent(data.paymentId, payment.quoteId, "approved");
-      }
-    }
     return reviewResult;
+  });
+
+/** Provider-side: review an already-uploaded AML file. Pure state
+ *  transition — no file metadata, just approve or reject. */
+export const reviewAmlFileFn = createServerFn({ method: "POST" })
+  .validator((d: { paymentId: string; decision: "approve" | "reject" }) => d)
+  .handler(async ({ data }) => {
+    applyAmlReview({
+      paymentId: data.paymentId,
+      approved: data.decision === "approve",
+    });
   });
 
 // ── OFI-side server functions ────────────────────────────────────────

@@ -3,7 +3,15 @@
 // for an HTTP client only changes this class.
 
 import { PayoutProviderService } from "./provider";
-import type { Currency, Payment, Payout, Quote, Settlement, SettlementState } from "./types";
+import type {
+  AmlFileMeta,
+  Currency,
+  Payment,
+  Payout,
+  Quote,
+  Settlement,
+  SettlementState,
+} from "./types";
 import { isSupportedCurrency } from "./currencies";
 import type { OfiT0Client } from "./ofi-client";
 import { toGetQuoteResult } from "./quote-mapper";
@@ -340,6 +348,29 @@ export class SandboxNetwork {
       throw new Error(`payment must be in pending_aml state, got ${payment.status}`);
     }
     return this.provider.markPaymentStatus(paymentId, approved ? "accepted" : "rejected");
+  }
+
+  /**
+   * Provider cancels the AML review. Semantically equivalent to
+   * `completeManualAml(id, false)` — kept as a separate entry point so
+   * the Provider UI can express intent ("I'm rejecting because we don't
+   * need AML") and the event log / audit trail can distinguish it from
+   * a regular reject.
+   */
+  cancelManualAml(paymentId: string): Payment {
+    return this.completeManualAml(paymentId, false);
+  }
+
+  /**
+   * Record (or overwrite) the OFI-uploaded AML file metadata on a
+   * payment. Pure state-write; does NOT change status. The file metadata
+   * is informational — the AML state transition is driven by the OFI
+   * calling `triggerManualAml` (status: pending → pending_aml) before
+   * the upload, and by the Provider calling `completeManualAml` /
+   * `cancelManualAml` after.
+   */
+  recordAmlFile(paymentId: string, meta: AmlFileMeta): Payment {
+    return this.provider.recordAmlFile(paymentId, meta);
   }
 
   /**

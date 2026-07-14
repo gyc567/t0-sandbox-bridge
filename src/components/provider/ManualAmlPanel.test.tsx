@@ -1,10 +1,14 @@
-// ManualAmlPanel.test.tsx — React component tests for the Provider AML panel.
-// Uses renderToStaticMarkup (server-side rendering) to avoid happy-dom/JSDOM
-// dependencies and keep tests fast and deterministic.
+// ManualAmlPanel.test.tsx — React component tests for the Provider AML panel
+// (Phase 7 rewrite: OFI-upload + Provider-review split).
+//
+// Most cases use renderToStaticMarkup (server-side rendering) for fast,
+// deterministic structural assertions. Handler tests use @testing-library/react
+// to exercise the click handlers + the window.confirm dialog for Cancel AML.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ManualAmlPanel } from "./ManualAmlPanel";
+import { render, cleanup, fireEvent } from "@testing-library/react";
+import { ManualAmlPanel, type AmlDecision } from "./ManualAmlPanel";
 import type { Payment } from "@/lib/t0/types";
 
 function makePayment(overrides: Partial<Payment> = {}): Payment {
@@ -22,114 +26,301 @@ function makePayment(overrides: Partial<Payment> = {}): Payment {
 }
 
 describe("ManualAmlPanel", () => {
-  const onUploadAndReview = vi.fn();
+  const onReviewAml = vi.fn(
+    async (_paymentId: string, _decision: AmlDecision): Promise<void> => {},
+  );
 
-  it("renders empty state when no pending_aml payments", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("renders empty state when there are no payments at all", () => {
     const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[]} busy={false} onUploadAndReview={onUploadAndReview} />,
+      <ManualAmlPanel payments={[]} busy={false} onReviewAml={onReviewAml} />,
     );
+    expect(html).toContain('data-testid="aml-empty"');
     expect(html).toContain("No payments pending AML review");
-    expect(html).toContain("Trigger AML from the OFI console");
   });
 
-  it("renders empty state when payments have other statuses", () => {
-    const accepted = makePayment({ status: "accepted" });
+  it("does NOT mention 'Trigger AML from the OFI console' in any state", () => {
+    const samples: Payment[][] = [
+      [],
+      [makePayment()],
+      [makePayment({ status: "accepted", id: "pm_app" })],
+      [makePayment({ status: "rejected", id: "pm_rej" })],
+      [
+        makePayment({ id: "pm_a" }),
+        makePayment({ id: "pm_b", status: "accepted" }),
+        makePayment({ id: "pm_c", status: "rejected" }),
+      ],
+    ];
+    for (const payments of samples) {
+      const html = renderToStaticMarkup(
+        <ManualAmlPanel payments={payments} busy={false} onReviewAml={onReviewAml} />,
+      );
+      expect(html).not.toContain("Trigger AML from the OFI console");
+    }
+  });
+
+  it("renders approved payments in their own read-only section", () => {
+    const accepted = makePayment({ status: "accepted", id: "pm_app_1" });
     const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[accepted]} busy={false} onUploadAndReview={onUploadAndReview} />,
+      <ManualAmlPanel payments={[accepted]} busy={false} onReviewAml={onReviewAml} />,
     );
-    expect(html).toContain("No payments pending AML review");
+    expect(html).toContain('data-testid="aml-approved-section"');
+    expect(html).toContain('data-testid="aml-readonly-accepted-pm_app_1"');
+    expect(html).not.toContain("No payments pending AML review");
   });
 
-  it("renders pending_aml payment details", () => {
+  it("renders rejected payments in their own read-only section", () => {
+    const rejected = makePayment({ status: "rejected", id: "pm_rej_1" });
+    const html = renderToStaticMarkup(
+      <ManualAmlPanel payments={[rejected]} busy={false} onReviewAml={onReviewAml} />,
+    );
+    expect(html).toContain('data-testid="aml-rejected-section"');
+    expect(html).toContain('data-testid="aml-readonly-rejected-pm_rej_1"');
+  });
+
+  it("renders three buttons on a pending_aml row", () => {
+    const payment = makePayment({
+      amlFile: {
+        filename: "report.pdf",
+        fileSize: 1024,
+        fileType: "application/pdf",
+        uploadedAt: 1_700_000_000_000,
+      },
+    });
+    const html = renderToStaticMarkup(
+      <ManualAmlPanel payments={[payment]} busy={false} onReviewAml={onReviewAml} />,
+    );
+    expect(html).toContain('data-testid="aml-approve-pm_test_001"');
+    expect(html).toContain('data-testid="aml-reject-pm_test_001"');
+    expect(html).toContain('data-testid="aml-cancel-pm_test_001"');
+    expect(html).toContain("Approve");
+    expect(html).toContain("Reject");
+    expect(html).toContain("Cancel AML");
+  });
+
+  it("does NOT expose any file input (OFI owns the upload, not Provider)", () => {
     const payment = makePayment();
     const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[payment]} busy={false} onUploadAndReview={onUploadAndReview} />,
+      <ManualAmlPanel payments={[payment]} busy={false} onReviewAml={onReviewAml} />,
     );
-    expect(html).toContain("pm_test_001");
-    expect(html).toContain("EUR");
-    expect(html).toContain("BEN-001");
-    expect(html).toContain("920.00");
+    expect(html).not.toContain('type="file"');
+    expect(html).not.toContain('data-testid^="aml-file-input"');
+    expect(html).not.toContain('data-testid^="aml-upload"');
   });
 
-  it("renders file input for each pending_aml payment", () => {
-    const payment = makePayment();
+  it("shows OFI-uploaded file metadata on a pending_aml row with amlFile", () => {
+    const payment = makePayment({
+      id: "pm_with_file",
+      amlFile: {
+        filename: "report.pdf",
+        fileSize: 2048,
+        fileType: "application/pdf",
+        uploadedAt: 1_700_000_000_000,
+      },
+    });
     const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[payment]} busy={false} onUploadAndReview={onUploadAndReview} />,
+      <ManualAmlPanel payments={[payment]} busy={false} onReviewAml={onReviewAml} />,
     );
-    expect(html).toContain('type="file"');
-    expect(html).toContain('data-testid="aml-file-input-pm_test_001"');
-    expect(html).toContain('accept=".pdf,image/png,image/jpeg,image/jpg"');
+    expect(html).toContain('data-testid="aml-file-meta-pm_with_file"');
+    expect(html).toContain("report.pdf");
+    expect(html).toContain("2.0 KB");
+    expect(html).toContain("from OFI");
   });
 
-  it("renders upload button with correct test id", () => {
-    const payment = makePayment();
-    const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[payment]} busy={false} onUploadAndReview={onUploadAndReview} />,
+  it("formats amlFile sizes in B / KB / MB units", () => {
+    const makeWith = (bytes: number, id: string): Payment =>
+      makePayment({
+        id,
+        amlFile: {
+          filename: "x",
+          fileSize: bytes,
+          fileType: "application/pdf",
+          uploadedAt: 0,
+        },
+      });
+    const htmlB = renderToStaticMarkup(
+      <ManualAmlPanel
+        payments={[makeWith(500, "pm_b")]}
+        busy={false}
+        onReviewAml={onReviewAml}
+      />,
     );
-    expect(html).toContain('data-testid="aml-upload-pm_test_001"');
-    expect(html).toContain("Upload &amp; Review");
+    expect(htmlB).toContain("500 B");
+    const htmlMB = renderToStaticMarkup(
+      <ManualAmlPanel
+        payments={[makeWith(2 * 1024 * 1024, "pm_mb")]}
+        busy={false}
+        onReviewAml={onReviewAml}
+      />,
+    );
+    expect(htmlMB).toContain("2.0 MB");
   });
 
-  it("disables upload button when busy", () => {
-    const payment = makePayment();
+  it("shows legacy warning when pending_aml has no amlFile", () => {
+    const payment = makePayment({ id: "pm_legacy" });
     const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[payment]} busy={true} onUploadAndReview={onUploadAndReview} />,
+      <ManualAmlPanel payments={[payment]} busy={false} onReviewAml={onReviewAml} />,
     );
-    // When busy, both file input and button should be disabled
-    expect(html).toContain('disabled=""');
+    expect(html).toContain('data-testid="aml-legacy-warning-pm_legacy"');
+    expect(html).toContain("legacy");
+    // Buttons still available even without a file (legacy fallback).
+    expect(html).toContain('data-testid="aml-approve-pm_legacy"');
+    expect(html).toContain('data-testid="aml-reject-pm_legacy"');
+    expect(html).toContain('data-testid="aml-cancel-pm_legacy"');
   });
 
-  it("renders multiple pending_aml payments", () => {
-    const p1 = makePayment({ id: "pm_1" });
-    const p2 = makePayment({ id: "pm_2" });
+  it("disables all three buttons when busy=true", () => {
+    const payment = makePayment({
+      amlFile: {
+        filename: "x.pdf",
+        fileSize: 1,
+        fileType: "application/pdf",
+        uploadedAt: 0,
+      },
+    });
     const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[p1, p2]} busy={false} onUploadAndReview={onUploadAndReview} />,
+      <ManualAmlPanel payments={[payment]} busy={true} onReviewAml={onReviewAml} />,
     );
-    expect(html).toContain('data-testid="aml-file-input-pm_1"');
-    expect(html).toContain('data-testid="aml-file-input-pm_2"');
-    expect(html).toContain('data-testid="aml-upload-pm_1"');
-    expect(html).toContain('data-testid="aml-upload-pm_2"');
+    // Count at least 3 'disabled=""' occurrences (one per button).
+    const matches = html.match(/disabled=""/g) ?? [];
+    expect(matches.length).toBeGreaterThanOrEqual(3);
   });
 
   it("renders the step number and title", () => {
     const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[]} busy={false} onUploadAndReview={onUploadAndReview} />,
+      <ManualAmlPanel payments={[]} busy={false} onReviewAml={onReviewAml} />,
     );
     expect(html).toContain("04");
     expect(html).toContain("Payment-Manual AML (Provider view)");
   });
 
-  it("renders payment quote and USD amount", () => {
-    const payment = makePayment({ quoteId: "qt_abc123_xyz", usdAmount: 5000 });
+  it("renders the updated description text", () => {
     const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[payment]} busy={false} onUploadAndReview={onUploadAndReview} />,
+      <ManualAmlPanel payments={[]} busy={false} onReviewAml={onReviewAml} />,
     );
-    expect(html).toContain("qt_abc123_xyz");
-    expect(html).toContain("USD: $5,000");
+    expect(html).toContain("OFI uploads");
+    expect(html).toContain("Approve");
+    expect(html).toContain("Reject");
+    expect(html).toContain("Cancel AML");
   });
 
-  it("renders description text", () => {
-    const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[]} busy={false} onUploadAndReview={onUploadAndReview} />,
-    );
-    expect(html).toContain("Payments awaiting manual AML review");
-    expect(html).toContain("Upload &amp; Review");
-    expect(html).toContain("Last Look");
-  });
-
-  it("renders StatusDot with pending_aml status", () => {
+  it("renders StatusDot with pending_aml status on the active row", () => {
     const payment = makePayment();
     const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[payment]} busy={false} onUploadAndReview={onUploadAndReview} />,
+      <ManualAmlPanel payments={[payment]} busy={false} onReviewAml={onReviewAml} />,
     );
     expect(html).toContain('data-testid="status-pending_aml"');
   });
 
-  it("renders file input label", () => {
-    const payment = makePayment();
+  it("hides sections that have no payments", () => {
+    const pending = makePayment({ id: "pm_only_pending" });
     const html = renderToStaticMarkup(
-      <ManualAmlPanel payments={[payment]} busy={false} onUploadAndReview={onUploadAndReview} />,
+      <ManualAmlPanel payments={[pending]} busy={false} onReviewAml={onReviewAml} />,
     );
-    expect(html).toContain("AML Document");
+    expect(html).toContain('data-testid="aml-active-queue"');
+    expect(html).not.toContain('data-testid="aml-approved-section"');
+    expect(html).not.toContain('data-testid="aml-rejected-section"');
+  });
+
+  it("rejected chip does not expose the upload UI", () => {
+    const rejected = makePayment({ status: "rejected", id: "pm_only_rej" });
+    const html = renderToStaticMarkup(
+      <ManualAmlPanel payments={[rejected]} busy={false} onReviewAml={onReviewAml} />,
+    );
+    expect(html).toContain('data-testid="aml-rejected-section"');
+    expect(html).not.toContain('type="file"');
+  });
+
+  it("approved chip does not expose the upload UI", () => {
+    const accepted = makePayment({ status: "accepted", id: "pm_only_app" });
+    const html = renderToStaticMarkup(
+      <ManualAmlPanel payments={[accepted]} busy={false} onReviewAml={onReviewAml} />,
+    );
+    expect(html).toContain('data-testid="aml-approved-section"');
+    expect(html).not.toContain('type="file"');
+  });
+});
+
+// ── Handler-driven tests (happy-dom) ────────────────────────────────────
+
+describe("ManualAmlPanel — handler interactions", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  function makePendingPaymentWithFile(overrides: Partial<Payment> = {}): Payment {
+    return {
+      ...makePayment(),
+      ...overrides,
+      amlFile: {
+        filename: "report.pdf",
+        fileSize: 1024,
+        fileType: "application/pdf",
+        uploadedAt: 1_700_000_000_000,
+      },
+    };
+  }
+
+  it("clicking Approve invokes onReviewAml(paymentId, 'approve')", () => {
+    const onReviewAml = vi.fn(async () => {});
+    const payment = makePendingPaymentWithFile({ id: "pm_ok" });
+    const { getByTestId } = render(
+      <ManualAmlPanel payments={[payment]} busy={false} onReviewAml={onReviewAml} />,
+    );
+    fireEvent.click(getByTestId("aml-approve-pm_ok"));
+    expect(onReviewAml).toHaveBeenCalledTimes(1);
+    expect(onReviewAml).toHaveBeenCalledWith("pm_ok", "approve");
+  });
+
+  it("clicking Reject invokes onReviewAml(paymentId, 'reject')", () => {
+    const onReviewAml = vi.fn(async () => {});
+    const payment = makePendingPaymentWithFile({ id: "pm_bad" });
+    const { getByTestId } = render(
+      <ManualAmlPanel payments={[payment]} busy={false} onReviewAml={onReviewAml} />,
+    );
+    fireEvent.click(getByTestId("aml-reject-pm_bad"));
+    expect(onReviewAml).toHaveBeenCalledWith("pm_bad", "reject");
+  });
+
+  it("clicking Cancel AML prompts confirm; on cancel → onReviewAml NOT called", () => {
+    const onReviewAml = vi.fn(async () => {});
+    const payment = makePendingPaymentWithFile({ id: "pm_skip" });
+    // happy-dom doesn't ship window.confirm; install it before render.
+    const originalConfirm = window.confirm;
+    const confirmSpy = vi.fn((_msg?: string): boolean => false);
+    window.confirm = confirmSpy as unknown as typeof window.confirm;
+
+    const { getByTestId } = render(
+      <ManualAmlPanel payments={[payment]} busy={false} onReviewAml={onReviewAml} />,
+    );
+    fireEvent.click(getByTestId("aml-cancel-pm_skip"));
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect((confirmSpy.mock.calls[0] as unknown as string[])[0]).toContain("Cancel AML");
+    expect(onReviewAml).not.toHaveBeenCalled();
+    window.confirm = originalConfirm;
+  });
+
+  it("clicking Cancel AML + confirming → onReviewAml(paymentId, 'reject')", () => {
+    const onReviewAml = vi.fn(async () => {});
+    const payment = makePendingPaymentWithFile({ id: "pm_skip_yes" });
+    const originalConfirm = window.confirm;
+    const confirmSpy = vi.fn((_msg?: string): boolean => true);
+    window.confirm = confirmSpy as unknown as typeof window.confirm;
+
+    const { getByTestId } = render(
+      <ManualAmlPanel payments={[payment]} busy={false} onReviewAml={onReviewAml} />,
+    );
+    fireEvent.click(getByTestId("aml-cancel-pm_skip_yes"));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(onReviewAml).toHaveBeenCalledTimes(1);
+    expect(onReviewAml).toHaveBeenCalledWith("pm_skip_yes", "reject");
+    window.confirm = originalConfirm;
   });
 });

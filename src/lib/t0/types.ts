@@ -31,6 +31,16 @@ export interface Quote {
 export type PaymentStatus = "pending" | "accepted" | "rejected" | "confirmed" | "pending_aml";
 export type PayoutStatus = "pending" | "accepted" | "success" | "failed";
 
+/** Metadata about an AML document uploaded by the OFI. Stored on the
+ *  Payment so the Provider can review the same file. Optional for
+ *  backwards compatibility with legacy pending_aml rows. */
+export interface AmlFileMeta {
+  filename: string;
+  fileSize: number;
+  fileType: string;
+  uploadedAt: number;
+}
+
 export interface Payment {
   id: string;
   quoteId: string;
@@ -40,6 +50,8 @@ export interface Payment {
   beneficiaryRef: string;
   status: PaymentStatus;
   createdAt: number;
+  /** Set when the OFI uploads an AML document for this payment. */
+  amlFile?: AmlFileMeta;
 }
 
 export interface Payout {

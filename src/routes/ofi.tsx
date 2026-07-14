@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import React, { useState, useCallback } from "react";
 import {
@@ -10,6 +10,7 @@ import {
   ofiSubmitSettlementFn,
   ofiApprovePaymentQuoteFn,
   triggerManualAmlFn,
+  ofiUploadAmlFileFn,
 } from "@/lib/t0/t0.functions";
 import type { Currency, Payment, Payout } from "@/lib/t0/types";
 import type { NetworkEvent } from "@/lib/t0/types";
@@ -71,6 +72,20 @@ export const Route = createFileRoute("/ofi")({
 function OfiPage() {
   const initial = Route.useLoaderData() as OfiSnapshot;
   const [data, setData] = useState<OfiSnapshot>(initial);
+  const router = useRouter();
+
+  // If the URL carries `?aml-required=<pm_id>` (e.g. after creating a
+  // payment), land on the Payment-Manual AML tab so the OFI sees the
+  // upload row immediately. Recomputed on every render so URL changes
+  // (via `router.navigate` after Create Payment) take effect without
+  // a full reload. The `key` on <OfiSidebarMenu> forces a remount
+  // when the tab changes, which is how Radix Tabs picks up the new
+  // defaultValue without race conditions.
+  const initialDefaultTab: "quote-management" | "payment-manual-aml" =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("aml-required")
+      ? "payment-manual-aml"
+      : "quote-management";
 
   const getQuote = useServerFn(ofiGetQuoteFn);
   const createPayment = useServerFn(ofiCreatePaymentFn);
@@ -80,6 +95,7 @@ function OfiPage() {
   const readModel = useServerFn(ofiReadModelFn);
   const submitSettlement = useServerFn(ofiSubmitSettlementFn);
   const approvePaymentQuote = useServerFn(ofiApprovePaymentQuoteFn);
+  const uploadAmlFile = useServerFn(ofiUploadAmlFileFn);
 
   // ── Phase 2: Funding Workspace state ────────────────────────────
   // The funding panel reads the durable read model. We use a fixed
@@ -157,6 +173,51 @@ function OfiPage() {
   React.useEffect(() => {
     void refreshReadModel();
   }, [refreshReadModel]);
+
+  // ── Phase 7 AML scroll-hint ─────────────────────────────────────────
+  // When the user lands on /ofi?aml-required=<paymentId> (e.g. after
+  // creating a payment), auto-scroll to the matching row and briefly
+  // highlight it. The row may be in any of the three sub-sections
+  // (trigger / upload / waiting), so probe each known testid.
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get("aml-required");
+    if (!target) return;
+
+    const tryScroll = () => {
+      // Prefer the upload row, then the trigger button, then the waiting
+      // row. Whichever renders first wins.
+      const candidates = [
+        `ofi-upload-row-${target}`,
+        `ofi-trigger-aml-${target}`,
+        `ofi-waiting-row-${target}`,
+      ];
+      let el: HTMLElement | null = null;
+      for (const sel of candidates) {
+        el = document.querySelector(`[data-testid="${sel}"]`) as HTMLElement | null;
+        if (el) break;
+      }
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("ring-2", "ring-accent-cyan");
+        setTimeout(() => {
+          el!.classList.remove("ring-2", "ring-accent-cyan");
+        }, 1500);
+        return true;
+      }
+      return false;
+    };
+    if (tryScroll()) return;
+    // Retry a few times in case the panel hasn't rendered yet (network
+    // refresh + state transition is async).
+    let attempts = 0;
+    const id = setInterval(() => {
+      attempts += 1;
+      if (tryScroll() || attempts > 20) clearInterval(id);
+    }, 200);
+    return () => clearInterval(id);
+  }, [data.payments, router]);
 
   const [txHashDraft, setTxHashDraft] = useState("");
   const [fundingAmount, setFundingAmount] = useState(5000);
@@ -266,7 +327,28 @@ function OfiPage() {
       };
       const r = await createPayment({ data: input });
       setPaymentResult(r);
+      // Phase 7 follow-up: every Create Payment must trigger AML.
+      // Sandbox currently drives the payment all the way to `confirmed`
+      // synchronously, which would leave nothing for the OFI to upload.
+      // Re-triggering AML here normalizes the state to `pending_aml` so
+      // the OFI can upload the AML file from Payment-Manual AML.
+      if ("success" in r) {
+        await triggerManualAml({ data: { paymentId: r.success.payment.id } });
+      }
       await refresh();
+      // Tell the AML panel to surface + highlight this payment so the
+      // operator lands on the upload row immediately. The existing
+      // useEffect on `data.payments` (and on the `?aml-required=`
+      // search param) picks this up and scrolls + ring-highlights.
+      if ("success" in r) {
+        const params = new URLSearchParams(window.location.search);
+        params.set("aml-required", r.success.payment.id);
+        router.navigate({
+          to: "/ofi",
+          search: { "aml-required": r.success.payment.id },
+          replace: true,
+        });
+      }
     });
 
   const onApprove = (p: Payment) =>
@@ -286,6 +368,22 @@ function OfiPage() {
       await triggerManualAml({ data: { paymentId: p.id } });
       await refresh();
     });
+
+  // OFI uploads the AML document for a pending_aml payment. The
+  // server fn validates the file + writes amlFile metadata. The
+  // Provider separately approves / rejects / cancels AML.
+  const onUploadAmlFile = async (paymentId: string, file: File) => {
+    await run(async () => {
+      await uploadAmlFile({
+        data: {
+          paymentId,
+          filename: file.name,
+          fileSize: file.size,
+          fileType: file.type || "application/octet-stream",
+        },
+      });
+    });
+  };
 
   // ── OFI Payment-Manual AML: Approve/Reject Quote (Last Look) ───────
   const onApproveQuote = (paymentId: string, quoteId: string) =>
@@ -343,6 +441,8 @@ function OfiPage() {
         )}
 
         <OfiSidebarMenu
+          key={initialDefaultTab}
+          defaultTab={initialDefaultTab}
           fundingContent={
             <PanelCard step="04" title="Funding & Capacity">
               <div className="space-y-4" data-testid="funding-panel">
@@ -857,6 +957,7 @@ function OfiPage() {
                 payments={data.payments}
                 busy={busy}
                 onTriggerAml={onTriggerAml}
+                onUploadAmlFile={onUploadAmlFile}
               />
               <PanelCard step="09" title="Payout Requests">
                 <div className="space-y-4">
