@@ -96,6 +96,7 @@ Config/secrets via `.env` (see `.env.example`), never committed. Never commit re
 - Keep new logic local and cohesive; split only when it clearly reduces duplication or branching.
 - Preserve unrelated files and existing tests.
 - State assumptions when needed, then verify live code or config before editing.
+- **Evidence-based reporting**: before claiming any work is done, verify it against actual tool outputs from this session. Only report results you can prove. If something is unverified, say so. If a step failed, include the output and state the failure honestly. Never report success you cannot demonstrate.
 
 ## Notes
 - Repo-specific overlay above; everything inside `agents-md` markers is generated.
