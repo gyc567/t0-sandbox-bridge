@@ -7,6 +7,7 @@ import {
   callbackInbox,
 } from "./index";
 import { validateAmlFile, sandboxAmlReviewer } from "./aml";
+import { bytesToBase64, base64ToBytes } from "./aml-blob";
 import type { Currency, VolumeBand } from "./types";
 import { SUPPORTED_CURRENCIES } from "./currencies";
 import type { CreatePaymentInput } from "./network";
@@ -49,6 +50,10 @@ export const completeManualAmlFn = createServerFn({ method: "POST" })
   .validator((d: { paymentId: string; approved: boolean }) => d)
   .handler(async ({ data }) => sandboxNetwork.completeManualAml(data.paymentId, data.approved));
 
+export const requestRefundFn = createServerFn({ method: "POST" })
+  .validator((d: { paymentId: string }) => d)
+  .handler(async ({ data }) => sandboxNetwork.requestRefund(data.paymentId));
+
 export const triggerManualAmlFn = createServerFn({ method: "POST" })
   .validator((d: { paymentId: string }) => d)
   .handler(async ({ data }) => sandboxNetwork.triggerManualAml(data.paymentId));
@@ -67,7 +72,7 @@ export const ofiApprovePaymentQuoteFn = createServerFn({ method: "POST" })
   });
 
 export const createPaymentIntentFn = createServerFn({ method: "POST" })
-  .validator((d: { quoteId: string; beneficiaryRef: string }) => d)
+  .validator((d: { quoteId: string; beneficiaryRef: string; recipientInfo?: import("./types").RecipientInfo }) => d)
   .handler(async ({ data }) => sandboxNetwork.createPaymentIntent(data));
 
 export const confirmFundsFn = createServerFn({ method: "POST" })
@@ -103,51 +108,113 @@ export async function reviewAmlUpload(input: {
 
 /** Apply an AML decision to network state. On approval: CompleteManualAmlCheck
  *  (approved) → ApprovePaymentQuotes (Last Look) → log OFI AML event.
- *  On rejection: CompleteManualAmlCheck (rejected) only — Last Look is
+ *  On rejection: CompleteManualAmlCheck (rejected) with reason — Last Look is
  *  deliberately NOT called. Returns the resulting payment. The network +
  *  provider arguments default to the singletons used by the server fn;
  *  tests pass in a local instance for isolation. */
 export function applyAmlReview(
-  input: { paymentId: string; approved: boolean },
+  input: {
+    paymentId: string;
+    approved: boolean;
+    reason?: "aml_denied" | "aml_not_needed";
+  },
   deps: {
     network: Pick<typeof sandboxNetwork, "completeManualAml" | "approvePaymentQuote">;
     provider: Pick<typeof providerService, "logOfiAmlEvent">;
   } = { network: sandboxNetwork, provider: providerService },
 ): ReturnType<typeof sandboxNetwork.completeManualAml> {
-  const payment = deps.network.completeManualAml(input.paymentId, input.approved);
+  const payment = deps.network.completeManualAml(input.paymentId, input.approved, input.reason);
   if (input.approved) {
     const quoteId = payment.quoteId;
     deps.network.approvePaymentQuote(input.paymentId, quoteId);
     deps.provider.logOfiAmlEvent(input.paymentId, quoteId, "approved");
+  } else {
+    deps.provider.logOfiAmlEvent(input.paymentId, payment.quoteId, "rejected");
   }
   return payment;
 }
 
 /** OFI-side: upload an AML document. Validates the file, runs the sandbox
- *  reviewer for the binary accept/reject signal, then writes the file
- *  metadata onto the payment. Does NOT change status — the Provider
- *  separately approves / rejects / cancels AML. */
+ *  reviewer for the binary accept/reject signal, stores the blob, writes
+ *  metadata, and emits an audit event. Does NOT change status — the
+ *  Provider separately approves / rejects / cancels AML. */
 export const ofiUploadAmlFileFn = createServerFn({ method: "POST" })
-  .validator((d: { paymentId: string; filename: string; fileSize: number; fileType: string }) => d)
+  .validator((d: {
+    paymentId: string;
+    filename: string;
+    fileSize: number;
+    fileType: string;
+    bytesBase64: string;
+  }) => d)
   .handler(async ({ data }) => {
-    const reviewResult = await reviewAmlUpload(data);
+    const bytes = base64ToBytes(data.bytesBase64);
+    const reviewResult = await reviewAmlUpload({
+      paymentId: data.paymentId,
+      filename: data.filename,
+      fileSize: data.fileSize,
+      fileType: data.fileType,
+    });
+    sandboxNetwork.recordAmlBlob(data.paymentId, bytes);
     sandboxNetwork.recordAmlFile(data.paymentId, {
       filename: data.filename,
       fileSize: data.fileSize,
       fileType: data.fileType,
       uploadedAt: Date.now(),
     });
+    providerService.emitEvent({
+      type: "AmlFileUploaded",
+      paymentId: data.paymentId,
+      filename: data.filename,
+      fileSize: data.fileSize,
+      at: Date.now(),
+    });
     return reviewResult;
   });
 
-/** Provider-side: review an already-uploaded AML file. Pure state
- *  transition — no file metadata, just approve or reject. */
-export const reviewAmlFileFn = createServerFn({ method: "POST" })
-  .validator((d: { paymentId: string; decision: "approve" | "reject" }) => d)
+/** Provider-side: download the raw bytes of an already-uploaded AML file.
+ *  Throws if the payment has no AML file metadata or if the blob is missing
+ *  (indicates a broken upload). Returns { filename, fileType, bytesBase64 }
+ *  so the caller can reconstruct the Blob on the client. */
+export const downloadAmlFileFn = createServerFn({ method: "POST" })
+  .validator((d: { paymentId: string }) => d)
   .handler(async ({ data }) => {
+    const payment = sandboxNetwork.listPayments().find((p) => p.id === data.paymentId);
+    if (!payment?.amlFile) throw new Error("no AML file for payment");
+    const bytes = sandboxNetwork.getAmlBlob(data.paymentId);
+    if (!bytes) throw new Error("AML file metadata present but blob missing");
+    return {
+      filename: payment.amlFile.filename,
+      fileType: payment.amlFile.fileType,
+      bytesBase64: bytesToBase64(bytes),
+    };
+  });
+
+/** Provider-side: review an already-uploaded AML file + recipient info check.
+ *  Pure state transition — records the recipient check decision first, then
+ *  applies the AML review (approve → Last Look; reject → terminal).
+ *  recipientCheckStatus is always sent: "approved" if OFI provided no recipientInfo
+ *  (skip verification) or if Provider checked the box; "rejected" if Provider
+ *  rejected the recipient info. */
+export const reviewAmlFileFn = createServerFn({ method: "POST" })
+  .validator(
+    (d: {
+      paymentId: string;
+      decision: "approve" | "reject";
+      reason?: "aml_denied" | "aml_not_needed";
+      recipientCheckStatus: "approved" | "rejected";
+      recipientCheckNote?: string;
+    }) => d,
+  )
+  .handler(async ({ data }) => {
+    sandboxNetwork.updateRecipientCheck(
+      data.paymentId,
+      data.recipientCheckStatus,
+      data.recipientCheckNote,
+    );
     applyAmlReview({
       paymentId: data.paymentId,
       approved: data.decision === "approve",
+      reason: data.reason,
     });
   });
 
@@ -171,6 +238,9 @@ export const ofiCreatePaymentFn = createServerFn({ method: "POST" })
 export const ofiCompleteManualAmlFn = createServerFn({ method: "POST" })
   .validator((d: { paymentId: string; approved: boolean }) => d)
   .handler(async ({ data }) => sandboxNetwork.completeManualAml(data.paymentId, data.approved));
+
+export const ofiListRejectedPaymentsFn = createServerFn({ method: "GET" })
+  .handler(async () => sandboxNetwork.listRejectedPayments());
 
 // ── §4–§7 — Pre-Settlement: USDT transfer + chain confirm + ledger ──
 

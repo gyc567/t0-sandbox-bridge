@@ -20,6 +20,7 @@ const TYPE_COLOR: Record<NetworkEvent["type"], string> = {
   PaymentConfirmed: "text-[#7ec488]",
   QuoteConfirmation: "text-muted-foreground",
   OfiAmlEvent: "text-[#7ec488]",
+  AmlFileUploaded: "text-[#7e95b0]",
 };
 
 /**

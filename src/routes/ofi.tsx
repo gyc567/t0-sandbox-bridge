@@ -21,6 +21,7 @@ import { formatQuoteForDisplay, type QuoteDisplay } from "@/lib/t0/quote-display
 import type { CreatePaymentInput, GetQuoteResult } from "@/lib/t0/network";
 import { PanelCard, StatusDot, List } from "@/components/console";
 import { OfiManualAmlPanel } from "@/components/ofi/OfiManualAmlPanel";
+import { OfiReFundPanel } from "@/components/ofi/OfiReFundPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -374,12 +375,22 @@ function OfiPage() {
   // Provider separately approves / rejects / cancels AML.
   const onUploadAmlFile = async (paymentId: string, file: File) => {
     await run(async () => {
+      const bytesBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(",")[1];
+          resolve(base64 ?? "");
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
       await uploadAmlFile({
         data: {
           paymentId,
           filename: file.name,
           fileSize: file.size,
           fileType: file.type || "application/octet-stream",
+          bytesBase64,
         },
       });
     });
@@ -443,167 +454,7 @@ function OfiPage() {
         <OfiSidebarMenu
           key={initialDefaultTab}
           defaultTab={initialDefaultTab}
-          fundingContent={
-            <PanelCard step="04" title="Funding & Capacity">
-              <div className="space-y-4" data-testid="funding-panel">
-                {readModelData?.latestLimit ? (
-                  <div className="grid gap-3 md:grid-cols-4 font-mono text-caption">
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
-                        Payout limit
-                      </p>
-                      <p className="text-foreground">
-                        <span className="tabular">
-                          ${readModelData.latestLimit.payoutLimit.unscaled}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
-                        Credit limit
-                      </p>
-                      <p className="text-foreground">
-                        <span className="tabular">
-                          ${readModelData.latestLimit.creditLimit?.unscaled ?? "—"}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
-                        Credit usage
-                      </p>
-                      <p className="text-foreground">
-                        <span className="tabular">
-                          ${readModelData.latestLimit.creditUsage?.unscaled ?? "—"}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
-                        Reserve
-                      </p>
-                      <p className="text-foreground">
-                        <span className="tabular">
-                          ${readModelData.latestLimit.reserve?.unscaled ?? "—"}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <p
-                    className="font-mono text-muted-foreground"
-                    style={{ fontSize: "12px" }}
-                    data-testid="funding-no-limit"
-                  >
-                    Network has not yet informed us of a payout limit. Capacity is unknown until the
-                    first <code>UpdateLimit</code> callback arrives.
-                  </p>
-                )}
-
-                <div
-                  className="font-mono rounded border border-hairline p-3 space-y-3"
-                  style={{ fontSize: "12px" }}
-                >
-                  <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
-                    Sandbox: simulate a USDT transfer by submitting a txHash. Real deployments
-                    should use the OFI Treasury workflow to transfer from a whitelisted wallet.
-                  </p>
-                  <div className="flex flex-wrap items-end gap-3">
-                    <div>
-                      <Label
-                        className="font-mono text-muted-foreground"
-                        style={{ fontSize: "11px" }}
-                      >
-                        Amount (USD)
-                      </Label>
-                      <Input
-                        type="number"
-                        value={fundingAmount}
-                        onChange={(e) => setFundingAmount(Number(e.target.value))}
-                        className="w-32 font-mono"
-                        data-testid="funding-amount"
-                      />
-                    </div>
-                    <div>
-                      <Label
-                        className="font-mono text-muted-foreground"
-                        style={{ fontSize: "11px" }}
-                      >
-                        Chain
-                      </Label>
-                      <Select
-                        value={fundingChain}
-                        onValueChange={(v) => setFundingChain(v as typeof fundingChain)}
-                      >
-                        <SelectTrigger className="w-32 font-mono" data-testid="funding-chain">
-                          <SelectValue aria-label={fundingChain}>{fundingChain}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="TRON">TRON</SelectItem>
-                          <SelectItem value="ETHEREUM">ETHEREUM</SelectItem>
-                          <SelectItem value="BSC">BSC</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex-1 min-w-[180px]">
-                      <Label
-                        className="font-mono text-muted-foreground"
-                        style={{ fontSize: "11px" }}
-                      >
-                        txHash (optional, auto-generated if blank)
-                      </Label>
-                      <Input
-                        type="text"
-                        value={txHashDraft}
-                        onChange={(e) => setTxHashDraft(e.target.value)}
-                        placeholder="0x…"
-                        className="w-full font-mono"
-                        data-testid="funding-txhash"
-                      />
-                    </div>
-                    <Button
-                      size="sm"
-                      className="btn-glow"
-                      onClick={onFund}
-                      disabled={busy}
-                      data-testid="btn-fund"
-                    >
-                      <PiggyBank className="w-4 h-4" />
-                      Submit funding
-                    </Button>
-                  </div>
-                </div>
-
-                {readModelData && readModelData.activeProjections.length > 0 && (
-                  <div
-                    className="font-mono rounded border border-hairline p-3 space-y-2"
-                    data-testid="active-projections"
-                  >
-                    <p className="text-muted-foreground" style={{ fontSize: "11px" }}>
-                      Active projections
-                    </p>
-                    {readModelData.activeProjections.map((p) => (
-                      <div
-                        key={p.id}
-                        className="flex flex-wrap items-center gap-2"
-                        data-testid={`projection-${p.id}`}
-                      >
-                        <Activity className="w-3 h-3 text-muted-foreground" />
-                        <span className="tabular">{p.txHash.slice(0, 10)}…</span>
-                        <span className="text-muted-foreground">{p.chain}</span>
-                        <span className="text-muted-foreground">·</span>
-                        <span>{p.chainStatus}</span>
-                        <span className="text-muted-foreground">·</span>
-                        <span>{p.accountingStatus}</span>
-                        <span className="text-muted-foreground">·</span>
-                        <span className="tabular">${p.amount.unscaled}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </PanelCard>
-          }
+          refundContent={<OfiReFundPanel payments={data.payments.filter((p) => p.status === "rejected")} />}
           paymentPreSettlementContent={
             <>
               <PanelCard step="05" title="USDT Settlement Transfer">

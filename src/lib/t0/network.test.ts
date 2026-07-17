@@ -138,6 +138,57 @@ describe("SandboxNetwork.createPayment (Network owns accept + routes PayoutReque
     // Idempotent re-call returns the existing payout; no extra executePayout.
     expect(spy).toHaveBeenCalledTimes(1);
   });
+
+  it("createPayment saves recipientInfo.fallback on the Payment", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const r = await network.createPayment(
+      {
+        paymentClientId: "baxs_recip",
+        quoteId: q.id,
+        beneficiaryRef: "BEN",
+        usdAmount: 1_000,
+        recipientInfo: {
+          fallback: {
+            accountHolderName: "Max Mustermann",
+            accountNumber: "DE89370400440532013000",
+            bankCode: "COBADEFFXXX",
+            bankName: "Commerzbank",
+            country: "DE",
+          },
+        },
+      },
+      clock,
+    );
+    expect("success" in r).toBe(true);
+    if ("success" in r) {
+      expect(r.success.payment.recipientInfo).toEqual({
+        fallback: {
+          accountHolderName: "Max Mustermann",
+          accountNumber: "DE89370400440532013000",
+          bankCode: "COBADEFFXXX",
+          bankName: "Commerzbank",
+          country: "DE",
+        },
+      });
+    }
+  });
+
+  it("createPayment without recipientInfo leaves recipientInfo undefined", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const r = await network.createPayment(
+      {
+        paymentClientId: "baxs_no_recip",
+        quoteId: q.id,
+        beneficiaryRef: "BEN",
+        usdAmount: 1_000,
+      },
+      clock,
+    );
+    expect("success" in r).toBe(true);
+    if ("success" in r) {
+      expect(r.success.payment.recipientInfo).toBeUndefined();
+    }
+  });
 });
 
 // ── completeManualAml ──────────────────────────────────────────────
@@ -223,6 +274,104 @@ describe("SandboxNetwork.cancelManualAml", () => {
   });
 });
 
+// ── updateRecipientCheck ──────────────────────────────────────────────
+
+describe("SandboxNetwork.updateRecipientCheck", () => {
+  it("sets recipientCheckStatus to approved", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: "baxs_rc_appr", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
+
+    const updated = network.updateRecipientCheck(p.success.payment.id, "approved");
+    expect(updated.recipientCheckStatus).toBe("approved");
+    expect(updated.recipientCheckNote).toBeUndefined();
+  });
+
+  it("sets recipientCheckStatus to rejected with a note", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: "baxs_rc_rej", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
+
+    const updated = network.updateRecipientCheck(p.success.payment.id, "rejected", "name mismatch");
+    expect(updated.recipientCheckStatus).toBe("rejected");
+    expect(updated.recipientCheckNote).toBe("name mismatch");
+  });
+
+  it("is idempotent: second call overwrites the previous decision", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: "baxs_rc_idem", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
+
+    network.updateRecipientCheck(p.success.payment.id, "approved");
+    const updated = network.updateRecipientCheck(p.success.payment.id, "rejected", "changed mind");
+    expect(updated.recipientCheckStatus).toBe("rejected");
+    expect(updated.recipientCheckNote).toBe("changed mind");
+  });
+
+  it("throws on unknown payment", () => {
+    expect(() => network.updateRecipientCheck("ghost_pm", "approved")).toThrow(/unknown payment/);
+  });
+});
+
+// ── requestRefund ─────────────────────────────────────────────────────
+
+describe("SandboxNetwork.requestRefund", () => {
+  it("rejects payment + releases credit + sets refundedAt", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: "baxs_refund_ok", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
+    network.completeManualAml(p.success.payment.id, false);
+
+    const updated = network.requestRefund(p.success.payment.id);
+    expect(updated.status).toBe("rejected");
+    expect(updated.refundedAt).toBe(clock);
+  });
+
+  it("throws on unknown payment", () => {
+    expect(() => network.requestRefund("ghost_pm")).toThrow(/unknown payment/);
+  });
+
+  it("throws when payment is not in rejected state", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: "baxs_refund_not_rejected", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    // payment is "confirmed" after createPayment
+    expect(() => network.requestRefund(p.success.payment.id)).toThrow(/not in rejected state/);
+  });
+
+  it("throws when payment is already refunded", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: "baxs_refund_double", quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
+    network.completeManualAml(p.success.payment.id, false);
+    network.requestRefund(p.success.payment.id);
+    expect(() => network.requestRefund(p.success.payment.id)).toThrow(/already refunded/);
+  });
+});
+
 // ── recordAmlFile (Phase 7 AML rewrite) ───────────────────────────────
 
 describe("SandboxNetwork.recordAmlFile", () => {
@@ -285,6 +434,30 @@ describe("SandboxNetwork.recordAmlFile", () => {
   });
 });
 
+// ── AML blob forwarding ─────────────────────────────────────────────
+
+describe("SandboxNetwork — AML blob", () => {
+  it("recordAmlBlob delegates to provider and getAmlBlob retrieves it", () => {
+    svc.recordPayment({
+      id: "pm_blob",
+      quoteId: "qt",
+      currency: "EUR",
+      usdAmount: 1,
+      localAmount: 1,
+      beneficiaryRef: "X",
+      status: "accepted",
+      createdAt: clock,
+    });
+    const bytes = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
+    network.recordAmlBlob("pm_blob", bytes);
+    expect(network.getAmlBlob("pm_blob")).toEqual(bytes);
+  });
+
+  it("recordAmlBlob throws on unknown payment", () => {
+    expect(() => network.recordAmlBlob("ghost", new Uint8Array())).toThrow(/unknown payment/);
+  });
+});
+
 // ── approvePaymentQuote (Last Look) ─────────────────────────────────
 
 describe("SandboxNetwork.approvePaymentQuote", () => {
@@ -330,6 +503,25 @@ describe("SandboxNetwork.createPaymentIntent / confirmFunds", () => {
     expect(intent.id).toMatch(/^pi_/);
     expect(intent.status).toBe("pending");
     expect(intent.localAmount).toBeCloseTo(900);
+  });
+
+  it("createPaymentIntent saves recipientInfo when provided", async () => {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const intent = network.createPaymentIntent(
+      {
+        quoteId: q.id,
+        beneficiaryRef: "INT-1",
+        recipientInfo: {
+          fallback: {
+            accountHolderName: "Jane Doe",
+            accountNumber: "GB82WEST12345698765432",
+            country: "GB",
+          },
+        },
+      },
+      clock,
+    );
+    expect(intent.recipientInfo?.fallback?.accountHolderName).toBe("Jane Doe");
   });
 
   it("createPaymentIntent throws on unknown quote", () => {
@@ -427,12 +619,12 @@ describe("SandboxNetwork ingress helpers (provider-impl RPC translations)", () =
   it("handleNetworkAccepted writes an accepted payment when no quote is published throws", () => {
     // Without any published quote the helper must fail loudly — the real
     // network's UpdatePayment.accepted always carries quote context.
-    expect(() => network.handleNetworkAccepted("n_1", "", clock)).toThrow(/no quote available/);
+    expect(() => network.handleNetworkAccepted("n_1", "", undefined, clock)).toThrow(/no quote available/);
   });
 
   it("handleNetworkAccepted writes accepted payment when a quote exists", async () => {
     const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
-    const p = network.handleNetworkAccepted("n_1", "BEN", clock);
+    const p = network.handleNetworkAccepted("n_1", "BEN", undefined, clock);
     expect(p.status).toBe("accepted");
     expect(p.beneficiaryRef).toBe("BEN");
     expect(p.currency).toBe(q.currency);
@@ -440,8 +632,8 @@ describe("SandboxNetwork ingress helpers (provider-impl RPC translations)", () =
 
   it("handleNetworkAccepted is idempotent on paymentClientId", async () => {
     await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
-    const p1 = network.handleNetworkAccepted("n_idem", "BEN", clock);
-    const p2 = network.handleNetworkAccepted("n_idem", "BEN", clock);
+    const p1 = network.handleNetworkAccepted("n_idem", "BEN", undefined, clock);
+    const p2 = network.handleNetworkAccepted("n_idem", "BEN", undefined, clock);
     expect(p1.id).toBe(p2.id);
     expect(svc.snapshot().payments.filter((x) => x.id === "n_idem")).toHaveLength(1);
   });
@@ -473,7 +665,72 @@ describe("SandboxNetwork ingress helpers (provider-impl RPC translations)", () =
   });
 });
 
-// ── listPayments + OFI delegation ───────────────────────────────────
+// ── listRejectedPayments (Phase 7 ReFund) ───────────────────────────
+
+describe("SandboxNetwork.listRejectedPayments (ReFund)", () => {
+  async function makeRejected(clientId: string, addRefunded = false) {
+    const q = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const p = await network.createPayment(
+      { paymentClientId: clientId, quoteId: q.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in p)) throw new Error("setup");
+    svc.markPaymentStatus(p.success.payment.id, "pending_aml");
+    network.completeManualAml(p.success.payment.id, false);
+    if (addRefunded) {
+      network.requestRefund(p.success.payment.id);
+    }
+    return p.success.payment.id;
+  }
+
+  it("returns only payments with status === rejected", async () => {
+    await makeRejected("baxs_rej_1");
+    const accepted = await svc.publishQuote({ currency: "EUR", band: 1_000, rate: 0.9 });
+    const ap = await network.createPayment(
+      { paymentClientId: "baxs_acc_1", quoteId: accepted.id, beneficiaryRef: "B", usdAmount: 1_000 },
+      clock,
+    );
+    if (!("success" in ap)) throw new Error("setup");
+    svc.markPaymentStatus(ap.success.payment.id, "pending_aml");
+    network.completeManualAml(ap.success.payment.id, true);
+
+    const rejected = network.listRejectedPayments();
+    expect(rejected.every((p) => p.status === "rejected")).toBe(true);
+  });
+
+  it("excludes accepted / confirmed / pending payments", async () => {
+    await makeRejected("baxs_rej_only");
+    const ids = network.listRejectedPayments().map((p) => p.id);
+    expect(ids).not.toContain("baxs_acc_1");
+  });
+
+  it("sorts refunded payments first (by refundedAt desc), then awaiting (by rejectedAt desc)", async () => {
+    // Payment A: rejected, later refunded
+    clock = 1_700_000_000_000;
+    const idA = await makeRejected("baxs_rej_a");
+    clock += 10_000;
+    network.requestRefund(idA);
+
+    // Payment B: rejected, never refunded (awaiting)
+    clock = 1_700_000_000_001;
+    const idB = await makeRejected("baxs_rej_b");
+
+    // Payment C: rejected, refunded earlier than A
+    clock = 1_700_000_000_002;
+    const idC = await makeRejected("baxs_rej_c");
+    clock += 5_000;
+    network.requestRefund(idC);
+
+    const list = network.listRejectedPayments();
+    expect(list[0]!.id).toBe(idA); // refunded latest → first
+    expect(list[1]!.id).toBe(idC); // refunded earlier → second
+    expect(list[2]!.id).toBe(idB); // awaiting → last
+  });
+
+  it("returns empty array when no rejected payments exist", () => {
+    expect(network.listRejectedPayments()).toEqual([]);
+  });
+});
 
 describe("SandboxNetwork.listPayments and OFI delegation", () => {
   it("listPayments returns the provider's payments", async () => {

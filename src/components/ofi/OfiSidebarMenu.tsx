@@ -11,7 +11,7 @@ const MENU_ITEMS: MenuItem[] = [
   { value: "payment-pre-settlement", label: "Payment-Pre-Settlement" },
   { value: "payment-continued", label: "Payment-Payment Continued" },
   { value: "payment-manual-aml", label: "Payment-Manual AML" },
-  { value: "funding-capacity", label: "Funding & Capacity" },
+  { value: "refund", label: "ReFund" },
 ];
 
 export type OfiTab =
@@ -19,11 +19,11 @@ export type OfiTab =
   | "payment-pre-settlement"
   | "payment-continued"
   | "payment-manual-aml"
-  | "funding-capacity";
+  | "refund";
 
 type OfiSidebarMenuProps = {
   children: ReactNode;
-  fundingContent: ReactNode;
+  refundContent: ReactNode;
   paymentPreSettlementContent: ReactNode;
   paymentContinuedContent: ReactNode;
   paymentManualAmlContent: ReactNode;
@@ -34,7 +34,7 @@ type OfiSidebarMenuProps = {
 
 export function OfiSidebarMenu({
   children,
-  fundingContent,
+  refundContent,
   paymentPreSettlementContent,
   paymentContinuedContent,
   paymentManualAmlContent,
@@ -75,8 +75,8 @@ export function OfiSidebarMenu({
       <TabsContent value="payment-manual-aml" className="mt-0 min-w-0">
         {paymentManualAmlContent}
       </TabsContent>
-      <TabsContent value="funding-capacity" className="mt-0 min-w-0">
-        {fundingContent}
+      <TabsContent value="refund" className="mt-0 min-w-0">
+        {refundContent}
       </TabsContent>
     </Tabs>
   );

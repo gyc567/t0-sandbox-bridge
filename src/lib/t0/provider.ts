@@ -52,6 +52,7 @@ export class PayoutProviderService {
   private payments = new Map<string, Payment>();
   private payouts = new Map<string, Payout>();
   private events: NetworkEvent[] = [];
+  private readonly amlBlobs = new Map<string, Uint8Array>();
 
   /**
    * Optional Pre-Settlement registry. When present, `notifyUsdtSettlement`
@@ -106,6 +107,15 @@ export class PayoutProviderService {
     await this.client.updateQuote(quote);
     this.log({ type: "QuotePublished", quoteId: quote.id, at: this.now() });
     return quote;
+  }
+
+  /**
+   * Store an external/OFI-fetched quote directly with its existing ID.
+   * Used by SandboxNetwork to persist fallback quotes (from jsDelivr etc.)
+   * so they survive server restarts and are findable via getQuoteById.
+   */
+  recordDirectQuote(quote: Quote): void {
+    this.quotes.set(quote.id, quote);
   }
 
   // ── 4/5. USDT settlement inbound notification ─────────────────
@@ -259,6 +269,17 @@ export class PayoutProviderService {
     return payment;
   }
 
+  /** Mark a rejected payment as refunded. Throws if the payment is not in
+   *  rejected state or has already been refunded. */
+  refundPayment(paymentId: string, refundedAt: number): Payment {
+    const payment = this.payments.get(paymentId);
+    if (!payment) throw new Error("unknown payment");
+    if (payment.status !== "rejected") throw new Error("payment not in rejected state");
+    if (payment.refundedAt !== undefined) throw new Error("payment already refunded");
+    payment.refundedAt = refundedAt;
+    return payment;
+  }
+
   /** Record (or overwrite) the AML file metadata on a payment. Does NOT
    *  change status — the file metadata is informational; the AML state
    *  transition happens via `markPaymentStatus` separately. Throws on
@@ -268,6 +289,20 @@ export class PayoutProviderService {
     if (!payment) throw new Error("unknown payment");
     payment.amlFile = meta;
     return payment;
+  }
+
+  /** Store (or overwrite) the raw bytes of an AML file for a payment.
+   *  Throws on unknown payment. The blob is independent of the metadata
+   *  stored via recordAmlFile — both must be written for a complete upload. */
+  recordAmlBlob(paymentId: string, bytes: Uint8Array): void {
+    if (!this.payments.has(paymentId)) throw new Error("unknown payment");
+    this.amlBlobs.set(paymentId, bytes);
+  }
+
+  /** Retrieve the raw bytes of an AML file for a payment, or undefined if
+   *  no blob has been recorded. */
+  getAmlBlob(paymentId: string): Uint8Array | undefined {
+    return this.amlBlobs.get(paymentId);
   }
 
   /**
@@ -352,6 +387,12 @@ export class PayoutProviderService {
    */
   logOfiAmlEvent(paymentId: string, quoteId: string, action: "approved" | "rejected"): void {
     this.log({ type: "OfiAmlEvent", paymentId, quoteId, action, at: this.now() });
+  }
+
+  /** Public seam so external callers (server-fns) can emit events without
+   *  direct access to the private log() method. */
+  emitEvent(e: NetworkEvent): void {
+    this.log(e);
   }
 
   private log(e: NetworkEvent) {

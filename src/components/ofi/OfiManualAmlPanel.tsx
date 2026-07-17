@@ -35,12 +35,14 @@ export type OfiAmlRowState =
   | { kind: "trigger" } // status pending — show "Trigger AML"
   | { kind: "upload" } // status pending_aml + no file — show file input
   | { kind: "waiting" } // status pending_aml + file uploaded — show waiting
+  | { kind: "rejected" } // status rejected — Provider rejected AML
   | { kind: "hidden" }; // terminal/irrelevant
 
 export function classifyOfiRow(p: Payment): OfiAmlRowState {
   if (p.status === "pending") return { kind: "trigger" };
   if (p.status === "pending_aml" && !p.amlFile) return { kind: "upload" };
   if (p.status === "pending_aml" && p.amlFile) return { kind: "waiting" };
+  if (p.status === "rejected") return { kind: "rejected" };
   return { kind: "hidden" };
 }
 
@@ -224,25 +226,61 @@ function WaitingRow({ payment }: { payment: Payment }) {
   );
 }
 
+function RejectedRow({ payment }: { payment: Payment }) {
+  const reasonLabel = payment.rejectedReason === "aml_not_needed"
+    ? "AML not needed"
+    : payment.rejectedReason === "aml_denied"
+      ? "AML denied"
+      : "AML rejected";
+  return (
+    <div
+      className="flex items-center justify-between gap-2 border-b border-hairline py-3 last:border-0"
+      data-testid={`ofi-rejected-row-${payment.id}`}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <StatusDot status={payment.status} />
+        <span className="font-mono tabular text-caption text-foreground truncate">
+          {payment.id} · {payment.currency} {payment.localAmount.toFixed(2)} ·{" "}
+          {payment.beneficiaryRef}
+        </span>
+      </div>
+      <div
+        className="flex items-center gap-2 shrink-0 text-[#ff453a]"
+        data-testid={`ofi-rejected-meta-${payment.id}`}
+      >
+        <AlertCircle className="w-3.5 h-3.5" />
+        <span className="font-mono text-caption">
+          {reasonLabel}
+          {payment.refundedAt
+            ? ` · refunded at ${formatTime(payment.refundedAt)}`
+            : " · awaiting refund"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function OfiManualAmlPanel({
   payments,
   busy,
   onTriggerAml,
   onUploadAmlFile,
 }: OfiManualAmlPanelProps) {
-  // Render rows in the three buckets; empty buckets are hidden.
+  // Render rows in the four buckets; empty buckets are hidden.
   const triggerRows: Payment[] = [];
   const uploadRows: Payment[] = [];
   const waitingRows: Payment[] = [];
+  const rejectedRows: Payment[] = [];
   for (const p of payments) {
     const state = classifyOfiRow(p);
     if (state.kind === "trigger") triggerRows.push(p);
     else if (state.kind === "upload") uploadRows.push(p);
     else if (state.kind === "waiting") waitingRows.push(p);
+    else if (state.kind === "rejected") rejectedRows.push(p);
     // hidden → not rendered
   }
 
-  const isEmpty = triggerRows.length === 0 && uploadRows.length === 0 && waitingRows.length === 0;
+  const isEmpty = triggerRows.length === 0 && uploadRows.length === 0 && waitingRows.length === 0 && rejectedRows.length === 0;
 
   return (
     <PanelCard step="09a" title="Payment-Manual AML (OFI view)">
@@ -276,6 +314,19 @@ export function OfiManualAmlPanel({
               items={waitingRows}
               emptyMessage="No payments awaiting Provider review."
               render={(p) => <WaitingRow key={p.id} payment={p} />}
+            />
+          </div>
+        )}
+
+        {!isEmpty && rejectedRows.length > 0 && (
+          <div data-testid="ofi-rejected-section">
+            <h4 className="font-mono text-muted-foreground mb-2" style={{ fontSize: "11px" }}>
+              AML Rejected ({rejectedRows.length})
+            </h4>
+            <List
+              items={rejectedRows}
+              emptyMessage="No rejected payments."
+              render={(p) => <RejectedRow key={p.id} payment={p} />}
             />
           </div>
         )}

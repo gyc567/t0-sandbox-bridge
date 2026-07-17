@@ -48,6 +48,8 @@ export interface CreatePaymentInput {
   quoteId: string;
   beneficiaryRef: string;
   usdAmount: number;
+  /** Optional local-currency recipient info (IVMS101 or fallback). */
+  recipientInfo?: import("./types").RecipientInfo;
 }
 
 let counter = 0;
@@ -133,6 +135,13 @@ export class SandboxNetwork {
     const result = toGetQuoteResult(res, now, input.currency);
     if ("success" in result) {
       this.recordExternalQuote(result.success.quote, now);
+      // Fallback quotes (fb_quote-*) are not published via provider.publishQuote
+      // and exist only in externalQuotes — they would be lost on server restart.
+      // Persist them to provider.quotes so getQuoteById can still find them.
+      // Normal quotes (qt_*) are already in provider.quotes via publishQuote.
+      if (result.success.quote.id.startsWith("fb_quote-")) {
+        this.provider.recordDirectQuote(result.success.quote);
+      }
     }
     return result;
   }
@@ -289,6 +298,7 @@ export class SandboxNetwork {
       usdAmount: quote.band,
       localAmount: quote.band * quote.rate,
       beneficiaryRef: input.beneficiaryRef,
+      recipientInfo: input.recipientInfo,
       status: "accepted",
       createdAt: now,
     };
@@ -301,7 +311,7 @@ export class SandboxNetwork {
    * linked to a quote. Funds not yet confirmed; rate is indicative.
    */
   createPaymentIntent(
-    input: { quoteId: string; beneficiaryRef: string },
+    input: { quoteId: string; beneficiaryRef: string; recipientInfo?: import("./types").RecipientInfo },
     now: number = Date.now(),
   ): Payment {
     const quote = this.provider.snapshot().quotes.find((q) => q.id === input.quoteId);
@@ -313,6 +323,7 @@ export class SandboxNetwork {
       usdAmount: quote.band,
       localAmount: quote.band * quote.rate,
       beneficiaryRef: input.beneficiaryRef,
+      recipientInfo: input.recipientInfo,
       status: "pending",
       createdAt: now,
     };
@@ -341,13 +352,77 @@ export class SandboxNetwork {
   }
 
   /** OFI-driven manual AML decision. */
-  completeManualAml(paymentId: string, approved: boolean): Payment {
+  completeManualAml(
+    paymentId: string,
+    approved: boolean,
+    reason?: "aml_denied" | "aml_not_needed",
+  ): Payment {
     const payment = this.provider.snapshot().payments.find((p) => p.id === paymentId);
     if (!payment) throw new Error("unknown payment");
     if (payment.status !== "pending_aml") {
       throw new Error(`payment must be in pending_aml state, got ${payment.status}`);
     }
-    return this.provider.markPaymentStatus(paymentId, approved ? "accepted" : "rejected");
+    const updated = this.provider.markPaymentStatus(paymentId, approved ? "accepted" : "rejected");
+    if (!approved) {
+      updated.rejectedAt = this.now();
+      updated.rejectedReason = reason;
+    }
+    return updated;
+  }
+
+  /**
+   * Provider manually reviews and records the recipient information check.
+   * Called alongside or before completeManualAml in the ManualAmlPanel flow.
+   * Idempotent: subsequent calls overwrite the previous decision.
+   */
+  updateRecipientCheck(
+    paymentId: string,
+    status: "approved" | "rejected",
+    note?: string,
+  ): Payment {
+    const payment = this.provider.snapshot().payments.find((p) => p.id === paymentId);
+    if (!payment) throw new Error("unknown payment");
+    payment.recipientCheckStatus = status;
+    payment.recipientCheckNote = note;
+    return payment;
+  }
+
+  /**
+   * Provider refunds a rejected payment — releases the reserved USDT credit
+   * back to OFI and marks the payment as refunded. Throws if the payment is
+   * not rejected or has already been refunded.
+   */
+  requestRefund(paymentId: string): Payment {
+    const payment = this.provider.snapshot().payments.find((p) => p.id === paymentId);
+    if (!payment) throw new Error("unknown payment");
+    if (payment.status !== "rejected") throw new Error("payment not in rejected state");
+    if (payment.refundedAt !== undefined) throw new Error("payment already refunded");
+
+    if (this.settlementRegistry) {
+      this.settlementRegistry.releaseCredit(payment.usdAmount);
+    }
+
+    const updated = this.provider.refundPayment(paymentId, this.now());
+    this.provider.notifyCreditUsage("ofi", payment.usdAmount, {
+      paymentId,
+      quoteId: payment.quoteId,
+    });
+    return updated;
+  }
+
+  /**
+   * All rejected payments (awaiting refund or already refunded), sorted:
+   * refunded first (by refundedAt desc), then awaiting (by rejectedAt desc).
+   */
+  listRejectedPayments(): Payment[] {
+    return this.provider
+      .snapshot()
+      .payments.filter((p) => p.status === "rejected")
+      .sort((a, b) => {
+        const aKey = b.refundedAt ?? b.rejectedAt ?? 0;
+        const bKey = a.refundedAt ?? a.rejectedAt ?? 0;
+        return aKey - bKey;
+      });
   }
 
   /**
@@ -371,6 +446,17 @@ export class SandboxNetwork {
    */
   recordAmlFile(paymentId: string, meta: AmlFileMeta): Payment {
     return this.provider.recordAmlFile(paymentId, meta);
+  }
+
+  /** Store (or overwrite) the raw bytes of an OFI-uploaded AML document.
+   *  Delegated to the Provider service which owns the blob map. */
+  recordAmlBlob(paymentId: string, bytes: Uint8Array): void {
+    this.provider.recordAmlBlob(paymentId, bytes);
+  }
+
+  /** Retrieve the raw bytes of an AML document, or undefined. */
+  getAmlBlob(paymentId: string): Uint8Array | undefined {
+    return this.provider.getAmlBlob(paymentId);
   }
 
   /**
@@ -399,6 +485,7 @@ export class SandboxNetwork {
   handleNetworkAccepted(
     paymentClientId: string,
     beneficiaryRef: string,
+    recipientInfo?: import("./types").RecipientInfo,
     now: number = Date.now(),
   ): Payment {
     const existing = this.provider.snapshot().payments.find((p) => p.id === paymentClientId);
@@ -415,6 +502,7 @@ export class SandboxNetwork {
       usdAmount: quote.band,
       localAmount: quote.band * quote.rate,
       beneficiaryRef,
+      recipientInfo,
       status: "accepted",
       createdAt: now,
     };

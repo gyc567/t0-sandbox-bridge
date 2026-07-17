@@ -11,10 +11,13 @@ import {
   callbackInboxStateFn,
   providerLedgerFn,
   reviewAmlFileFn,
+  downloadAmlFileFn,
+  requestRefundFn,
 } from "@/lib/t0/t0.functions";
 import { ManualAmlPanel } from "@/components/provider/ManualAmlPanel";
 // (auth removed — sandbox console is open access; no login required)
 import type { Currency, Payment, Payout, Quote, VolumeBand } from "@/lib/t0/types";
+import { base64ToBytes } from "@/lib/t0/aml-blob";
 import type { NetworkEvent } from "@/lib/t0/types";
 import type { LimitSnapshot, LedgerEntry } from "@/lib/t0/read-model/types";
 import { SUPPORTED_CURRENCIES } from "@/lib/t0/currencies";
@@ -29,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RefreshCw, Wallet, ScrollText, Layers, Send, CheckCircle2 } from "lucide-react";
+import { RefreshCw, Wallet, ScrollText, Layers, Send, CheckCircle2, Download } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ProviderSidebarMenu } from "@/components/provider/ProviderSidebarMenu";
 
@@ -69,6 +72,7 @@ function ProviderPage() {
   const notifyCredit = useServerFn(notifyCreditFn);
   const snapshot = useServerFn(snapshotFn);
   const reviewAmlFile = useServerFn(reviewAmlFileFn);
+  const downloadAmlFile = useServerFn(downloadAmlFileFn);
 
   // ── Phase 3: Provider read-model views ─────────────────────────────
   // Provider role is providerId 0 in this sandbox. Production would
@@ -142,9 +146,36 @@ function ProviderPage() {
   const onReviewAml = async (
     paymentId: string,
     decision: "approve" | "reject",
+    recipientCheckStatus: "approved" | "rejected",
+    reason?: "aml_denied" | "aml_not_needed",
+    recipientCheckNote?: string,
   ): Promise<void> => {
     await run(async () => {
-      await reviewAmlFile({ data: { paymentId, decision } });
+      await reviewAmlFile({
+        data: { paymentId, decision, reason, recipientCheckStatus, recipientCheckNote },
+      });
+    });
+  };
+
+  const onDownloadAmlFile = async (paymentId: string): Promise<void> => {
+    await run(async () => {
+      const result = await downloadAmlFile({ data: { paymentId } });
+      const bytes = base64ToBytes(result.bytesBase64);
+      const blob = new Blob([new Uint8Array(bytes)], { type: result.fileType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+  };
+
+  const onRefundAml = async (paymentId: string): Promise<void> => {
+    await run(async () => {
+      await requestRefundFn({ data: { paymentId } });
     });
   };
 
@@ -391,6 +422,38 @@ function ProviderPage() {
                                 </span>
                               )}
                             </div>
+                            {p.recipientInfo && (
+                              <div className="ml-6 rounded border border-hairline p-2 space-y-1">
+                                <p className="font-mono text-muted-foreground" style={{ fontSize: "10px" }}>
+                                  Recipient info
+                                </p>
+                                {p.recipientInfo.fallback ? (
+                                  <>
+                                    <p className="font-mono text-caption">
+                                      {p.recipientInfo.fallback.accountHolderName} · {p.recipientInfo.fallback.accountNumber}
+                                    </p>
+                                    {(p.recipientInfo.fallback.bankName || p.recipientInfo.fallback.bankCode) && (
+                                      <p className="font-mono text-caption text-muted-foreground">
+                                        {p.recipientInfo.fallback.bankName}
+                                        {p.recipientInfo.fallback.bankName && p.recipientInfo.fallback.bankCode && " · "}
+                                        {p.recipientInfo.fallback.bankCode}
+                                      </p>
+                                    )}
+                                  </>
+                                ) : p.recipientInfo.ivms101 ? (
+                                  <p className="font-mono text-caption">
+                                    IVMS101: {p.recipientInfo.ivms101.name.primary}
+                                  </p>
+                                ) : null}
+                              </div>
+                            )}
+                            {!p.recipientInfo && (
+                              <div className="ml-6">
+                                <p className="font-mono text-muted-foreground" style={{ fontSize: "10px" }}>
+                                  No recipient info (legacy payment)
+                                </p>
+                              </div>
+                            )}
                           </div>
                         );
                       }}
@@ -525,6 +588,8 @@ function ProviderPage() {
               payments={data.payments}
               busy={busy}
               onReviewAml={onReviewAml}
+              onDownloadAml={onDownloadAmlFile}
+              onRefundAml={onRefundAml}
             />
           }
         />

@@ -68,14 +68,14 @@ function Index() {
                   className="text-display-mega font-semibold tracking-tight text-foreground"
                   style={{ lineHeight: 1, letterSpacing: "-0.03em" }}
                 >
-                  资金,在到达
+                  Watch money move
                   <br />
-                  之前先被<span className="text-accent-cyan">看见</span>。
+                  before it <span className="text-accent-cyan">moves</span>.
                 </h1>
 
                 <p className="max-w-xl text-tagline text-muted-foreground">
-                  Built by BAXS PAY LIMITED · T-0 is the sandbox where it runs. 在 T-0 Network
-                  上,每一笔报价、结算、支付与放款的全链路都可观测、可回放、可验证。
+                  Built by BAXS PAY LIMITED · T-0 is the sandbox where it runs. Every quote,
+                  settlement, payment, and payout — fully observable, replayable, and verifiable.
                 </p>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -113,26 +113,26 @@ function Index() {
         <section className="container container-7xl py-section">
           <SectionHeading
             eyebrow="CAPABILITIES"
-            title="完整的资金流,一条链路"
-            sub="从报价发布到放款确认,每个环节都可视、可测、可追溯。"
+            title="Full fund flow, end-to-end"
+            sub="From quote publish to payout confirm — every step is visible, testable, traceable."
           />
           <div className="mt-10 grid gap-5 md:grid-cols-3">
             <CapabilityCard
               icon={<Radio className="w-5 h-5" />}
               title="Publish Quote"
-              desc="发布多币种、多档位的实时报价,锁定费率与额度带。"
+              desc="Multi-currency, multi-band real-time quotes with locked rates and capacity limits."
               accent="cyan"
             />
             <CapabilityCard
               icon={<Zap className="w-5 h-5" />}
               title="Move Funds"
-              desc="USDT 链上结算模拟,在途资金流可视化,状态实时更新。"
+              desc="USDT on-chain settlement simulation. Visualize in-transit funds with live state updates."
               accent="violet"
             />
             <CapabilityCard
               icon={<ShieldCheck className="w-5 h-5" />}
               title="Verify & Pay Out"
-              desc="ECDSA secp256k1 签名验证,Keccak-256 哈希,放款原子确认。"
+              desc="ECDSA secp256k1 signature verification, Keccak-256 hashing, atomic payout confirmation."
               accent="usdt"
             />
           </div>
@@ -142,8 +142,8 @@ function Index() {
         <section className="container container-7xl py-section">
           <SectionHeading
             eyebrow="CHANNELS"
-            title="五种行业通道,三种协议流"
-            sub="每个通道映射到底层的 Pay-Out / Manual-AML / Payment-Intent 协议流。"
+            title="Five industry channels, three protocol flows"
+            sub="Each channel maps to a Pay-Out / Manual-AML / Payment-Intent protocol flow."
           />
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {CHANNELS.map((c) => (
@@ -182,8 +182,8 @@ function Index() {
         <section className="container container-7xl py-section">
           <SectionHeading
             eyebrow="PROTOCOL"
-            title="ECDSA 签名,可在线验证"
-            sub="每个请求由 secp256k1 私钥签名,Keccak-256 哈希,头部携带公钥与时间戳。"
+            title="ECDSA signatures, verifiable online"
+            sub="Every request signed with secp256k1 private key, hashed with Keccak-256, with public key and timestamp in headers."
           />
           <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_1.3fr] items-start">
             <div className="space-y-4">
@@ -223,10 +223,10 @@ function Index() {
             />
             <div className="relative space-y-5">
               <h2 className="text-display-md font-semibold tracking-tight text-foreground">
-                进入指挥中心
+                Enter the Command Center
               </h2>
               <p className="mx-auto max-w-lg text-tagline text-muted-foreground">
-                滚动驱动的实时回放,观察资金包如何在 OFI、Network Core、POP 三节点间流动。
+                Scroll-driven real-time replay — watch fund packets flow between OFI, Network Core, and POP.
               </p>
               <Button asChild size="lg" className="btn-glow">
                 <Link to="/sandbox">

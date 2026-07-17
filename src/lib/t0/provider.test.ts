@@ -284,6 +284,56 @@ describe("PayoutProviderService", () => {
   it("rekeyQuote throws on unknown oldId", () => {
     expect(() => svc.rekeyQuote("ghost", "new")).toThrow(/unknown quote/);
   });
+
+  it("refundPayment sets refundedAt on a rejected payment", () => {
+    svc.recordPayment({
+      id: "pm_refund_ok",
+      quoteId: "qt_refund",
+      currency: "EUR",
+      usdAmount: 1_000,
+      localAmount: 920,
+      beneficiaryRef: "BEN",
+      status: "rejected",
+      createdAt: clock,
+    });
+    const updated = svc.refundPayment("pm_refund_ok", clock + 60_000);
+    expect(updated.refundedAt).toBe(clock + 60_000);
+  });
+
+  it("refundPayment throws on unknown payment", () => {
+    expect(() => svc.refundPayment("ghost", clock)).toThrow(/unknown payment/);
+  });
+
+  it("refundPayment throws when payment is not in rejected state", () => {
+    svc.recordPayment({
+      id: "pm_not_rejected",
+      quoteId: "qt_nr",
+      currency: "EUR",
+      usdAmount: 500,
+      localAmount: 460,
+      beneficiaryRef: "X",
+      status: "accepted",
+      createdAt: clock,
+    });
+    expect(() => svc.refundPayment("pm_not_rejected", clock)).toThrow(/not in rejected state/);
+  });
+
+  it("refundPayment throws when payment is already refunded", () => {
+    svc.recordPayment({
+      id: "pm_double_refund",
+      quoteId: "qt_dr",
+      currency: "EUR",
+      usdAmount: 500,
+      localAmount: 460,
+      beneficiaryRef: "X",
+      status: "rejected",
+      refundedAt: clock,
+      createdAt: clock,
+    });
+    expect(() => svc.refundPayment("pm_double_refund", clock + 60_000)).toThrow(
+      /already refunded/,
+    );
+  });
 });
 
 // ── Role boundary guard (moved methods no longer exist on Provider) ──
@@ -298,5 +348,49 @@ describe("PayoutProviderService (role boundary)", () => {
     expect(proto.confirmFunds).toBeUndefined();
     expect(proto.processPayout).toBeUndefined();
     expect(proto.requestPayout).toBeUndefined();
+  });
+});
+
+// ── AML blob storage ────────────────────────────────────────────────
+
+describe("PayoutProviderService — AML blob", () => {
+  it("recordAmlBlob stores bytes and getAmlBlob retrieves them", () => {
+    svc.recordPayment({
+      id: "pm_blob",
+      quoteId: "qt",
+      currency: "EUR",
+      usdAmount: 1,
+      localAmount: 1,
+      beneficiaryRef: "X",
+      status: "accepted",
+      createdAt: clock,
+    });
+    const bytes = new Uint8Array([72, 101, 108, 108, 111]);
+    svc.recordAmlBlob("pm_blob", bytes);
+    expect(svc.getAmlBlob("pm_blob")).toEqual(bytes);
+  });
+
+  it("recordAmlBlob throws on unknown payment", () => {
+    expect(() => svc.recordAmlBlob("ghost", new Uint8Array())).toThrow(/unknown payment/);
+  });
+
+  it("getAmlBlob returns undefined for unknown payment", () => {
+    expect(svc.getAmlBlob("ghost")).toBeUndefined();
+  });
+
+  it("blob is independent of amlFile metadata (can exist without metadata)", () => {
+    svc.recordPayment({
+      id: "pm_meta",
+      quoteId: "qt",
+      currency: "EUR",
+      usdAmount: 1,
+      localAmount: 1,
+      beneficiaryRef: "X",
+      status: "accepted",
+      createdAt: clock,
+    });
+    svc.recordAmlBlob("pm_meta", new Uint8Array([1, 2, 3]));
+    expect(svc.getAmlBlob("pm_meta")).toEqual(new Uint8Array([1, 2, 3]));
+    expect(svc.snapshot().payments[0]?.amlFile).toBeUndefined();
   });
 });

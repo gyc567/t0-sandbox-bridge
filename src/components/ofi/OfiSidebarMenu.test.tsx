@@ -14,7 +14,7 @@ function renderSidebar(defaultTab?: string): string {
   return renderToStaticMarkup(
     <OfiSidebarMenu
       {...(defaultTab ? { defaultTab: defaultTab as never } : {})}
-      fundingContent={<div data-testid="funding">funding</div>}
+      refundContent={<div data-testid="refund">refund</div>}
       paymentPreSettlementContent={<div data-testid="pps">pps</div>}
       paymentContinuedContent={<div data-testid="pc">pc</div>}
       paymentManualAmlContent={<div data-testid="aml">aml</div>}
@@ -58,6 +58,6 @@ describe("OfiSidebarMenu — defaultTab prop (SSR)", () => {
     expect(html).toContain("Payment-Pre-Settlement");
     expect(html).toContain("Payment-Payment Continued");
     expect(html).toContain("Payment-Manual AML");
-    expect(html).toContain("Funding &amp; Capacity");
+    expect(html).toContain("ReFund");
   });
 });

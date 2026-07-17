@@ -50,11 +50,19 @@ describe("classifyOfiRow (pure)", () => {
     expect(classifyOfiRow(p)).toEqual({ kind: "waiting" });
   });
 
-  it("returns 'hidden' for terminal statuses (accepted/rejected/confirmed)", () => {
+  it("returns 'hidden' for terminal statuses (accepted/confirmed)", () => {
     expect(classifyOfiRow(makePayment({ status: "accepted" }))).toEqual({ kind: "hidden" });
-    expect(classifyOfiRow(makePayment({ status: "rejected" }))).toEqual({ kind: "hidden" });
     expect(classifyOfiRow(makePayment({ status: "confirmed" }))).toEqual({ kind: "hidden" });
   });
+
+  it("returns 'rejected' for status rejected", () => {
+    expect(classifyOfiRow(makePayment({ status: "rejected" }))).toEqual({ kind: "rejected" });
+  });
+
+  it("returns 'rejected' for status rejected with refundedAt", () => {
+    expect(classifyOfiRow(makePayment({ status: "rejected", refundedAt: 1_700_000_000_000 }))).toEqual({ kind: "rejected" });
+  });
+
 });
 
 describe("OfiManualAmlPanel — structural", () => {
@@ -212,7 +220,7 @@ describe("OfiManualAmlPanel — structural", () => {
     expect(html).toContain('data-testid="ofi-trigger-section"');
   });
 
-  it("hides terminal-status payments entirely", () => {
+  it("hides accepted/confirmed payments, shows rejected payments in rejected section", () => {
     const accepted = makePayment({ id: "pm_done", status: "accepted" });
     const confirmed = makePayment({ id: "pm_paid", status: "confirmed" });
     const rejected = makePayment({ id: "pm_no", status: "rejected" });
@@ -224,10 +232,44 @@ describe("OfiManualAmlPanel — structural", () => {
         onUploadAmlFile={onUploadAmlFile}
       />,
     );
-    expect(html).toContain("No payments eligible for manual AML");
     expect(html).not.toContain('data-testid="ofi-trigger-aml-pm_done"');
     expect(html).not.toContain('data-testid="ofi-trigger-aml-pm_paid"');
-    expect(html).not.toContain('data-testid="ofi-trigger-aml-pm_no"');
+    expect(html).toContain('data-testid="ofi-rejected-section"');
+    expect(html).toContain('data-testid="ofi-rejected-row-pm_no"');
+  });
+
+  it("renders rejected row with 'awaiting refund' when refundedAt is undefined", () => {
+    const p = makePayment({ id: "pm_rej_wait", status: "rejected", refundedAt: undefined });
+    const html = renderToStaticMarkup(
+      <OfiManualAmlPanel
+        payments={[p]}
+        busy={false}
+        onTriggerAml={onTriggerAml}
+        onUploadAmlFile={onUploadAmlFile}
+      />,
+    );
+    expect(html).toContain('data-testid="ofi-rejected-section"');
+    expect(html).toContain('data-testid="ofi-rejected-row-pm_rej_wait"');
+    expect(html).toContain("awaiting refund");
+  });
+
+  it("renders rejected row with 'refunded at' when refundedAt is set", () => {
+    const p = makePayment({
+      id: "pm_rej_refunded",
+      status: "rejected",
+      refundedAt: 1_700_000_060_000,
+    });
+    const html = renderToStaticMarkup(
+      <OfiManualAmlPanel
+        payments={[p]}
+        busy={false}
+        onTriggerAml={onTriggerAml}
+        onUploadAmlFile={onUploadAmlFile}
+      />,
+    );
+    expect(html).toContain('data-testid="ofi-rejected-section"');
+    expect(html).toContain('data-testid="ofi-rejected-row-pm_rej_refunded"');
+    expect(html).toContain("refunded at");
   });
 
   it("disables the Trigger AML button when busy", () => {
