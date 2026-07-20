@@ -48,9 +48,10 @@ export function FlowHero() {
               two <span className="text-accent-cyan">roles</span>.
             </h1>
             <p className="max-w-xl text-tagline text-muted-foreground">
-              T-0 Network 是 Tether 战略支持的机构级 USDT 清结算网络。 BAXS 在此扮演双重角色 ——
-              既是发起换币的 OFI，也是执行法币付款的 Provider。 全部基于 Connect
-              RPC，签名验证在公网上可独立完成。
+              T-0 Network is a Tether-strategically backed institutional USDT settlement network.
+              BAXS plays a dual role here — as OFI initiating token swaps and as Provider executing
+              fiat payments. All built on Connect RPC with independently verifiable signature
+              verification over the public internet.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Link

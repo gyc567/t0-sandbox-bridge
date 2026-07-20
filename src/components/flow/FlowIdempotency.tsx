@@ -10,11 +10,11 @@ export function FlowIdempotency() {
       <div className="space-y-3">
         <p className="eyebrow">IDEMPOTENCY</p>
         <h2 className="text-display-md font-semibold tracking-tight text-foreground">
-          重复请求不是错误
+          Repeated requests are not errors
         </h2>
         <p className="max-w-2xl text-tagline text-muted-foreground">
-          网络采用 at-least-once delivery + idempotent receivers = exactly-once processing。BAXS
-          作为 Provider 实现时必须遵守以下三条核心规则。
+          The network uses at-least-once delivery + idempotent receivers = exactly-once
+          processing. BAXS as Provider must obey these three core rules.
         </p>
       </div>
 

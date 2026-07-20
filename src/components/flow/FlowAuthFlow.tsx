@@ -15,11 +15,12 @@ export function FlowAuthFlow() {
       <div className="space-y-3">
         <p className="eyebrow">AUTHENTICATION</p>
         <h2 className="text-display-md font-semibold tracking-tight text-foreground">
-          ECDSA 签名，可在线验证
+          ECDSA signatures, independently verifiable
         </h2>
         <p className="max-w-2xl text-tagline text-muted-foreground">
-          每个请求由 secp256k1 私钥签名，Keccak-256 哈希，{REPLAY_WINDOW_MS / 1000} 秒
-          内重放窗口。公钥通过 HTTP 头传输，无需预先握手。
+          Every request is signed with a secp256k1 private key and Keccak-256 hashed, with a{" "}
+          {REPLAY_WINDOW_MS / 1000}-second replay window. Public keys travel in HTTP headers — no
+          pre-shared handshake required.
         </p>
       </div>
 

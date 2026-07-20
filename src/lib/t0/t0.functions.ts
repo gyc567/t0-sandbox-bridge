@@ -71,6 +71,14 @@ export const ofiApprovePaymentQuoteFn = createServerFn({ method: "POST" })
     return result;
   });
 
+export const ofiRejectPaymentQuoteFn = createServerFn({ method: "POST" })
+  .validator((d: { paymentId: string; quoteId: string }) => d)
+  .handler(async ({ data }) => {
+    const payment = sandboxNetwork.rejectPaymentQuote(data.paymentId, data.quoteId);
+    providerService.logOfiAmlEvent(data.paymentId, data.quoteId, "rejected");
+    return payment;
+  });
+
 export const createPaymentIntentFn = createServerFn({ method: "POST" })
   .validator((d: { quoteId: string; beneficiaryRef: string; recipientInfo?: import("./types").RecipientInfo }) => d)
   .handler(async ({ data }) => sandboxNetwork.createPaymentIntent(data));
@@ -98,8 +106,16 @@ export async function reviewAmlUpload(input: {
   filename: string;
   fileSize: number;
   fileType: string;
+  decodedLength?: number;
+  magicBytes?: Uint8Array;
 }) {
-  const validation = validateAmlFile(input.filename, input.fileSize, input.fileType);
+  const validation = validateAmlFile(
+    input.filename,
+    input.fileSize,
+    input.fileType,
+    input.decodedLength,
+    input.magicBytes,
+  );
   if (!validation.valid) {
     throw new Error(validation.reason);
   }
@@ -153,6 +169,8 @@ export const ofiUploadAmlFileFn = createServerFn({ method: "POST" })
       filename: data.filename,
       fileSize: data.fileSize,
       fileType: data.fileType,
+      decodedLength: bytes.length,
+      magicBytes: bytes.slice(0, 8),
     });
     sandboxNetwork.recordAmlBlob(data.paymentId, bytes);
     sandboxNetwork.recordAmlFile(data.paymentId, {

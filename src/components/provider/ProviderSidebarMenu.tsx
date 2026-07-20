@@ -11,6 +11,7 @@ const MENU_ITEMS: MenuItem[] = [
   { value: "payment-pre-settlement", label: "Payment-Pre-Settlement" },
   { value: "payment-continued", label: "Payment-Payment Continued" },
   { value: "payment-manual-aml", label: "Payment-Manual AML" },
+  { value: "payment-refund", label: "ReFund" },
 ];
 
 type ProviderSidebarMenuProps = {
@@ -18,6 +19,7 @@ type ProviderSidebarMenuProps = {
   paymentPreSettlementContent: ReactNode;
   paymentContinuedContent: ReactNode;
   paymentManualAmlContent: ReactNode;
+  paymentRefundContent: ReactNode;
 };
 
 export function ProviderSidebarMenu({
@@ -25,6 +27,7 @@ export function ProviderSidebarMenu({
   paymentPreSettlementContent,
   paymentContinuedContent,
   paymentManualAmlContent,
+  paymentRefundContent,
 }: ProviderSidebarMenuProps) {
   return (
     <Tabs
@@ -57,6 +60,9 @@ export function ProviderSidebarMenu({
       </TabsContent>
       <TabsContent value="payment-manual-aml" className="mt-0 min-w-0">
         {paymentManualAmlContent}
+      </TabsContent>
+      <TabsContent value="payment-refund" className="mt-0 min-w-0">
+        {paymentRefundContent}
       </TabsContent>
     </Tabs>
   );

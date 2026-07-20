@@ -199,20 +199,21 @@ describe("updateLimit", () => {
 describe("approvePaymentQuote", () => {
   it("accepts when the payment and quote exist", async () => {
     const q = await svc.publishQuote({ currency: "EUR", band: 1000, rate: 0.9 });
+    // Rekey the quote BEFORE createPayment so the payment stores the proto-friendly id.
+    svc.rekeyQuote(q.id, "1");
     const r = await network.createPayment(
       {
         paymentClientId: `n_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        quoteId: q.id,
+        quoteId: "1",
         beneficiaryRef: "BEN",
         usdAmount: 1000,
       },
       clock,
     );
     if (!("success" in r)) throw new Error("setup failed");
-    // Map internal auto-generated ids to numeric proto-friendly ids.
+    // Map internal auto-generated payment id to a proto-friendly id.
     const internalPaymentId = svc.snapshot().payments[0]!.id;
     svc.rekeyPayment(internalPaymentId, "n_1");
-    svc.rekeyQuote(q.id, "1");
     const req = create(ApprovePaymentQuoteRequestSchema, {
       paymentId: BigInt(1),
       payOutQuoteId: BigInt(1),

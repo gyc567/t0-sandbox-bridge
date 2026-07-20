@@ -21,11 +21,12 @@ export function FlowDualRole() {
       <div className="space-y-3">
         <p className="eyebrow">DUAL ROLE</p>
         <h2 className="text-display-md font-semibold tracking-tight text-foreground">
-          BAXS 在 T-0 上扮演两个角色
+          BAXS plays two roles on T-0
         </h2>
         <p className="max-w-2xl text-tagline text-muted-foreground">
-          作为 OFI 发起换币请求，作为 Provider 接收并执行法币付款指令。
-          双角色耦合在同一签名身份上，幂等性保证重复请求永不产生副作用。
+          As OFI it initiates token swap requests; as Provider it receives and executes fiat payment
+          instructions. Both roles are coupled to the same signing identity, with idempotency
+          guarantees ensuring repeated requests never produce side effects.
         </p>
       </div>
       <div className="mt-10 grid gap-5 md:grid-cols-3">
@@ -80,8 +81,9 @@ export function FlowDualRole() {
               Idempotent Receiver
             </h3>
             <p className="text-caption text-muted-foreground leading-relaxed">
-              网络采用 at-least-once delivery + idempotent receivers = exactly-once processing。
-              BAXS 服务端所有改变状态的方法必须基于业务标识符去重。
+              The network uses at-least-once delivery + idempotent receivers = exactly-once
+              processing. All state-mutating BAXS server methods must deduplicate by business
+              identifier.
             </p>
             <div
               className="flex flex-wrap gap-1 pt-1 font-mono text-muted-canvas"

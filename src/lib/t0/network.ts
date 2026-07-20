@@ -295,8 +295,8 @@ export class SandboxNetwork {
       id: input.paymentClientId,
       quoteId: quote.id,
       currency: quote.currency,
-      usdAmount: quote.band,
-      localAmount: quote.band * quote.rate,
+      usdAmount: input.usdAmount,
+      localAmount: input.usdAmount * quote.rate,
       beneficiaryRef: input.beneficiaryRef,
       recipientInfo: input.recipientInfo,
       status: "accepted",
@@ -322,6 +322,7 @@ export class SandboxNetwork {
       currency: quote.currency,
       usdAmount: quote.band,
       localAmount: quote.band * quote.rate,
+      // createPaymentIntent derives USD amount from the quote band (no caller input).
       beneficiaryRef: input.beneficiaryRef,
       recipientInfo: input.recipientInfo,
       status: "pending",
@@ -340,15 +341,30 @@ export class SandboxNetwork {
   }
 
   /**
-   * Approve / refresh a payment quote (Last Look). The Network bumps the
-   * quote TTL on behalf of the OFI after AML/quote approval.
+   * Approve a payment quote (Last Look). The OFI approves the refreshed rate
+   * after the Provider's manual AML review. bumps the quote TTL.
    */
   approvePaymentQuote(paymentId: string, quoteId: string): Quote {
-    // Validate both exist before mutating the TTL.
     const payment = this.provider.snapshot().payments.find((p) => p.id === paymentId);
     if (!payment) throw new Error("unknown payment");
-    const quote = this.provider.refreshQuoteTtl(quoteId);
-    return quote;
+    this.provider.refreshQuoteTtl(quoteId); // throws "unknown quote" if not found
+    if (payment.quoteId !== quoteId) throw new Error("quoteId mismatch");
+    return this.provider.snapshot().quotes.find((q) => q.id === quoteId)!;
+  }
+
+  /**
+   * Reject a payment quote (Last Look). The OFI rejects the refreshed rate
+   * after the Provider's manual AML review — terminates the payment.
+   * Moves payment from accepted → rejected (not pending_aml, unlike AML reject).
+   */
+  rejectPaymentQuote(paymentId: string, quoteId: string): Payment {
+    const payment = this.provider.snapshot().payments.find((p) => p.id === paymentId);
+    if (!payment) throw new Error("unknown payment");
+    if (payment.quoteId !== quoteId) throw new Error("quoteId mismatch");
+    if (payment.status !== "accepted") {
+      throw new Error(`payment must be accepted for quote rejection, got ${payment.status}`);
+    }
+    return this.provider.markPaymentStatus(paymentId, "rejected");
   }
 
   /** OFI-driven manual AML decision. */
@@ -499,6 +515,7 @@ export class SandboxNetwork {
       id: paymentClientId,
       quoteId: quote.id,
       currency: quote.currency,
+      // handleNetworkAccepted: no caller input; derive from quote (sandbox best-effort)
       usdAmount: quote.band,
       localAmount: quote.band * quote.rate,
       beneficiaryRef,

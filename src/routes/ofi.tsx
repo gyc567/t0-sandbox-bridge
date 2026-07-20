@@ -9,16 +9,18 @@ import {
   ofiReadModelFn,
   ofiSubmitSettlementFn,
   ofiApprovePaymentQuoteFn,
+  ofiRejectPaymentQuoteFn,
   triggerManualAmlFn,
   ofiUploadAmlFileFn,
 } from "@/lib/t0/t0.functions";
 import type { Currency, Payment, Payout } from "@/lib/t0/types";
 import type { NetworkEvent } from "@/lib/t0/types";
 import type { SettlementState } from "@/lib/t0/settlement";
-import { getCurrencyLabel } from "@/lib/t0/currencies";
+import { getCurrencyLabel, SUPPORTED_CURRENCIES } from "@/lib/t0/currencies";
 import { formatQuoteFailure } from "@/lib/t0/quote-message";
 import { formatQuoteForDisplay, type QuoteDisplay } from "@/lib/t0/quote-display";
 import type { CreatePaymentInput, GetQuoteResult } from "@/lib/t0/network";
+import type { RecipientInfo } from "@/lib/t0/types";
 import { PanelCard, StatusDot, List } from "@/components/console";
 import { OfiManualAmlPanel } from "@/components/ofi/OfiManualAmlPanel";
 import { OfiReFundPanel } from "@/components/ofi/OfiReFundPanel";
@@ -96,6 +98,7 @@ function OfiPage() {
   const readModel = useServerFn(ofiReadModelFn);
   const submitSettlement = useServerFn(ofiSubmitSettlementFn);
   const approvePaymentQuote = useServerFn(ofiApprovePaymentQuoteFn);
+  const rejectPaymentQuote = useServerFn(ofiRejectPaymentQuoteFn);
   const uploadAmlFile = useServerFn(ofiUploadAmlFileFn);
 
   // ── Phase 2: Funding Workspace state ────────────────────────────
@@ -251,6 +254,13 @@ function OfiPage() {
   const [clientId, setClientId] = useState(() => `baxs_${Date.now()}`);
   const [beneficiaryRef, setBeneficiaryRef] = useState("BEN-DEMO-001");
   const [quoteId, setQuoteId] = useState<string | null>(null);
+
+  // ── Recipient info (Step 07 — local-currency payout details) ────
+  const [recipientCountry, setRecipientCountry] = useState("");
+  const [recipientAccountHolderName, setRecipientAccountHolderName] = useState("");
+  const [recipientAccountNumber, setRecipientAccountNumber] = useState("");
+  const [recipientBankCode, setRecipientBankCode] = useState("");
+  const [recipientBankName, setRecipientBankName] = useState("");
   const [quoteSummary, setQuoteSummary] = useState<GetQuoteResult | null>(null);
   const [quoteDisplay, setQuoteDisplay] = useState<QuoteDisplay | null>(null);
   const [paymentResult, setPaymentResult] = useState<unknown>(null);
@@ -320,11 +330,25 @@ function OfiPage() {
         setError("Run Get Quote first.");
         return;
       }
+      const recipientInfo: RecipientInfo | undefined =
+        recipientCountry || recipientAccountHolderName || recipientAccountNumber
+          ? {
+              fallback: {
+                country: recipientCountry,
+                accountHolderName: recipientAccountHolderName,
+                accountNumber: recipientAccountNumber,
+                ...(recipientBankCode && { bankCode: recipientBankCode }),
+                ...(recipientBankName && { bankName: recipientBankName }),
+              },
+            }
+          : undefined;
+
       const input: CreatePaymentInput = {
         paymentClientId: clientId,
         quoteId,
         beneficiaryRef,
         usdAmount,
+        ...(recipientInfo && { recipientInfo }),
       };
       const r = await createPayment({ data: input });
       setPaymentResult(r);
@@ -405,8 +429,7 @@ function OfiPage() {
 
   const onRejectQuote = (paymentId: string, quoteId: string) =>
     run(async () => {
-      // Reject quote: mark payment as rejected via manual AML
-      await completeManualAml({ data: { paymentId, approved: false } });
+      await rejectPaymentQuote({ data: { paymentId, quoteId } });
       await refresh();
     });
 
@@ -714,6 +737,82 @@ function OfiPage() {
                       className="font-mono text-caption"
                       placeholder="Run Get Quote first"
                       data-testid="quote-id"
+                    />
+                  </div>
+
+                  {/* ── Recipient info (local-currency payout details) ── */}
+                  <div className="md:col-span-2 mt-2">
+                    <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      Recipient info — local-currency payout details (optional)
+                    </Label>
+                  </div>
+                  <div>
+                    <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      country
+                    </Label>
+                    <Select
+                      value={recipientCountry}
+                      onValueChange={setRecipientCountry}
+                      data-testid="recipient-country"
+                    >
+                      <SelectTrigger className="font-mono text-caption">
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_CURRENCIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code} data-testid={`recipient-country-${c.code}`}>
+                            {c.code} · {c.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      accountHolderName
+                    </Label>
+                    <Input
+                      value={recipientAccountHolderName}
+                      onChange={(e) => setRecipientAccountHolderName(e.target.value)}
+                      className="font-mono text-caption"
+                      placeholder="Zhang San"
+                      data-testid="recipient-account-holder-name"
+                    />
+                  </div>
+                  <div>
+                    <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      accountNumber
+                    </Label>
+                    <Input
+                      value={recipientAccountNumber}
+                      onChange={(e) => setRecipientAccountNumber(e.target.value)}
+                      className="font-mono text-caption"
+                      placeholder="DE89370400440532013000"
+                      data-testid="recipient-account-number"
+                    />
+                  </div>
+                  <div>
+                    <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      bankCode (optional)
+                    </Label>
+                    <Input
+                      value={recipientBankCode}
+                      onChange={(e) => setRecipientBankCode(e.target.value)}
+                      className="font-mono text-caption"
+                      placeholder="COBADEFFXXX"
+                      data-testid="recipient-bank-code"
+                    />
+                  </div>
+                  <div>
+                    <Label className="font-mono text-muted-foreground" style={{ fontSize: "11px" }}>
+                      bankName (optional)
+                    </Label>
+                    <Input
+                      value={recipientBankName}
+                      onChange={(e) => setRecipientBankName(e.target.value)}
+                      className="font-mono text-caption"
+                      placeholder="Commerzbank"
+                      data-testid="recipient-bank-name"
                     />
                   </div>
                 </div>

@@ -37,8 +37,6 @@ export interface ManualAmlPanelProps {
   /** Download the AML file bytes from the server and trigger a browser
    *  save-as (blob URL + <a download>). */
   onDownloadAml: (paymentId: string) => Promise<void>;
-  /** Refund a rejected payment — releases the reserved credit back to OFI. */
-  onRefundAml: (paymentId: string) => Promise<void>;
 }
 
 interface PaymentRowProps {
@@ -52,12 +50,6 @@ interface PaymentRowProps {
     recipientCheckNote?: string,
   ) => Promise<void>;
   onDownloadAml: (paymentId: string) => Promise<void>;
-}
-
-interface RefundableRowProps {
-  payment: Payment;
-  busy: boolean;
-  onRefundAml: (paymentId: string) => Promise<void>;
 }
 
 function formatBytes(bytes: number): string {
@@ -277,85 +269,15 @@ function ReadOnlyRow({ payment }: { payment: Payment }) {
   );
 }
 
-/** Rejected but not yet refunded — shows Refund button. */
-function RefundableRow({ payment, busy, onRefundAml }: RefundableRowProps) {
-  return (
-    <div
-      className="flex items-center justify-between gap-2 border-b border-hairline py-3 last:border-0"
-      data-testid={`aml-refundable-row-${payment.id}`}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        <StatusDot status={payment.status} />
-        <span className="font-mono tabular text-caption text-foreground truncate">
-          {payment.id} · {payment.currency} {payment.localAmount.toFixed(2)} ·{" "}
-          {payment.beneficiaryRef}
-        </span>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <span
-          className="font-mono text-caption text-[#ff9f0a]"
-          data-testid={`aml-rejected-reason-${payment.id}`}
-        >
-          Awaiting refund
-        </span>
-        <Button
-          size="sm"
-          variant="destructive"
-          disabled={busy}
-          onClick={() => void onRefundAml(payment.id)}
-          data-testid={`aml-refund-${payment.id}`}
-        >
-          Refund
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/** Rejected and already refunded — read-only. */
-function RefundedRow({ payment }: { payment: Payment }) {
-  return (
-    <div
-      className="flex items-center justify-between gap-2 border-b border-hairline py-3 last:border-0"
-      data-testid={`aml-refunded-row-${payment.id}`}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        <StatusDot status={payment.status} />
-        <span className="font-mono tabular text-caption text-foreground truncate">
-          {payment.id} · {payment.currency} {payment.localAmount.toFixed(2)} ·{" "}
-          {payment.beneficiaryRef}
-        </span>
-      </div>
-      <div className="flex items-center gap-2 shrink-0 text-accent-green">
-        <CheckCircle2 className="w-3.5 h-3.5" />
-        <span className="font-mono text-caption">
-          ✓ Refunded at {formatTime(payment.refundedAt!)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export function ManualAmlPanel({
   payments,
   busy,
   onReviewAml,
   onDownloadAml,
-  onRefundAml,
 }: ManualAmlPanelProps) {
   const pendingAmlPayments = payments.filter((p) => p.status === "pending_aml");
   const approvedPayments = payments.filter((p) => p.status === "accepted");
-  const refundablePayments = payments.filter(
-    (p) => p.status === "rejected" && p.refundedAt === undefined,
-  );
-  const refundedPayments = payments.filter(
-    (p) => p.status === "rejected" && p.refundedAt !== undefined,
-  );
-  const isEmpty =
-    pendingAmlPayments.length === 0 &&
-    approvedPayments.length === 0 &&
-    refundablePayments.length === 0 &&
-    refundedPayments.length === 0;
+  const isEmpty = pendingAmlPayments.length === 0 && approvedPayments.length === 0;
 
   return (
     <PanelCard step="04" title="Payment-Manual AML (Provider view)">
@@ -406,39 +328,6 @@ export function ManualAmlPanel({
               items={approvedPayments}
               emptyMessage="No approved payments."
               render={(p) => <ReadOnlyRow key={p.id} payment={p} />}
-            />
-          </div>
-        )}
-
-        {!isEmpty && refundablePayments.length > 0 && (
-          <div data-testid="aml-refundable-section">
-            <h4 className="font-mono text-muted-foreground mb-2" style={{ fontSize: "11px" }}>
-              Awaiting Refund ({refundablePayments.length})
-            </h4>
-            <List
-              items={refundablePayments}
-              emptyMessage="No payments awaiting refund."
-              render={(p) => (
-                <RefundableRow
-                  key={p.id}
-                  payment={p}
-                  busy={busy}
-                  onRefundAml={onRefundAml}
-                />
-              )}
-            />
-          </div>
-        )}
-
-        {!isEmpty && refundedPayments.length > 0 && (
-          <div data-testid="aml-refunded-section">
-            <h4 className="font-mono text-muted-foreground mb-2" style={{ fontSize: "11px" }}>
-              Refunded ({refundedPayments.length})
-            </h4>
-            <List
-              items={refundedPayments}
-              emptyMessage="No refunded payments."
-              render={(p) => <RefundedRow key={p.id} payment={p} />}
             />
           </div>
         )}

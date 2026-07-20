@@ -14,11 +14,11 @@ export function FlowSandboxPhases() {
       <div className="space-y-3">
         <p className="eyebrow">SANDBOX TEST PLAN</p>
         <h2 className="text-display-md font-semibold tracking-tight text-foreground">
-          4 个阶段 · {TEST_CASES.length} 个测试用例
+          4 phases · {TEST_CASES.length} test cases
         </h2>
         <p className="max-w-2xl text-tagline text-muted-foreground">
-          端到端目标：3 分钟内完成 USDT → {CHAINS.length > 0 ? "CAD/HKD/USD" : ""}{" "}
-          任意币种的换币流程， 全部用例在 api-sandbox.t-0.network 上验证。
+          End-to-end goal: complete USDT → {CHAINS.length > 0 ? "CAD/HKD/USD" : ""} swaps in
+          under 3 minutes, all cases verified on api-sandbox.t-0.network.
         </p>
       </div>
 

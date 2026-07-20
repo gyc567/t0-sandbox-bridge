@@ -15,6 +15,7 @@ import {
   requestRefundFn,
 } from "@/lib/t0/t0.functions";
 import { ManualAmlPanel } from "@/components/provider/ManualAmlPanel";
+import { ProviderReFundPanel } from "@/components/provider/ProviderReFundPanel";
 // (auth removed — sandbox console is open access; no login required)
 import type { Currency, Payment, Payout, Quote, VolumeBand } from "@/lib/t0/types";
 import { base64ToBytes } from "@/lib/t0/aml-blob";
@@ -136,6 +137,9 @@ function ProviderPage() {
       const result = await fn();
       await refresh();
       return result;
+    } catch (e) {
+      console.error("[Provider]", e instanceof Error ? e.message : String(e));
+      throw e;
     } finally {
       setBusy(false);
     }
@@ -589,6 +593,12 @@ function ProviderPage() {
               busy={busy}
               onReviewAml={onReviewAml}
               onDownloadAml={onDownloadAmlFile}
+            />
+          }
+          paymentRefundContent={
+            <ProviderReFundPanel
+              payments={data.payments.filter((p) => p.status === "rejected")}
+              busy={busy}
               onRefundAml={onRefundAml}
             />
           }

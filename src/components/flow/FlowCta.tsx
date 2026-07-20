@@ -17,10 +17,11 @@ export function FlowCta() {
         />
         <div className="relative space-y-5">
           <h2 className="text-display-md font-semibold tracking-tight text-foreground">
-            进入 T-0 接入沙盒
+            Enter the T-0 integration sandbox
           </h2>
           <p className="mx-auto max-w-lg text-tagline text-muted-foreground">
-            在 Sandbox Console 中发送签名请求，观察 ECDSA 头如何在每个 RPC 上 被组装、验证、记录。
+            Send signed requests in the Sandbox Console and observe how ECDSA headers are
+            assembled, verified, and logged on every RPC call.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <Link

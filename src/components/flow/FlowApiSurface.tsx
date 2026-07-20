@@ -22,12 +22,12 @@ export function FlowApiSurface() {
       <div className="space-y-3">
         <p className="eyebrow">API SURFACE</p>
         <h2 className="text-display-md font-semibold tracking-tight text-foreground">
-          Connect RPC · {RPC_METHODS.length} 个方法
+          Connect RPC · {RPC_METHODS.length} methods
         </h2>
         <p className="max-w-2xl text-tagline text-muted-foreground">
-          BAXS 调用 {counts.ofi} 个 NetworkService 方法作为 OFI，实现 {counts.provider} 个
-          ProviderService 回调作为 Provider（其中 UpdateQuote 是 streaming 推送报价）。
-          所有方法均支持 gRPC 和 REST/JSON 双编码。
+          BAXS calls {counts.ofi} NetworkService methods as OFI and implements {counts.provider}{" "}
+          ProviderService callbacks as Provider (UpdateQuote is a streaming price push). All
+          methods support both gRPC and REST/JSON encoding.
         </p>
       </div>
 
