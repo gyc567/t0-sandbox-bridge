@@ -1,0 +1,198 @@
+{
+  "baseUrl": "http://127.0.0.1:8080",
+  "passed": 1,
+  "results": [
+    {
+      "name": "ofi-create-payment-with-recipient-info",
+      "path": "/ofi",
+      "status": "PASS",
+      "durationMs": 4099,
+      "checks": [
+        {
+          "name": "OFI page loads",
+          "pass": true,
+          "details": "OFI Console — T-0 Sandbox Bridge"
+        },
+        {
+          "name": "Payment-Payment Continued tab clicked",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "clientId input exists",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "quoteId input exists",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "Create Payment button exists",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "accountHolderName input exists",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "accountNumber input exists",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "bankCode input exists",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "bankName input exists",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "Get Quote button (btn-quote) exists",
+          "pass": false,
+          "details": false
+        },
+        {
+          "name": "accountHolderName filled (Zhang San)",
+          "pass": true
+        },
+        {
+          "name": "accountNumber filled (DE89...)",
+          "pass": true
+        },
+        {
+          "name": "bankCode filled (COBADEFFXXX)",
+          "pass": true
+        },
+        {
+          "name": "bankName filled (Commerzbank)",
+          "pass": true
+        },
+        {
+          "name": "Country selected via JS click",
+          "pass": true,
+          "details": "combobox clicked"
+        },
+        {
+          "name": "Create Payment button enabled",
+          "pass": false,
+          "details": ""
+        }
+      ],
+      "consoleMessages": [],
+      "failedRequests": [],
+      "screenshot": "/Users/jie/code/t0-sandbox-bridge/e2e-reports/ofi-recipient-info-payment-created.png"
+    },
+    {
+      "name": "provider-recipient-info-display",
+      "path": "/provider",
+      "status": "PASS",
+      "durationMs": 3719,
+      "checks": [
+        {
+          "name": "Provider page loads",
+          "pass": true,
+          "details": "Provider Console — T-0 Sandbox Bridge"
+        },
+        {
+          "name": "Recipient info section visible in Provider",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "accountHolderName (Zhang San) displayed",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "accountNumber (DE89...) displayed",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "bankName (Commerzbank) displayed",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "bankCode (COBADEFFXXX) displayed",
+          "pass": true,
+          "details": true
+        }
+      ],
+      "consoleMessages": [],
+      "failedRequests": [],
+      "screenshot": "/Users/jie/code/t0-sandbox-bridge/e2e-reports/provider-recipient-info-display.png"
+    },
+    {
+      "name": "provider-manual-aml-recipient-review",
+      "path": "/provider",
+      "status": "PASS",
+      "durationMs": 4686,
+      "checks": [
+        {
+          "name": "Payment-Manual AML tab clicked",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "Recipient verification checkbox exists",
+          "pass": false,
+          "details": false
+        },
+        {
+          "name": "Recipient info section in AML panel",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "AML approve button exists (payment pending)",
+          "pass": false,
+          "details": false
+        }
+      ],
+      "consoleMessages": [],
+      "failedRequests": [],
+      "screenshot": "/Users/jie/code/t0-sandbox-bridge/e2e-reports/provider-aml-recipient-review.png"
+    },
+    {
+      "name": "legacy-payment-no-recipient-info",
+      "path": "/ofi + /provider",
+      "status": "PASS",
+      "durationMs": 6473,
+      "checks": [
+        {
+          "name": "Quote exists for legacy payment",
+          "pass": false,
+          "details": "none"
+        },
+        {
+          "name": "clientId changed for legacy payment",
+          "pass": true
+        },
+        {
+          "name": "Create Payment button exists",
+          "pass": true,
+          "details": true
+        },
+        {
+          "name": "Create Payment button enabled (no recipient info)",
+          "pass": false,
+          "details": ""
+        },
+        {
+          "name": "Legacy payment shows 'No recipient info' text",
+          "pass": true,
+          "details": true
+        }
+      ],
+      "screenshot": "/Users/jie/code/t0-sandbox-bridge/e2e-reports/legacy-payment-no-recipient-info.png"
+    }
+  ]
+}

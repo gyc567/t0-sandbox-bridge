@@ -1,0 +1,21 @@
+{
+  "baseUrl": "http://127.0.0.1:8080",
+  "passed": 0,
+  "results": [
+    {
+      "name": "aml-upload-download",
+      "status": "FAIL",
+      "durationMs": 17295,
+      "error": "page.waitForSelector: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"btn-create\"]:not([disabled])') to be visible\u001b[22m\n",
+      "checks": [
+        {
+          "name": "OFI page title",
+          "pass": true
+        }
+      ],
+      "consoleMessages": [],
+      "failedRequests": [],
+      "screenshot": "/Users/jie/code/t0-sandbox-bridge/e2e-reports/aml-upload-download-failure.png"
+    }
+  ]
+}
