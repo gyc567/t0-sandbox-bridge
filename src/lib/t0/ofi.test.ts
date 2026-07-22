@@ -306,14 +306,15 @@ describe("OFIService Pre-Settlement (audit §4–§7)", () => {
 
   it("submitUsdtSettlement honours caller-supplied txHash", () => {
     const { ofi } = buildOFIWithRegistry();
+    const validTxHash = "0x" + "f".repeat(64);
     const s = ofi.submitUsdtSettlement({
-      txHash: "0xfixed",
+      txHash: validTxHash,
       blockchain: "BSC",
       fromAddress: "a",
       toAddress: "b",
       usdAmount: 100,
     });
-    expect(s.txHash).toBe("0xfixed");
+    expect(s.txHash).toBe(validTxHash);
     expect(s.blockchain).toBe("BSC");
   });
 

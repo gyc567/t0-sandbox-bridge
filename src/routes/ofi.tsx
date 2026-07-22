@@ -17,6 +17,8 @@ import type { Currency, Payment, Payout } from "@/lib/t0/types";
 import type { NetworkEvent } from "@/lib/t0/types";
 import type { SettlementState } from "@/lib/t0/settlement";
 import { getCurrencyLabel, SUPPORTED_CURRENCIES } from "@/lib/t0/currencies";
+import { SUPPORTED_COUNTRIES } from "@/lib/t0/countries";
+import { downloadRecipientCSV, type RecipientInfoRecord } from "@/lib/t0/recipient-info-csv";
 import { formatQuoteFailure } from "@/lib/t0/quote-message";
 import { formatQuoteForDisplay, type QuoteDisplay } from "@/lib/t0/quote-display";
 import type { CreatePaymentInput, GetQuoteResult } from "@/lib/t0/network";
@@ -183,6 +185,16 @@ function OfiPage() {
   // creating a payment), auto-scroll to the matching row and briefly
   // highlight it. The row may be in any of the three sub-sections
   // (trigger / upload / waiting), so probe each known testid.
+
+  // Scroll config — extracted to constants for maintainability.
+  const HIGHLIGHT_DURATION_MS = 1500;
+  const SCROLL_RETRY_INTERVAL_MS = 200;
+  const SCROLL_RETRY_MAX = 20;
+
+  // useRef for interval id so cleanup always clears the right timer
+  // regardless of effect re-entry from dependency changes.
+  const scrollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -205,9 +217,10 @@ function OfiPage() {
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         el.classList.add("ring-2", "ring-accent-cyan");
+        const highlightEl = el;
         setTimeout(() => {
-          el!.classList.remove("ring-2", "ring-accent-cyan");
-        }, 1500);
+          highlightEl.classList.remove("ring-2", "ring-accent-cyan");
+        }, HIGHLIGHT_DURATION_MS);
         return true;
       }
       return false;
@@ -216,11 +229,21 @@ function OfiPage() {
     // Retry a few times in case the panel hasn't rendered yet (network
     // refresh + state transition is async).
     let attempts = 0;
-    const id = setInterval(() => {
+    scrollIntervalRef.current = setInterval(() => {
       attempts += 1;
-      if (tryScroll() || attempts > 20) clearInterval(id);
-    }, 200);
-    return () => clearInterval(id);
+      if (tryScroll() || attempts > SCROLL_RETRY_MAX) {
+        if (scrollIntervalRef.current !== null) {
+          clearInterval(scrollIntervalRef.current);
+          scrollIntervalRef.current = null;
+        }
+      }
+    }, SCROLL_RETRY_INTERVAL_MS);
+    return () => {
+      if (scrollIntervalRef.current !== null) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    };
   }, [data.payments, router]);
 
   const [txHashDraft, setTxHashDraft] = useState("");
@@ -263,7 +286,10 @@ function OfiPage() {
   const [recipientBankName, setRecipientBankName] = useState("");
   const [quoteSummary, setQuoteSummary] = useState<GetQuoteResult | null>(null);
   const [quoteDisplay, setQuoteDisplay] = useState<QuoteDisplay | null>(null);
-  const [paymentResult, setPaymentResult] = useState<unknown>(null);
+  const [paymentResult, setPaymentResult] = useState<
+    | Awaited<ReturnType<typeof ofiCreatePaymentFn>>
+    | null
+  >(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorTitle, setErrorTitle] = useState<string | null>(null);
@@ -284,6 +310,7 @@ function OfiPage() {
     try {
       return await fn();
     } catch (e) {
+      console.error(e);
       setError(e instanceof Error ? e.message : "Operation failed");
       return undefined;
     } finally {
@@ -759,7 +786,7 @@ function OfiPage() {
                         <SelectValue placeholder="Select country" />
                       </SelectTrigger>
                       <SelectContent>
-                        {SUPPORTED_CURRENCIES.map((c) => (
+                        {SUPPORTED_COUNTRIES.map((c) => (
                           <SelectItem key={c.code} value={c.code} data-testid={`recipient-country-${c.code}`}>
                             {c.code} · {c.label}
                           </SelectItem>
@@ -816,16 +843,37 @@ function OfiPage() {
                     />
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  className="btn-glow mt-4"
-                  disabled={busy || !quoteId}
-                  onClick={onCreatePayment}
-                  data-testid="btn-create"
-                >
-                  <Send className="w-4 h-4" />
-                  Create Payment
-                </Button>
+                <div className="flex gap-2 mt-4">
+                  <Button
+                    size="sm"
+                    className="btn-glow"
+                    disabled={busy || !quoteId}
+                    onClick={onCreatePayment}
+                    data-testid="btn-create"
+                  >
+                    <Send className="w-4 h-4" />
+                    Create Payment
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!recipientAccountHolderName || !recipientCountry}
+                    onClick={() => {
+                      const record: RecipientInfoRecord = {
+                        recipientName: recipientAccountHolderName,
+                        country: recipientCountry,
+                        mobilePhone: recipientAccountNumber,
+                        address: recipientBankName || undefined,
+                        postalCode: recipientBankCode || undefined,
+                      };
+                      downloadRecipientCSV([record], `recipient-${clientId}.csv`);
+                    }}
+                    data-testid="btn-download-csv"
+                  >
+                    <FileCheck className="w-4 h-4" />
+                    Download CSV
+                  </Button>
+                </div>
                 {paymentResult !== null && (
                   <Textarea
                     readOnly

@@ -13,6 +13,24 @@ import { buildT0Receiver } from "@/lib/t0/t0-receiver";
 
 const networkPublicKey = process.env.T0_NETWORK_PUBLIC_KEY ?? "";
 
+/** Validate the public key is a proper secp256k1 hex string (33 or 65 bytes). */
+function validatePublicKey(key: string): void {
+  if (!/^0x[a-fA-F0-9]+$/.test(key)) {
+    throw new Error("T0_NETWORK_PUBLIC_KEY must be a 0x-prefixed hex string");
+  }
+  const byteLen = (key.length - 2) / 2;
+  if (byteLen !== 33 && byteLen !== 65) {
+    throw new Error(
+      `T0_NETWORK_PUBLIC_KEY must be 33 bytes (compressed) or 65 bytes (uncompressed), got ${byteLen} bytes`,
+    );
+  }
+}
+
+// Fail fast at module load time if the key is misconfigured.
+if (networkPublicKey) {
+  validatePublicKey(networkPublicKey);
+}
+
 export const Route = createFileRoute("/api/t0/provider/$")({
   server: {
     handlers: {

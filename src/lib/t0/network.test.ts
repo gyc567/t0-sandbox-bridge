@@ -1152,15 +1152,16 @@ describe("SandboxNetwork Pre-Settlement credit gate (audit §4–§7)", () => {
 
   it("submitUsdtSettlement is idempotent on the same txHash", () => {
     const { network, registry } = buildNetworkWithRegistry();
+    const dupTxHash = "0x" + "d".repeat(64);
     const first = network.submitUsdtSettlement({
-      txHash: "0xdup",
+      txHash: dupTxHash,
       blockchain: "TRON",
       fromAddress: "a",
       toAddress: "b",
       usdAmount: 1500,
     });
     const second = network.submitUsdtSettlement({
-      txHash: "0xdup",
+      txHash: dupTxHash,
       blockchain: "TRON",
       fromAddress: "a",
       toAddress: "b",

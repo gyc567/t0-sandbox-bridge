@@ -167,6 +167,11 @@ export class SettlementRegistry {
     if (!Number.isFinite(input.usdAmount) || input.usdAmount <= 0) {
       throw new Error("submitSettlement: usdAmount must be a finite positive number");
     }
+    if (input.txHash !== undefined && !isValidTxHash(input.txHash)) {
+      throw new Error(
+        `submitSettlement: txHash must be a 0x-prefixed 64-hex-char string, got "${input.txHash}"`,
+      );
+    }
     this.evictExpired(this.now());
 
     const txHash = input.txHash ?? autoTxHash();
@@ -406,7 +411,12 @@ export class SettlementRegistry {
 
 /** Auto-generate a fake txHash so the OFI demo button is one click. */
 function autoTxHash(): string {
-  return `0x${randomHex(16)}`;
+  return `0x${randomHex(32)}`;
+}
+
+/** Validate txHash is 0x-prefixed 64-char hex string. */
+function isValidTxHash(txHash: string): boolean {
+  return /^0x[a-fA-F0-9]{64}$/.test(txHash);
 }
 
 /**
